@@ -26,3 +26,4 @@ There is no application code in the repository yet. The current work is centered
 - [Glossary and shared terms](CONTEXT.md)
 - [Product brief and requirements](luma-lingo-prd.md)
 - [ADR 0001: Agent Roles and Lesson Flow](docs/adr/0001-agent-roles-and-lesson-flow.md)
+- [ADR 0002: Web MVP Stack and AWS Deployment](docs/adr/0002-web-mvp-stack-and-aws-deployment.md)
