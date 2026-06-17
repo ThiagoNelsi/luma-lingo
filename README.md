@@ -19,7 +19,14 @@ The MVP stays focused on beginners and intermediate learners, with speaking excl
 
 ## Current repo state
 
-There is no application code in the repository yet. The current work is centered on aligning the product vocabulary and decisions before implementation begins.
+The repository has an initial TypeScript monorepo scaffold with:
+
+- `apps/web` for the React and Vite frontend
+- `apps/api` for the Fastify backend
+- `packages/shared` for shared TypeScript contracts
+- `infra` for future Terraform work
+
+Feature implementation has not started yet.
 
 ## Key docs
 

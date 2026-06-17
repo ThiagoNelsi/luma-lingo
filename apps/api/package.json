@@ -1,0 +1,35 @@
+{
+  "name": "@language-guru/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "latest",
+    "@fastify/cookie": "latest",
+    "@fastify/cors": "latest",
+    "@fastify/swagger": "latest",
+    "@fastify/swagger-ui": "latest",
+    "@language-guru/shared": "workspace:*",
+    "bullmq": "latest",
+    "dotenv": "latest",
+    "fastify": "latest",
+    "fastify-type-provider-zod": "latest",
+    "ioredis": "latest",
+    "pg": "latest",
+    "pino": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/pg": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
