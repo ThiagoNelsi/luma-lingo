@@ -1,0 +1,29 @@
+project_name  = "luma-lingo"
+environment   = "dev"
+aws_region    = "us-east-1"
+
+# Must be globally unique in the selected AWS region and must not contain
+# aws, amazon, or cognito.
+cognito_domain_prefix = "luma-lingo-dev-yourname"
+
+frontend_origin = "http://localhost:5173"
+api_origin      = "http://localhost:3000"
+
+callback_urls = [
+  "http://localhost:3000/auth/callback",
+]
+
+logout_urls = [
+  "http://localhost:5173/login",
+]
+
+session_cookie_name   = "luma_lingo_session"
+session_cookie_secure = false
+
+# Leave disabled until a Google OAuth client exists.
+enable_google_idp = false
+
+# When enable_google_idp = true, pass these through an uncommitted tfvars file
+# or TF_VAR_google_client_id / TF_VAR_google_client_secret environment variables.
+# google_client_id     = "..."
+# google_client_secret = "..."

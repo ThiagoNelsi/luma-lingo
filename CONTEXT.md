@@ -6,16 +6,41 @@ Language chosen by the user to receive explanations, examples, and support conte
 ## Target language
 Language the user wants to learn.
 
+## Learner
+Authenticated person using the app to study a target language.
+
+## Authenticated session
+App-owned web session created after successful Cognito authentication and resolved by the backend to a learner.
+
 ## Onboarding phrasing
 "I speak [Instruction language], I want to learn [Target language]".
 
+## Onboarding progress
+Saved position in the onboarding flow that lets a learner resume from the last completed onboarding step instead of starting over.
+
 ## User profile
 Relevant personal context for lesson personalization, captured through fixed blocks:
+- Display name
+- Learner age range
 - Job / field
 - Interests
 - Daily routine
 - Study context (optional)
 - Other
+
+## Display name
+Name the app uses to address the learner in the product experience. It is not a login identifier or a public username.
+
+## Learner age range
+Approximate age band selected during onboarding for age-appropriate lesson personalization.
+
+Learner age range options:
+- Under 13
+- 13-17
+- 18-24
+- 25-39
+- 40-59
+- 60+
 
 ## Goal
 Learning target chosen from fixed options:

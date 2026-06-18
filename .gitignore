@@ -11,3 +11,13 @@ coverage/
 
 .DS_Store
 *.log
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+
+teach-skill-dir/
