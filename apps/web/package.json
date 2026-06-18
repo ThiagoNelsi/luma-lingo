@@ -1,5 +1,5 @@
 {
-  "name": "@language-guru/web",
+  "name": "@luma-lingo/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@language-guru/shared": "workspace:*",
+    "@luma-lingo/shared": "workspace:*",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",

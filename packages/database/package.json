@@ -1,0 +1,30 @@
+{
+  "name": "@luma-lingo/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "check": "DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost:5432/luma_lingo} prisma validate && tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:studio": "dotenv -e ../../.env -- prisma studio",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "uuid": "latest"
+  },
+  "devDependencies": {
+    "dotenv-cli": "latest",
+    "prisma": "6.19.3",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

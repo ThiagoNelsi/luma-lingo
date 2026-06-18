@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OnboardingStatus {
+  not_started
+  in_progress
+  completed
+
+  @@map("onboarding_status")
+}
+
+model User {
+  id              String         @id @db.Uuid
+  primaryEmail    String         @map("primary_email")
+  emailVerifiedAt DateTime       @map("email_verified_at") @db.Timestamptz(6)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt     DateTime?      @map("last_login_at") @db.Timestamptz(6)
+  authIdentities  AuthIdentity[]
+  learner         Learner?
+  sessions        Session[]
+
+  @@map("users")
+}
+
+model AuthIdentity {
+  id              String    @id @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  provider        String
+  providerSubject String    @map("provider_subject")
+  emailAtAuthTime String    @map("email_at_auth_time")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@map("auth_identities")
+}
+
+model Session {
+  id         String    @id @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt DateTime  @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Learner {
+  id                     String          @id @db.Uuid
+  userId                 String          @unique @map("user_id") @db.Uuid
+  displayName            String?         @map("display_name")
+  nativeLanguage         String?         @map("native_language")
+  ageRange               String?         @map("age_range")
+  ageRangeDeclaredAt     DateTime?       @map("age_range_declared_at") @db.Timestamptz(6)
+  currentLearningTrackId String?         @unique @map("current_learning_track_id") @db.Uuid
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentLearningTrack   LearningTrack?  @relation("CurrentLearningTrack", fields: [currentLearningTrackId], references: [id], onDelete: SetNull)
+  learningTracks         LearningTrack[] @relation("LearnerLearningTracks")
+
+  @@map("learners")
+}
+
+model LearningTrack {
+  id                String           @id @db.Uuid
+  learnerId         String           @map("learner_id") @db.Uuid
+  targetLanguage    String           @map("target_language")
+  level             String?
+  learningGoal      String?          @map("learning_goal")
+  onboardingStatus  OnboardingStatus @default(not_started) @map("onboarding_status")
+  onboardingStep    String?          @map("onboarding_step")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learner           Learner          @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
+  currentForLearner Learner?         @relation("CurrentLearningTrack")
+
+  @@unique([learnerId, targetLanguage])
+  @@map("learning_tracks")
+}

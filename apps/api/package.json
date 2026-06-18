@@ -1,5 +1,5 @@
 {
-  "name": "@language-guru/api",
+  "name": "@luma-lingo/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,8 @@
     "@fastify/cors": "latest",
     "@fastify/swagger": "latest",
     "@fastify/swagger-ui": "latest",
-    "@language-guru/shared": "workspace:*",
+    "@luma-lingo/database": "workspace:*",
+    "@luma-lingo/shared": "workspace:*",
     "bullmq": "latest",
     "dotenv": "latest",
     "fastify": "latest",

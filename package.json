@@ -1,5 +1,5 @@
 {
-  "name": "language-guru",
+  "name": "luma-lingo",
   "version": "0.1.0",
   "private": true,
   "description": "LumaLingo TypeScript monorepo.",
@@ -8,6 +8,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "check": "pnpm -r check",
+    "db:generate": "pnpm --filter @luma-lingo/database db:generate",
+    "db:migrate": "pnpm --filter @luma-lingo/database db:migrate",
+    "db:studio": "pnpm --filter @luma-lingo/database db:studio",
     "dev": "pnpm --parallel -r dev",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
