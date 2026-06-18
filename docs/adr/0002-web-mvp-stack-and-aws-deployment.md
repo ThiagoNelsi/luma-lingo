@@ -1,6 +1,6 @@
 # ADR 0002: Web MVP Stack and AWS Deployment
 
-Status: Accepted
+Status: Accepted, amended by ADR 0004 for the development-phase deployment baseline
 
 ## Context
 
@@ -32,6 +32,8 @@ We will build the MVP as a TypeScript monorepo using:
 - S3 and CloudFront for frontend hosting
 
 The initial AWS deployment will use one AWS account, one VPC, and one environment. Terraform should keep the configuration modular enough to add more environments later.
+
+ADR 0004 changes the development-phase baseline for cost control: development runs web/API locally, uses Cognito in AWS, uses Neon Postgres, avoids always-on AWS compute and database infrastructure, and forbids NAT Gateway as a required MVP dependency. The AWS deployment direction in this ADR should be treated as a later production path, not the current dev baseline.
 
 ## Consequences
 
