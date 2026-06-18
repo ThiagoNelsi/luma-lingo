@@ -44,6 +44,16 @@ describe("CognitoAuthProvider", () => {
       name: "Learner One",
     });
   });
+
+  it("builds the Cognito managed logout URL", async () => {
+    const provider = new CognitoAuthProvider(config);
+
+    await expect(
+      provider.getLogoutUrl({ logoutUri: "http://localhost:5173/login" }),
+    ).resolves.toBe(
+      "https://auth.example.com/logout?client_id=client-id&logout_uri=http%3A%2F%2Flocalhost%3A5173%2Flogin",
+    );
+  });
 });
 
 function createUnsignedJwt(payload: Record<string, unknown>): string {

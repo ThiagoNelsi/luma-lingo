@@ -27,6 +27,11 @@ export async function createApp(deps: AppDependencies) {
   const app = Fastify({ logger: deps.config.nodeEnv !== "test" });
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  app.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    async () => ({}),
+  );
 
   const auth = new AuthService(deps.users, deps.sessions, deps.config);
 

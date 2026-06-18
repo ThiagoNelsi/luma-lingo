@@ -18,6 +18,10 @@ export function createLoginRedirect(apiOrigin: string): string {
   return `${apiOrigin.replace(/\/$/, "")}/auth/login`;
 }
 
+export function createLogoutAction(apiOrigin: string): string {
+  return `${apiOrigin.replace(/\/$/, "")}/auth/logout`;
+}
+
 export function renderPublicRouteText(): string {
   return "public route";
 }
@@ -80,5 +84,18 @@ function PrivateRoute({ apiOrigin }: { apiOrigin: string }) {
     };
   }, [apiOrigin]);
 
-  return <main>{me ? renderPrivateRouteText(me) : ""}</main>;
+  return (
+    <main>
+      {me ? (
+        <>
+          <p>{renderPrivateRouteText(me)}</p>
+          <form method="post" action={createLogoutAction(apiOrigin)}>
+            <button type="submit">Log out</button>
+          </form>
+        </>
+      ) : (
+        ""
+      )}
+    </main>
+  );
 }

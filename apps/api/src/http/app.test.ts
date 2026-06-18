@@ -125,6 +125,7 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     users,
     sessions,
     getUserCount: () => usersByIdentity.size,
+    getSession: () => session,
   };
 }
 
@@ -258,6 +259,107 @@ describe("auth routes", () => {
       learner: { displayName: "Learner One" },
       currentLearningTrack: null,
     });
+  });
+
+  it("logs out a valid session, clears the session cookie, and redirects through Cognito logout", async () => {
+    const deps = createMemoryDeps();
+    const app = await createApp({ config: baseConfig, ...deps });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/logout",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "http://localhost:5173",
+      },
+      payload: "",
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe(
+      "https://auth.example.com/logout?logout_uri=http%3A%2F%2Flocalhost%3A5173%2Flogin",
+    );
+    expect(response.cookies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "luma_lingo_session",
+          value: "",
+          sameSite: "Lax",
+        }),
+      ]),
+    );
+    expect(response.headers["set-cookie"]?.toString()).not.toContain("Secure");
+    expect(deps.getSession()?.revokedAt).toBeInstanceOf(Date);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/me",
+          cookies: { luma_lingo_session: sessionCookie },
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
+  it("logs out safely when the session cookie is missing or already invalid", async () => {
+    const missingApp = await createApp({
+      config: baseConfig,
+      ...createMemoryDeps(),
+    });
+    expect(
+      (
+        await missingApp.inject({
+          method: "POST",
+          url: "/auth/logout",
+        })
+      ).statusCode,
+    ).toBe(302);
+
+    const invalidApp = await createApp({
+      config: baseConfig,
+      ...createMemoryDeps(),
+    });
+    expect(
+      (
+        await invalidApp.inject({
+          method: "POST",
+          url: "/auth/logout",
+          cookies: { luma_lingo_session: "not-a-real-session" },
+        })
+      ).statusCode,
+    ).toBe(302);
+  });
+
+  it("rejects logout requests from untrusted browser origins", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/logout",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://evil.example.com",
+      },
+      payload: "",
+      cookies: { luma_lingo_session: "not-a-real-session" },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "invalid_request_origin" });
   });
 
   it("rejects missing, invalid, expired, and revoked sessions", async () => {

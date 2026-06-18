@@ -123,14 +123,23 @@ export function registerAuthRoutes(
           "Revokes the app session, clears the app cookie, and redirects through the auth provider logout flow.",
         response: {
           302: redirectResponseSchema,
+          403: errorDtoSchema,
         },
       },
     },
     async (request, reply) => {
+      if (!isTrustedLogoutOrigin(request.headers.origin, deps.config)) {
+        return reply.code(403).send({ error: "invalid_request_origin" });
+      }
+
       await deps.auth.revokeSession(
         request.cookies[deps.config.sessionCookieName],
       );
-      reply.clearCookie(deps.config.sessionCookieName, { path: "/" });
+      reply.clearCookie(deps.config.sessionCookieName, {
+        path: "/",
+        sameSite: "lax",
+        secure: deps.config.sessionCookieSecure,
+      });
 
       return reply.redirect(
         await deps.authProvider.getLogoutUrl({
@@ -139,4 +148,13 @@ export function registerAuthRoutes(
       );
     },
   );
+}
+
+function isTrustedLogoutOrigin(
+  origin: string | undefined,
+  config: AppConfig,
+): boolean {
+  if (!origin) return true;
+
+  return origin === config.frontendOrigin || origin === config.apiOrigin;
 }

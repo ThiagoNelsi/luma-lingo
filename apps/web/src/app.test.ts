@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createLogoutAction,
   createLoginRedirect,
   getRouteKind,
   renderPrivateRouteText,
@@ -24,6 +25,12 @@ describe("web routes", () => {
   it("redirects /login to the backend-managed Cognito login start", () => {
     expect(createLoginRedirect("http://localhost:3000")).toBe(
       "http://localhost:3000/auth/login",
+    );
+  });
+
+  it("posts logout to the backend-managed Cognito logout route", () => {
+    expect(createLogoutAction("http://localhost:3000/")).toBe(
+      "http://localhost:3000/auth/logout",
     );
   });
 
