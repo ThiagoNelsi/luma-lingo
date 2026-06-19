@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  createLogoutAction,
-  createLoginRedirect,
-  getRouteKind,
-  renderPrivateRouteText,
-  renderPublicRouteText,
-} from "./app.js";
+import { createLogoutAction, createLoginRedirect } from "./auth/auth-routes.js";
+import { normalizeApiOrigin, readApiOrigin } from "./config/api-origin.js";
+import { renderPrivateRouteText } from "./pages/private-page.js";
+import { renderPublicRouteText } from "./pages/public-page.js";
 
 describe("web routes", () => {
   it("renders the public route text", () => {
@@ -34,9 +31,13 @@ describe("web routes", () => {
     );
   });
 
-  it("recognizes public, private, and login routes", () => {
-    expect(getRouteKind("/public")).toBe("public");
-    expect(getRouteKind("/private")).toBe("private");
-    expect(getRouteKind("/login")).toBe("login");
+  it("normalizes the API origin used by route actions", () => {
+    expect(normalizeApiOrigin("http://localhost:3000///")).toBe(
+      "http://localhost:3000",
+    );
+  });
+
+  it("uses the local API origin by default", () => {
+    expect(readApiOrigin(undefined)).toBe("http://localhost:3000");
   });
 });

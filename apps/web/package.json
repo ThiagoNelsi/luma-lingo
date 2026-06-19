@@ -15,6 +15,7 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-router": "^8.0.1",
     "zod": "latest"
   },
   "devDependencies": {
