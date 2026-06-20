@@ -1,5 +1,35 @@
 # Future Improvements
 
+## 2026-06-19
+
+### Tutor Mascot
+
+- **Deferred:** Introduce a mascot character that represents the tutor or teacher who customizes lessons for the learner.
+- **Current scope boundary:** The MVP should avoid mascots and stay focused on the essential learning loop.
+- **Future value:** A tutor mascot may make personalization feel more concrete and emotionally memorable once the core product is working.
+- **Revisit when:** The product has validated the core lesson loop and is ready to invest in a stronger brand and retention layer.
+
+### Retention-Focused Gamification
+
+- **Deferred:** Add gamification mechanics focused on user retention.
+- **Current scope boundary:** The MVP intentionally avoids gamification and streak pressure so the experience stays learning-first.
+- **Future value:** Carefully designed gamification may improve return behavior without undermining the app's supportive tone.
+- **Revisit when:** The product has baseline retention data and can evaluate which mechanics support learning instead of creating pressure.
+
+### Age-Range-Specific Interface Modes
+
+- **Deferred:** Adapt the interface style by `Learner age range`, especially with more playful, mascot-led, and gamified experiences for children.
+- **Current scope boundary:** The MVP should use one mobile-first visual direction that avoids both childishness and excessive seriousness.
+- **Future value:** Age-aware presentation may improve comfort, motivation, and appropriateness for very different learner groups.
+- **Revisit when:** The app supports enough learners across age ranges to justify maintaining multiple experience modes.
+
+### Inline Per-Activity Feedback
+
+- **Deferred:** Show short corrective feedback immediately after each learner response during a lesson, in addition to the final `Lesson report`.
+- **Current scope boundary:** The MVP should keep the first lesson UI focused on the guided activity flow and final report rather than adding more interaction states.
+- **Future value:** Inline feedback may help learners correct mistakes earlier and make the tutor feel more responsive.
+- **Revisit when:** The core activity stack and lesson report are working and the team can test whether inline feedback improves completion and learning quality.
+
 ## 2026-06-18
 
 ### Explicit Email Change Flow

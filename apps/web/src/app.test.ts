@@ -7,7 +7,9 @@ import { renderPublicRouteText } from "./pages/public-page.js";
 
 describe("web routes", () => {
   it("renders the public route text", () => {
-    expect(renderPublicRouteText()).toBe("public route");
+    expect(renderPublicRouteText()).toBe(
+      "Aulas de idiomas personalizadas para seus objetivos, interesses e ritmo.",
+    );
   });
 
   it("renders private route text with learner data", () => {
@@ -16,7 +18,7 @@ describe("web routes", () => {
         user: { primaryEmail: "learner@example.com" },
         learner: { displayName: "Thiago" },
       }),
-    ).toBe("private route + Thiago learner@example.com");
+    ).toBe("Boas-vindas, Thiago!");
   });
 
   it("redirects /login to the backend-managed Cognito login start", () => {
