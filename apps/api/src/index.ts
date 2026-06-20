@@ -4,6 +4,7 @@ import { CognitoAuthProvider } from "./auth/cognito-auth-provider.js";
 import { loadRuntimeEnv, readRuntimeConfig } from "./config.js";
 import { createApp } from "./http/app.js";
 import { PrismaSessionRepository } from "./repositories/prisma-session-repository.js";
+import { PrismaLearnerRepository } from "./repositories/prisma-learner-repository.js";
 import { PrismaUserRepository } from "./repositories/prisma-user-repository.js";
 
 loadRuntimeEnv();
@@ -13,6 +14,7 @@ const prisma = createDatabaseClient();
 const app = await createApp({
   config: runtime.app,
   authProvider: new CognitoAuthProvider(runtime.cognito),
+  learners: new PrismaLearnerRepository(prisma),
   users: new PrismaUserRepository(prisma),
   sessions: new PrismaSessionRepository(prisma),
 });

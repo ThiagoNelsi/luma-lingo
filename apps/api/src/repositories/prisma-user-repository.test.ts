@@ -26,7 +26,7 @@ describe("PrismaUserRepository", () => {
         id: "learner-1",
         userId: "user-1",
         displayName: "Learner One",
-        nativeLanguage: null,
+        instructionLanguage: null,
         ageRange: null,
         ageRangeDeclaredAt: null,
         currentLearningTrackId: null,

@@ -27,6 +27,7 @@ Tests sit beside the code they exercise and use `*.test.ts`, for example `apps/a
 - `pnpm build`: build every workspace package with TypeScript/Vite/Prisma as applicable.
 - `pnpm check`: run TypeScript checks across the monorepo; the database package also validates Prisma.
 - `pnpm test`: run Vitest tests in all packages.
+- `pnpm test:e2e`: run the Playwright browser tests against local web and API test servers.
 - `pnpm format` / `pnpm format:write`: check or apply Prettier formatting.
 - `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:studio`: run Prisma client generation, migrations, and Studio through `@luma-lingo/database`.
 

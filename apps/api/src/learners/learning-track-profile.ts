@@ -1,8 +1,9 @@
+import { languageCodeSchema } from "@luma-lingo/shared";
 import { z } from "zod/v4";
 
 export const learningTrackProfileSchema = z.object({
   id: z.uuid(),
-  targetLanguage: z.string(),
+  targetLanguage: languageCodeSchema,
   level: z.string().nullable(),
   learningGoal: z.string().nullable(),
   onboardingStatus: z.string(),

@@ -63,7 +63,7 @@ model Learner {
   id                     String          @id @db.Uuid
   userId                 String          @unique @map("user_id") @db.Uuid
   displayName            String?         @map("display_name")
-  nativeLanguage         String?         @map("native_language")
+  instructionLanguage    String?         @map("instruction_language")
   ageRange               String?         @map("age_range")
   ageRangeDeclaredAt     DateTime?       @map("age_range_declared_at") @db.Timestamptz(6)
   currentLearningTrackId String?         @unique @map("current_learning_track_id") @db.Uuid

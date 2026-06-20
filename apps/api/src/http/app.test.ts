@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import type { LanguageSelection } from "@luma-lingo/shared";
 import { describe, expect, it } from "vitest";
 
 import type { AuthIdentity } from "../auth/auth-identity.js";
@@ -73,7 +74,7 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
         learner: {
           id: randomUUID(),
           displayName: authIdentity.name,
-          nativeLanguage: null,
+          instructionLanguage: null,
           ageRange: null,
           currentLearningTrackId: null,
         },
@@ -120,8 +121,46 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     },
   };
 
+  const learners = {
+    async saveLanguageSelection(
+      learnerId: string,
+      selection: LanguageSelection,
+    ) {
+      const entry = [...usersByIdentity.entries()].find(
+        ([, profile]) => profile.learner.id === learnerId,
+      );
+      if (!entry) throw new Error("learner_not_found");
+
+      const [key, profile] = entry;
+      const trackId = profile.currentLearningTrack?.id ?? randomUUID();
+      const updated: AuthProfile = {
+        ...profile,
+        learner: {
+          ...profile.learner,
+          instructionLanguage: selection.instructionLanguage,
+          currentLearningTrackId: trackId,
+        },
+        currentLearningTrack: {
+          id: trackId,
+          targetLanguage: selection.targetLanguage,
+          level: null,
+          learningGoal: null,
+          onboardingStatus: "in_progress",
+          onboardingStep: "languages",
+        },
+      };
+      usersByIdentity.set(key, updated);
+      return {
+        ...selection,
+        onboardingStatus: "in_progress" as const,
+        onboardingStep: "languages" as const,
+      };
+    },
+  };
+
   return {
     authProvider,
+    learners,
     users,
     sessions,
     getUserCount: () => usersByIdentity.size,
@@ -130,6 +169,23 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
 }
 
 describe("auth routes", () => {
+  it("allows the web app to preflight language-selection writes", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/me/languages",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "PUT",
+        "access-control-request-headers": "content-type",
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-methods"]).toContain("PUT");
+  });
+
   it("exposes OpenAPI documentation for the HTTP routes", async () => {
     const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
 
@@ -144,6 +200,7 @@ describe("auth routes", () => {
         "/auth/callback": expect.any(Object),
         "/auth/logout": expect.any(Object),
         "/me": expect.any(Object),
+        "/me/languages": expect.any(Object),
       },
     });
   });
@@ -259,6 +316,113 @@ describe("auth routes", () => {
       learner: { displayName: "Learner One" },
       currentLearningTrack: null,
     });
+  });
+
+  it("saves language selection for the authenticated learner and exposes it through /me", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: {
+        instructionLanguage: "pt",
+        targetLanguage: "en",
+      },
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toEqual({
+      instructionLanguage: "pt",
+      targetLanguage: "en",
+      onboardingStatus: "in_progress",
+      onboardingStep: "languages",
+    });
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/me",
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(me.json()).toMatchObject({
+      learner: { instructionLanguage: "pt" },
+      currentLearningTrack: {
+        targetLanguage: "en",
+        onboardingStatus: "in_progress",
+        onboardingStep: "languages",
+      },
+    });
+  });
+
+  it("rejects language selection without an authenticated session", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      payload: {
+        instructionLanguage: "pt",
+        targetLanguage: "en",
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "unauthenticated" });
+  });
+
+  it("rejects matching, unsupported, and untrusted language selections", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    for (const payload of [
+      { instructionLanguage: "pt", targetLanguage: "pt" },
+      { instructionLanguage: "pt", targetLanguage: "xx" },
+    ]) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/me/languages",
+        cookies: { luma_lingo_session: sessionCookie },
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+
+    const untrusted = await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "https://evil.example.com" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    expect(untrusted.statusCode).toBe(403);
+    expect(untrusted.json()).toEqual({ error: "invalid_request_origin" });
   });
 
   it("logs out a valid session, clears the session cookie, and redirects through Cognito logout", async () => {

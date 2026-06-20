@@ -1,5 +1,14 @@
 # Future Improvements
 
+## 2026-06-20
+
+### Broader Language Catalog And Regional Variants
+
+- **Deferred:** Expand beyond Portuguese, English, Spanish, Italian, French, German, and Chinese; add languages such as Japanese and Korean, plus explicit regional variants such as `pt-BR`, `pt-PT`, `en-US`, and `en-GB`.
+- **Current scope boundary:** Issue #2 uses a small fixed catalog with language-level codes and one representative flag per language so onboarding and lesson inputs stay consistent.
+- **Future value:** More languages and regional variants can improve reach, local vocabulary, pronunciation guidance, and culturally accurate content.
+- **Revisit when:** Learner demand justifies expanding the catalog and lesson generation can validate each new language/variant across content, typography, and pedagogy.
+
 ## 2026-06-19
 
 ### Tutor Mascot

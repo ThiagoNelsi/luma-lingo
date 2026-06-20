@@ -37,8 +37,9 @@ The repository is a pnpm TypeScript monorepo with:
 The current implementation includes the authentication and session foundation,
 public and authenticated web routes, and the initial responsive design system.
 The design system provides semantic light and dark theme tokens and reusable
-`Button`, `Surface`, and `Progress` components. Onboarding screens are not
-implemented yet.
+`Button`, `Surface`, and `Progress` components. The first onboarding screen
+lets an authenticated learner select and persist their `Instruction language`
+and `Target language`.
 
 ## Development
 
@@ -54,8 +55,12 @@ Run validation before committing changes:
 ```bash
 pnpm check
 pnpm test
+pnpm test:e2e
 pnpm format
 ```
+
+The end-to-end suite uses Playwright and starts local web and API test servers
+with an in-memory authenticated learner.
 
 ## Key docs
 

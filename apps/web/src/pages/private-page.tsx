@@ -127,7 +127,11 @@ export function PrivatePage({ apiOrigin }: PrivatePageProps) {
             value={1}
           />
 
-          <Button size="full" variant="emphasis">
+          <Button
+            onClick={() => navigate("/onboarding/languages")}
+            size="full"
+            variant="emphasis"
+          >
             Continuar
             <ArrowRight aria-hidden="true" size={17} />
           </Button>

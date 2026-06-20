@@ -1,4 +1,5 @@
 import type { Prisma } from "@luma-lingo/database";
+import { languageCodeSchema } from "@luma-lingo/shared";
 
 import type { AuthProfile } from "../services/auth-profile.js";
 
@@ -23,14 +24,18 @@ export function toAuthProfile(user: UserWithLearner): AuthProfile {
     learner: {
       id: user.learner.id,
       displayName: user.learner.displayName,
-      nativeLanguage: user.learner.nativeLanguage,
+      instructionLanguage: user.learner.instructionLanguage
+        ? languageCodeSchema.parse(user.learner.instructionLanguage)
+        : null,
       ageRange: user.learner.ageRange,
       currentLearningTrackId: user.learner.currentLearningTrackId,
     },
     currentLearningTrack: user.learner.currentLearningTrack
       ? {
           id: user.learner.currentLearningTrack.id,
-          targetLanguage: user.learner.currentLearningTrack.targetLanguage,
+          targetLanguage: languageCodeSchema.parse(
+            user.learner.currentLearningTrack.targetLanguage,
+          ),
           level: user.learner.currentLearningTrack.level,
           learningGoal: user.learner.currentLearningTrack.learningGoal,
           onboardingStatus: user.learner.currentLearningTrack.onboardingStatus,

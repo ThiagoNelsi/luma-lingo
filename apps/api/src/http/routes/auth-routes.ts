@@ -8,6 +8,7 @@ import { UnverifiedEmailError } from "../../services/auth-errors.js";
 import { AuthService } from "../../services/auth-service.js";
 import { errorDtoSchema } from "../dtos/error-dto.js";
 import { redirectResponseSchema } from "../schemas/common-schemas.js";
+import { isTrustedOrigin } from "../trusted-origin.js";
 
 export interface AuthRoutesDependencies {
   auth: AuthService;
@@ -128,7 +129,7 @@ export function registerAuthRoutes(
       },
     },
     async (request, reply) => {
-      if (!isTrustedLogoutOrigin(request.headers.origin, deps.config)) {
+      if (!isTrustedOrigin(request.headers.origin, deps.config)) {
         return reply.code(403).send({ error: "invalid_request_origin" });
       }
 
@@ -148,13 +149,4 @@ export function registerAuthRoutes(
       );
     },
   );
-}
-
-function isTrustedLogoutOrigin(
-  origin: string | undefined,
-  config: AppConfig,
-): boolean {
-  if (!origin) return true;
-
-  return origin === config.frontendOrigin || origin === config.apiOrigin;
 }
