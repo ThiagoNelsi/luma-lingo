@@ -1,8 +1,12 @@
-import { languageSelectionSchema } from "@luma-lingo/shared";
+import {
+  ageAndGoalsSelectionSchema,
+  languageSelectionSchema,
+} from "@luma-lingo/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 
 import type { AppConfig } from "../../config.js";
+import { ageAndGoalsProgressSchema } from "../../learners/age-and-goals-progress.js";
 import { languageSelectionProgressSchema } from "../../learners/language-selection-progress.js";
 import { AuthService } from "../../services/auth-service.js";
 import { OnboardingService } from "../../services/onboarding-service.js";
@@ -49,6 +53,36 @@ export function registerOnboardingRoutes(
         session.learner.id,
         request.body,
       );
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().put(
+    "/me/age-and-goals",
+    {
+      schema: {
+        tags: ["Learner"],
+        summary: "Save onboarding age and goals",
+        body: ageAndGoalsSelectionSchema,
+        response: {
+          200: ageAndGoalsProgressSchema,
+          401: errorDtoSchema,
+          403: errorDtoSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!isTrustedOrigin(request.headers.origin, deps.config)) {
+        return reply.code(403).send({ error: "invalid_request_origin" });
+      }
+
+      const session = await deps.auth.resolveSession(
+        request.cookies[deps.config.sessionCookieName],
+      );
+      if (!session) {
+        return reply.code(401).send({ error: "unauthenticated" });
+      }
+
+      return deps.onboarding.saveAgeAndGoals(session.learner.id, request.body);
     },
   );
 }

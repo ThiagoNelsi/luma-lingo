@@ -82,6 +82,8 @@ model LearningTrack {
   targetLanguage    String           @map("target_language")
   level             String?
   learningGoal      String?          @map("learning_goal")
+  goalCefrLevel     String?          @map("goal_cefr_level")
+  additionalGoals   String[]         @default([]) @map("additional_goals")
   onboardingStatus  OnboardingStatus @default(not_started) @map("onboarding_status")
   onboardingStep    String?          @map("onboarding_step")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)

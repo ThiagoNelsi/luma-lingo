@@ -29,7 +29,6 @@ Saved position in the onboarding flow that lets a learner resume from the last c
 Relevant personal context for lesson personalization, captured directly or inferred from a learner-provided introduction:
 
 - Display name
-- Learner age range
 - Job / field
 - Interests
 - Daily routine
@@ -38,7 +37,19 @@ Relevant personal context for lesson personalization, captured directly or infer
 
 ## User profile input policy
 
-The primary onboarding path for `User profile` is a learner-recorded introduction. Closed profile blocks are an alternate path for learners who do not want to record.
+The primary onboarding path for `User profile` is a learner-recorded introduction about the learner's interests and routines. Closed profile blocks are an alternate path for learners who do not want to record.
+
+`Learner age range`, `Goal`, `Lesson emphasis`, and `Study pace` are separate constrained onboarding inputs. They are never extracted or inferred from the recorded introduction.
+
+The recorded introduction may populate only information the learner states explicitly:
+
+- Job / field
+- Interests
+- Daily routine
+- Study context
+- Other
+
+`Job / field` and `Interests` are required profile details. `Daily routine`, `Study context`, and `Other` are optional. The recording prompt and closed inputs should encourage the learner to share `Daily routine` because it improves personalization. After extraction, the learner reviews the recovered details and completes required details that remain missing through closed inputs.
 
 Recorded introductions are used only to infer the `User profile`; raw audio is not retained after extraction.
 Recorded introductions should feel short and natural, with a 90-second maximum.
@@ -48,6 +59,8 @@ Learners under 13 should use closed profile blocks instead of recorded introduct
 ## Display name
 
 Name the app uses to address the learner in the product experience. It is not a login identifier or a public username.
+
+During onboarding, ask "How would you like me to address you?" with an optional editable input prefilled from the auth-provider name when available. `Display name` is never extracted from the recorded introduction.
 
 ## Learner age range
 
@@ -71,7 +84,6 @@ Learning target chosen from fixed options:
 - Travel
 - Exam prep
 - CEFR level
-- Other
 
 Goal policy:
 
@@ -107,7 +119,7 @@ Then optionally run a short diagnostic test to confirm or adjust the estimate.
 
 ## Study pace
 
-Study cadence preference, collected in same onboarding step as Goal. For the MVP, limited to two modes: relaxed or accelerated.
+Study cadence preference, collected in the same onboarding step as `Lesson emphasis`. For the MVP, limited to two modes: relaxed or accelerated.
 
 ## Study pace policy
 

@@ -2,6 +2,20 @@
 
 ## 2026-06-20
 
+### Durable Recorded-Introduction Processing
+
+- **Deferred:** Move recorded-introduction transcription and profile extraction out of the API process into bounded worker concurrency backed by a durable queue and encrypted temporary audio storage with automatic TTL deletion.
+- **Current scope boundary:** Issue #4 keeps each short recording in API memory, runs a small bounded retry policy, and persists only extraction status and structured results. Adding Redis/workers and temporary object storage conflicts with the cost-controlled development baseline and would expand the privacy surface before load requires it.
+- **Future value:** Dedicated workers isolate OpenAI latency and retries from API capacity, apply backpressure, survive API restarts, and let web traffic scale independently from media processing.
+- **Revisit when:** Concurrent recordings create material API memory pressure, event-loop latency or request throughput degrades, retries amplify OpenAI traffic, jobs are lost during deploys/restarts, or production already has secure queue and temporary object-storage infrastructure.
+
+### Verified Recorded-Introduction Duration
+
+- **Deferred:** Decode uploaded recorded-introduction media on the backend and verify its real duration instead of trusting the browser-reported duration.
+- **Current scope boundary:** Issue #4 caps browser recording at 90 seconds and combines the declared duration with strict MIME and byte-size limits; adding media probing or `ffmpeg` would expand the MVP runtime and deployment surface.
+- **Future value:** Server-side verification prevents modified clients from submitting recordings longer than the product limit and gives more reliable resource controls.
+- **Revisit when:** The recorded-introduction endpoint faces untrusted-client abuse, duration-based billing risk, or already has a supported media-processing dependency.
+
 ### Broader Language Catalog And Regional Variants
 
 - **Deferred:** Expand beyond Portuguese, English, Spanish, Italian, French, German, and Chinese; add languages such as Japanese and Korean, plus explicit regional variants such as `pt-BR`, `pt-PT`, `en-US`, and `en-GB`.

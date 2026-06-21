@@ -1,6 +1,13 @@
-import type { LanguageSelection } from "@luma-lingo/shared";
+import type {
+  AgeAndGoalsSelection,
+  LanguageSelection,
+} from "@luma-lingo/shared";
 import { createId, PrismaClient } from "@luma-lingo/database";
 
+import {
+  toAgeAndGoalsProgress,
+  type AgeAndGoalsProgress,
+} from "../learners/age-and-goals-progress.js";
 import {
   toLanguageSelectionProgress,
   type LanguageSelectionProgress,
@@ -8,7 +15,10 @@ import {
 import type { LearnerRepository } from "../learners/learner-repository.js";
 
 export class PrismaLearnerRepository implements LearnerRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   async saveLanguageSelection(
     learnerId: string,
@@ -45,5 +55,30 @@ export class PrismaLearnerRepository implements LearnerRepository {
     });
 
     return toLanguageSelectionProgress(selection);
+  }
+
+  async saveAgeAndGoals(
+    learnerId: string,
+    selection: AgeAndGoalsSelection,
+  ): Promise<AgeAndGoalsProgress> {
+    await this.prisma.learner.update({
+      where: { id: learnerId },
+      data: {
+        ageRange: selection.ageRange,
+        ageRangeDeclaredAt: this.now(),
+        displayName: selection.displayName,
+        currentLearningTrack: {
+          update: {
+            learningGoal: selection.primaryGoal,
+            goalCefrLevel: selection.cefrGoalLevel,
+            additionalGoals: selection.additionalGoals,
+            onboardingStatus: "in_progress",
+            onboardingStep: "age_and_goals",
+          },
+        },
+      },
+    });
+
+    return toAgeAndGoalsProgress(selection);
   }
 }

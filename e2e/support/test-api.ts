@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import type { LanguageSelection } from "@luma-lingo/shared";
+import type {
+  AgeAndGoalsSelection,
+  LanguageSelection,
+} from "@luma-lingo/shared";
 
 import type { AuthProvider } from "../../apps/api/src/auth/auth-provider.js";
 import type { AppConfig } from "../../apps/api/src/config.js";
@@ -113,11 +116,36 @@ const learners: LearnerRepository = {
         targetLanguage: selection.targetLanguage,
         level: null,
         learningGoal: null,
+        goalCefrLevel: null,
+        additionalGoals: [],
         onboardingStatus: "in_progress",
         onboardingStep: "languages",
       },
     };
     return toLanguageSelectionProgress(selection);
+  },
+  async saveAgeAndGoals(_learnerId, selection: AgeAndGoalsSelection) {
+    if (!profile?.currentLearningTrack) throw new Error("learner_not_found");
+    profile = {
+      ...profile,
+      learner: {
+        ...profile.learner,
+        ageRange: selection.ageRange,
+        displayName: selection.displayName,
+      },
+      currentLearningTrack: {
+        ...profile.currentLearningTrack,
+        learningGoal: selection.primaryGoal,
+        goalCefrLevel: selection.cefrGoalLevel,
+        additionalGoals: selection.additionalGoals,
+        onboardingStep: "age_and_goals",
+      },
+    };
+    return {
+      ...selection,
+      onboardingStatus: "in_progress",
+      onboardingStep: "age_and_goals",
+    };
   },
 };
 

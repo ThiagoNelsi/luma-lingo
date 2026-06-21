@@ -21,3 +21,6 @@ coverage/
 !*.tfvars.example
 
 teach-skill-dir/
+ignore
+
+test-results/

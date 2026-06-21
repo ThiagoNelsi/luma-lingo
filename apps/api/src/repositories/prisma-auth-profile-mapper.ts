@@ -1,5 +1,11 @@
 import type { Prisma } from "@luma-lingo/database";
-import { languageCodeSchema } from "@luma-lingo/shared";
+import {
+  additionalGoalSchema,
+  cefrGoalLevelSchema,
+  goalSchema,
+  languageCodeSchema,
+  learnerAgeRangeSchema,
+} from "@luma-lingo/shared";
 
 import type { AuthProfile } from "../services/auth-profile.js";
 
@@ -27,7 +33,9 @@ export function toAuthProfile(user: UserWithLearner): AuthProfile {
       instructionLanguage: user.learner.instructionLanguage
         ? languageCodeSchema.parse(user.learner.instructionLanguage)
         : null,
-      ageRange: user.learner.ageRange,
+      ageRange: user.learner.ageRange
+        ? learnerAgeRangeSchema.parse(user.learner.ageRange)
+        : null,
       currentLearningTrackId: user.learner.currentLearningTrackId,
     },
     currentLearningTrack: user.learner.currentLearningTrack
@@ -37,7 +45,18 @@ export function toAuthProfile(user: UserWithLearner): AuthProfile {
             user.learner.currentLearningTrack.targetLanguage,
           ),
           level: user.learner.currentLearningTrack.level,
-          learningGoal: user.learner.currentLearningTrack.learningGoal,
+          learningGoal: user.learner.currentLearningTrack.learningGoal
+            ? goalSchema.parse(user.learner.currentLearningTrack.learningGoal)
+            : null,
+          goalCefrLevel: user.learner.currentLearningTrack.goalCefrLevel
+            ? cefrGoalLevelSchema.parse(
+                user.learner.currentLearningTrack.goalCefrLevel,
+              )
+            : null,
+          additionalGoals:
+            user.learner.currentLearningTrack.additionalGoals.map((goal) =>
+              additionalGoalSchema.parse(goal),
+            ),
           onboardingStatus: user.learner.currentLearningTrack.onboardingStatus,
           onboardingStep: user.learner.currentLearningTrack.onboardingStep,
         }

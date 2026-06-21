@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import type { LanguageSelection } from "@luma-lingo/shared";
+import type {
+  AgeAndGoalsSelection,
+  LanguageSelection,
+} from "@luma-lingo/shared";
 import { describe, expect, it } from "vitest";
 
 import type { AuthIdentity } from "../auth/auth-identity.js";
@@ -145,6 +148,8 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
           targetLanguage: selection.targetLanguage,
           level: null,
           learningGoal: null,
+          goalCefrLevel: null,
+          additionalGoals: [],
           onboardingStatus: "in_progress",
           onboardingStep: "languages",
         },
@@ -154,6 +159,36 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
         ...selection,
         onboardingStatus: "in_progress" as const,
         onboardingStep: "languages" as const,
+      };
+    },
+    async saveAgeAndGoals(learnerId: string, selection: AgeAndGoalsSelection) {
+      const entry = [...usersByIdentity.entries()].find(
+        ([, profile]) => profile.learner.id === learnerId,
+      );
+      if (!entry) throw new Error("learner_not_found");
+
+      const [key, profile] = entry;
+      usersByIdentity.set(key, {
+        ...profile,
+        learner: {
+          ...profile.learner,
+          ageRange: selection.ageRange,
+          displayName: selection.displayName,
+        },
+        currentLearningTrack: profile.currentLearningTrack
+          ? {
+              ...profile.currentLearningTrack,
+              learningGoal: selection.primaryGoal,
+              goalCefrLevel: selection.cefrGoalLevel,
+              additionalGoals: selection.additionalGoals,
+              onboardingStep: "age_and_goals",
+            }
+          : null,
+      });
+      return {
+        ...selection,
+        onboardingStatus: "in_progress" as const,
+        onboardingStep: "age_and_goals" as const,
       };
     },
   };
@@ -201,6 +236,7 @@ describe("auth routes", () => {
         "/auth/logout": expect.any(Object),
         "/me": expect.any(Object),
         "/me/languages": expect.any(Object),
+        "/me/age-and-goals": expect.any(Object),
       },
     });
   });
@@ -366,6 +402,101 @@ describe("auth routes", () => {
         onboardingStep: "languages",
       },
     });
+  });
+
+  it("saves age and goals for the authenticated learner", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/me/age-and-goals",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: {
+        ageRange: "25_39",
+        displayName: "Thiago",
+        primaryGoal: "cefr_level",
+        cefrGoalLevel: "B2",
+        additionalGoals: ["travel"],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ageRange: "25_39",
+      displayName: "Thiago",
+      primaryGoal: "cefr_level",
+      cefrGoalLevel: "B2",
+      additionalGoals: ["travel"],
+      onboardingStatus: "in_progress",
+      onboardingStep: "age_and_goals",
+    });
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/me",
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(me.json()).toMatchObject({
+      learner: { ageRange: "25_39", displayName: "Thiago" },
+      currentLearningTrack: {
+        learningGoal: "cefr_level",
+        goalCefrLevel: "B2",
+        additionalGoals: ["travel"],
+        onboardingStep: "age_and_goals",
+      },
+    });
+  });
+
+  it("rejects invalid or unauthenticated age and goal selections", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const invalid = await app.inject({
+      method: "PUT",
+      url: "/me/age-and-goals",
+      headers: { origin: "http://localhost:5173" },
+      payload: {
+        ageRange: "unknown",
+        displayName: null,
+        primaryGoal: "cefr_level",
+        cefrGoalLevel: null,
+        additionalGoals: ["work", "work", "travel"],
+      },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const unauthenticated = await app.inject({
+      method: "PUT",
+      url: "/me/age-and-goals",
+      headers: { origin: "http://localhost:5173" },
+      payload: {
+        ageRange: "25_39",
+        displayName: null,
+        primaryGoal: "travel",
+        cefrGoalLevel: null,
+        additionalGoals: [],
+      },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
   });
 
   it("rejects language selection without an authenticated session", async () => {

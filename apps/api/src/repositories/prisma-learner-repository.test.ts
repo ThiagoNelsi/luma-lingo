@@ -64,4 +64,48 @@ describe("PrismaLearnerRepository", () => {
       },
     });
   });
+
+  it("saves age and goals on the learner and current learning track", async () => {
+    const learnerInput: { data?: unknown } = {};
+    const prisma = {
+      learner: {
+        update: async (input: { data: unknown }) => {
+          learnerInput.data = input.data;
+          return {};
+        },
+      },
+    };
+    const declaredAt = new Date("2026-06-20T18:00:00.000Z");
+    const repository = new PrismaLearnerRepository(
+      prisma as unknown as PrismaClient,
+      () => declaredAt,
+    );
+
+    await expect(
+      repository.saveAgeAndGoals("learner-1", {
+        ageRange: "25_39",
+        displayName: "Thiago",
+        primaryGoal: "cefr_level",
+        cefrGoalLevel: "B2",
+        additionalGoals: ["travel"],
+      }),
+    ).resolves.toMatchObject({
+      primaryGoal: "cefr_level",
+      onboardingStep: "age_and_goals",
+    });
+    expect(learnerInput.data).toEqual({
+      ageRange: "25_39",
+      ageRangeDeclaredAt: declaredAt,
+      displayName: "Thiago",
+      currentLearningTrack: {
+        update: {
+          learningGoal: "cefr_level",
+          goalCefrLevel: "B2",
+          additionalGoals: ["travel"],
+          onboardingStatus: "in_progress",
+          onboardingStep: "age_and_goals",
+        },
+      },
+    });
+  });
 });

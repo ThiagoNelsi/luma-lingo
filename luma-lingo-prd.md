@@ -104,7 +104,7 @@ The app should:
 ## Implementation Decisions
 
 - The onboarding flow will place the `Level check` near the end of initial onboarding so the optional diagnostic sub-flow does not interrupt the earliest setup steps.
-- The onboarding flow order will be: language entry, `Learner age range`, `Goal`, `User profile`, `Lesson emphasis` with `Study pace`, `Level check`, review summary, then first lesson generation.
+- The onboarding flow order will be: language entry; `Learner age range`, `Display name`, and `Goal`; recorded introduction with asynchronous `User profile` extraction; `Lesson emphasis` with `Study pace`; `Level check`; extracted-profile review and missing-field completion; review summary; then first lesson generation.
 - The `Level check` will use friendly labels such as `Beginner (A1)`, `Beginner plus (A2)`, `Intermediate (B1)`, and `Upper intermediate (B2)`.
 - The `Level check` will also allow `I don't know`.
 - A short diagnostic test may optionally follow the self-assessment to confirm or adjust the level estimate.
@@ -117,6 +117,10 @@ The app should:
 - The app will make a short recorded introduction the primary `User profile` input path.
 - The app will offer closed profile blocks through an alternate "try another way" path for learners who do not want to record.
 - The app will let learners review and edit the `User profile` extracted from a recorded introduction.
+- Recorded-introduction processing will run asynchronously so the learner can continue through `Lesson emphasis`, `Study pace`, and `Level check` while extraction completes.
+- After `Level check`, the app will show the extracted `User profile` and request any required details that were not recovered before the final onboarding review.
+- `Job / field` and `Interests` will be required profile details. `Daily routine`, `Study context`, and `Other` will be optional, while the interface will encourage `Daily routine` because it improves personalization.
+- Recorded introductions may populate only explicitly stated `Job / field`, `Interests`, `Daily routine`, `Study context`, and `Other`; they must not infer `Learner age range`, `Goal`, `Lesson emphasis`, `Study pace`, or `Display name`.
 - The app will not retain raw recorded introduction audio after profile extraction.
 - The app will explain recording use and non-retention before requesting microphone permission.
 - Recorded introductions will have a 90-second maximum and should allow re-recording before submission.
@@ -159,6 +163,8 @@ The app should:
 - The onboarding flow should be tested to ensure it collects `Instruction language`, `Target language`, `Goal`, `Lesson emphasis`, and optional `Study pace` correctly.
 - The onboarding flow should be tested to ensure a learner can provide `User profile` context through the primary recorded-introduction path or alternate closed profile blocks.
 - The onboarding flow should be tested to ensure learners can review and edit the `User profile` extracted from a recorded introduction.
+- The onboarding flow should be tested to ensure profile extraction can continue asynchronously through later preference and level steps, then resolves before final onboarding review.
+- The onboarding flow should be tested to ensure missing required `Job / field` and `Interests` details are collected through closed inputs while optional profile details remain optional.
 - The onboarding flow should be tested to ensure raw recorded introduction audio is not retained after profile extraction.
 - The onboarding flow should be tested to ensure recording use and non-retention are explained before microphone permission is requested.
 - The onboarding flow should be tested to ensure recorded introductions are capped at 90 seconds and can be re-recorded before submission.

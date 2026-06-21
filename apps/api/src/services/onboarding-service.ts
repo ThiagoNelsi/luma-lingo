@@ -1,4 +1,7 @@
-import type { LanguageSelection } from "@luma-lingo/shared";
+import type {
+  AgeAndGoalsSelection,
+  LanguageSelection,
+} from "@luma-lingo/shared";
 
 import type { LearnerRepository } from "../learners/learner-repository.js";
 
@@ -7,5 +10,9 @@ export class OnboardingService {
 
   saveLanguageSelection(learnerId: string, selection: LanguageSelection) {
     return this.learners.saveLanguageSelection(learnerId, selection);
+  }
+
+  saveAgeAndGoals(learnerId: string, selection: AgeAndGoalsSelection) {
+    return this.learners.saveAgeAndGoals(learnerId, selection);
   }
 }

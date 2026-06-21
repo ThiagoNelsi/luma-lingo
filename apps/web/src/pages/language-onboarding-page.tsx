@@ -1,5 +1,5 @@
 import { languageOptions, type LanguageCode } from "@luma-lingo/shared";
-import { ArrowRight, Check, Languages } from "lucide-react";
+import { ArrowRight, Languages } from "lucide-react";
 import { SubmitEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -10,10 +10,7 @@ import {
   Progress,
   Surface,
 } from "../design-system/components/index.js";
-import {
-  formatLanguageSelection,
-  getLanguageSelectionError,
-} from "../onboarding/language-form.js";
+import { getLanguageSelectionError } from "../onboarding/language-form.js";
 import {
   saveLanguageSelection,
   UnauthorizedLanguageSelectionError,
@@ -37,7 +34,6 @@ export function LanguageOnboardingPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -87,7 +83,7 @@ export function LanguageOnboardingPage({
         instructionLanguage,
         targetLanguage,
       });
-      setSaved(true);
+      navigate("/onboarding/about-you");
     } catch (error) {
       if (error instanceof UnauthorizedLanguageSelectionError) {
         navigate("/login", { replace: true });
@@ -97,41 +93,6 @@ export function LanguageOnboardingPage({
     } finally {
       setSaving(false);
     }
-  }
-
-  if (saved && instructionLanguage && targetLanguage) {
-    return (
-      <main className="min-h-dvh px-[var(--screen-gutter)] pb-10 sm:pb-12">
-        <div className="mx-auto flex w-full max-w-176 flex-col gap-[var(--content-gap)]">
-          <PageHeader />
-          <section className="pt-8" aria-live="polite">
-            <Surface className="flex flex-col gap-5" variant="tinted">
-              <div className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <Check aria-hidden="true" size={20} />
-              </div>
-              <div>
-                <p className="mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-                  Preferências salvas
-                </p>
-                <h1 className="mb-2">Sua jornada já tem uma direção</h1>
-                <p className="mb-0 max-w-[42ch] leading-[var(--line-height-relaxed)] text-muted-foreground">
-                  {formatLanguageSelection(instructionLanguage, targetLanguage)}
-                  . Usaremos essa escolha nas próximas etapas e aulas.
-                </p>
-              </div>
-              <Button
-                onClick={() => navigate("/private")}
-                size="full"
-                variant="primary"
-              >
-                Continuar
-                <ArrowRight aria-hidden="true" size={17} />
-              </Button>
-            </Surface>
-          </section>
-        </div>
-      </main>
-    );
   }
 
   return (
