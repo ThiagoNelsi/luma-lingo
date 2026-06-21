@@ -33,6 +33,8 @@ describe("toAuthProfile", () => {
           learningGoal: "cefr_level",
           goalCefrLevel: "B2",
           additionalGoals: ["travel"],
+          lessonEmphases: ["listening", "reading"],
+          studyPace: "relaxed",
           onboardingStatus: "in_progress",
           onboardingStep: "age_and_goals",
           createdAt: now,
@@ -47,6 +49,8 @@ describe("toAuthProfile", () => {
         learningGoal: "cefr_level",
         goalCefrLevel: "B2",
         additionalGoals: ["travel"],
+        lessonEmphases: ["listening", "reading"],
+        studyPace: "relaxed",
         onboardingStep: "age_and_goals",
       },
     });

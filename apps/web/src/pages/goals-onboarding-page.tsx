@@ -152,12 +152,12 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
 
         <section className="pt-2">
           <Progress
-            label="Configuração inicial, etapa 3 de 4"
-            max={4}
+            label="Configuração inicial, etapa 3 de 6"
+            max={6}
             value={3}
           />
           <p className="mt-3 mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Etapa 3 de 4
+            Etapa 3 de 6
           </p>
           <h1 className="mb-2">Quais são seus objetivos?</h1>
           <p className="mb-0 max-w-[48ch] leading-[var(--line-height-relaxed)] text-muted-foreground">

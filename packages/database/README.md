@@ -10,6 +10,9 @@ This package owns the Prisma schema, migrations, and database client for LumaLin
 - Profile introduction records store processing status, retry count, errors,
   and extracted profile fields. The database never stores the raw recording or
   its transcript.
+- Learning tracks store the learner's selected Lesson emphasis values and
+  optional Study pace so Level check and lesson generation can consume the same
+  persisted preferences.
 
 `Learner.currentLearningTrackId` intentionally points to `LearningTrack`, while each `LearningTrack` also belongs to a `Learner`.
 

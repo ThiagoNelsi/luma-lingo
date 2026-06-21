@@ -5,6 +5,8 @@ import {
   goalSchema,
   languageCodeSchema,
   learnerAgeRangeSchema,
+  lessonEmphasisSchema,
+  studyPaceSchema,
 } from "@luma-lingo/shared";
 
 import type { AuthProfile } from "../services/auth-profile.js";
@@ -57,6 +59,12 @@ export function toAuthProfile(user: UserWithLearner): AuthProfile {
             user.learner.currentLearningTrack.additionalGoals.map((goal) =>
               additionalGoalSchema.parse(goal),
             ),
+          lessonEmphases: user.learner.currentLearningTrack.lessonEmphases.map(
+            (emphasis) => lessonEmphasisSchema.parse(emphasis),
+          ),
+          studyPace: user.learner.currentLearningTrack.studyPace
+            ? studyPaceSchema.parse(user.learner.currentLearningTrack.studyPace)
+            : null,
           onboardingStatus: user.learner.currentLearningTrack.onboardingStatus,
           onboardingStep: user.learner.currentLearningTrack.onboardingStep,
         }

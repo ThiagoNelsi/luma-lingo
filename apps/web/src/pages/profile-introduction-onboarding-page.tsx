@@ -165,7 +165,7 @@ export function ProfileIntroductionOnboardingPage({
     setError(null);
     try {
       await submitProfileIntroduction(apiOrigin, audio, elapsedMs);
-      navigate("/private");
+      navigate("/onboarding/preferences");
     } catch (caught) {
       if (caught instanceof UnauthorizedProfileIntroductionError) {
         navigate("/login", { replace: true });
@@ -181,7 +181,7 @@ export function ProfileIntroductionOnboardingPage({
   async function chooseManualFallback() {
     try {
       await useManualProfileIntroduction(apiOrigin);
-      navigate("/private");
+      navigate("/onboarding/preferences");
     } catch {
       setError("Não foi possível continuar agora. Tente novamente.");
     }
@@ -193,8 +193,8 @@ export function ProfileIntroductionOnboardingPage({
         <div className="mx-auto flex w-full max-w-176 flex-col gap-5">
           <PageHeader />
           <Progress
-            label="Configuração inicial, etapa 4 de 4"
-            max={4}
+            label="Configuração inicial, etapa 4 de 6"
+            max={6}
             value={4}
           />
           <Surface className="flex flex-col gap-4">
@@ -203,7 +203,10 @@ export function ProfileIntroductionOnboardingPage({
               Para esta faixa etária, a apresentação será preenchida manualmente
               em uma próxima etapa.
             </p>
-            <Button size="full" onClick={() => navigate("/private")}>
+            <Button
+              size="full"
+              onClick={() => navigate("/onboarding/preferences")}
+            >
               Continuar
             </Button>
           </Surface>
@@ -218,12 +221,12 @@ export function ProfileIntroductionOnboardingPage({
         <PageHeader />
         <section className="pt-2">
           <Progress
-            label="Configuração inicial, etapa 4 de 4"
-            max={4}
+            label="Configuração inicial, etapa 4 de 6"
+            max={6}
             value={4}
           />
           <p className="mt-3 mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Etapa 4 de 4
+            Etapa 4 de 6
           </p>
           <h1 className="mb-2">Conte um pouco sobre você</h1>
           <p className="mb-0 max-w-[48ch] leading-[var(--line-height-relaxed)] text-muted-foreground">

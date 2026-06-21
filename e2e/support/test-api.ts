@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AgeAndGoalsSelection,
   LanguageSelection,
+  LessonPreferencesSelection,
 } from "@luma-lingo/shared";
 
 import type { AuthProvider } from "../../apps/api/src/auth/auth-provider.js";
@@ -12,6 +13,7 @@ import type { LearnerRepository } from "../../apps/api/src/learners/learner-repo
 import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
 import { ProfileIntroductionService } from "../../apps/api/src/profile/profile-introduction-service.js";
 import { toLanguageSelectionProgress } from "../../apps/api/src/learners/language-selection-progress.js";
+import { toLessonPreferencesProgress } from "../../apps/api/src/learners/lesson-preferences-progress.js";
 import type { UserRepository } from "../../apps/api/src/repositories/user-repository.js";
 import type { AuthProfile } from "../../apps/api/src/services/auth-profile.js";
 import type { SessionRecord } from "../../apps/api/src/sessions/session-record.js";
@@ -120,6 +122,8 @@ const learners: LearnerRepository = {
         learningGoal: null,
         goalCefrLevel: null,
         additionalGoals: [],
+        lessonEmphases: [],
+        studyPace: null,
         onboardingStatus: "in_progress",
         onboardingStep: "languages",
       },
@@ -148,6 +152,22 @@ const learners: LearnerRepository = {
       onboardingStatus: "in_progress",
       onboardingStep: "age_and_goals",
     };
+  },
+  async saveLessonPreferences(
+    _learnerId,
+    selection: LessonPreferencesSelection,
+  ) {
+    if (!profile?.currentLearningTrack) throw new Error("learner_not_found");
+    profile = {
+      ...profile,
+      currentLearningTrack: {
+        ...profile.currentLearningTrack,
+        lessonEmphases: selection.lessonEmphases,
+        studyPace: selection.studyPace,
+        onboardingStep: "lesson_preferences",
+      },
+    };
+    return toLessonPreferencesProgress(selection);
   },
 };
 

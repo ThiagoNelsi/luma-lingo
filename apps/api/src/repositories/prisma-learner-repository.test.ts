@@ -108,4 +108,40 @@ describe("PrismaLearnerRepository", () => {
       },
     });
   });
+
+  it("saves Lesson emphasis and optional Study pace on the current learning track", async () => {
+    const learnerInput: { data?: unknown } = {};
+    const prisma = {
+      learner: {
+        update: async (input: { data: unknown }) => {
+          learnerInput.data = input.data;
+          return {};
+        },
+      },
+    };
+    const repository = new PrismaLearnerRepository(
+      prisma as unknown as PrismaClient,
+    );
+
+    await expect(
+      repository.saveLessonPreferences("learner-1", {
+        lessonEmphases: ["listening", "reading"],
+        studyPace: null,
+      }),
+    ).resolves.toMatchObject({
+      lessonEmphases: ["listening", "reading"],
+      studyPace: null,
+      onboardingStep: "lesson_preferences",
+    });
+    expect(learnerInput.data).toEqual({
+      currentLearningTrack: {
+        update: {
+          lessonEmphases: ["listening", "reading"],
+          studyPace: null,
+          onboardingStatus: "in_progress",
+          onboardingStep: "lesson_preferences",
+        },
+      },
+    });
+  });
 });

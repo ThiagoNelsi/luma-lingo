@@ -118,12 +118,12 @@ export function PrivatePage({ apiOrigin }: PrivatePageProps) {
           </p>
           <div className="flex justify-between gap-4 text-[var(--text-overline)] font-medium">
             <span>Configuração inicial</span>
-            <span>1 de 4</span>
+            <span>1 de 6</span>
           </div>
           <Progress
             inverted
-            label="Configuração inicial, etapa 1 de 4"
-            max={4}
+            label="Configuração inicial, etapa 1 de 6"
+            max={6}
             value={1}
           />
 

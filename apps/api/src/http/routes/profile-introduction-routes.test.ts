@@ -45,6 +45,8 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
       learningGoal: "work",
       goalCefrLevel: null,
       additionalGoals: [],
+      lessonEmphases: [],
+      studyPace: null,
       onboardingStatus: "in_progress",
       onboardingStep: "age_and_goals",
     },
@@ -123,6 +125,9 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
         throw new Error("unused");
       },
       async saveAgeAndGoals() {
+        throw new Error("unused");
+      },
+      async saveLessonPreferences() {
         throw new Error("unused");
       },
     },

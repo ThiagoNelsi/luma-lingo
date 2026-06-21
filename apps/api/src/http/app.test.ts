@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AgeAndGoalsSelection,
   LanguageSelection,
+  LessonPreferencesSelection,
 } from "@luma-lingo/shared";
 import { describe, expect, it } from "vitest";
 
@@ -150,6 +151,8 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
           learningGoal: null,
           goalCefrLevel: null,
           additionalGoals: [],
+          lessonEmphases: [],
+          studyPace: null,
           onboardingStatus: "in_progress",
           onboardingStep: "languages",
         },
@@ -189,6 +192,33 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
         ...selection,
         onboardingStatus: "in_progress" as const,
         onboardingStep: "age_and_goals" as const,
+      };
+    },
+    async saveLessonPreferences(
+      learnerId: string,
+      selection: LessonPreferencesSelection,
+    ) {
+      const entry = [...usersByIdentity.entries()].find(
+        ([, profile]) => profile.learner.id === learnerId,
+      );
+      if (!entry) throw new Error("learner_not_found");
+
+      const [key, profile] = entry;
+      usersByIdentity.set(key, {
+        ...profile,
+        currentLearningTrack: profile.currentLearningTrack
+          ? {
+              ...profile.currentLearningTrack,
+              lessonEmphases: selection.lessonEmphases,
+              studyPace: selection.studyPace,
+              onboardingStep: "lesson_preferences",
+            }
+          : null,
+      });
+      return {
+        ...selection,
+        onboardingStatus: "in_progress" as const,
+        onboardingStep: "lesson_preferences" as const,
       };
     },
   };
@@ -237,6 +267,7 @@ describe("auth routes", () => {
         "/me": expect.any(Object),
         "/me/languages": expect.any(Object),
         "/me/age-and-goals": expect.any(Object),
+        "/me/lesson-preferences": expect.any(Object),
       },
     });
   });
@@ -497,6 +528,76 @@ describe("auth routes", () => {
       },
     });
     expect(unauthenticated.statusCode).toBe(401);
+  });
+
+  it("saves Lesson emphasis and optional Study pace and exposes them through /me", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    const response = await app.inject({
+      method: "PUT",
+      url: "/me/lesson-preferences",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: {
+        lessonEmphases: ["listening", "reading"],
+        studyPace: null,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      lessonEmphases: ["listening", "reading"],
+      studyPace: null,
+      onboardingStatus: "in_progress",
+      onboardingStep: "lesson_preferences",
+    });
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/me",
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(me.json()).toMatchObject({
+      currentLearningTrack: {
+        lessonEmphases: ["listening", "reading"],
+        studyPace: null,
+        onboardingStep: "lesson_preferences",
+      },
+    });
+  });
+
+  it("rejects Speaking and an empty Lesson emphasis selection", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+
+    for (const lessonEmphases of [["speaking"], []]) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/me/lesson-preferences",
+        headers: { origin: "http://localhost:5173" },
+        payload: { lessonEmphases, studyPace: null },
+      });
+      expect(response.statusCode).toBe(400);
+    }
   });
 
   it("rejects language selection without an authenticated session", async () => {

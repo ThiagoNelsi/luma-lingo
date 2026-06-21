@@ -121,5 +121,23 @@ test("authenticated learner chooses and persists onboarding languages", async ({
   ).resolves.toBe(1);
   await page.getByRole("button", { name: "Parar gravação" }).click();
   await page.getByRole("button", { name: "Enviar apresentação" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/preferences$/);
+  await expect(
+    page.getByRole("heading", { name: "Como você gosta de aprender?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: /Quando estou estudando, prefiro/ }),
+  ).not.toContainText("Falar");
+  await page.getByLabel("Ouvir").check();
+  await page.getByLabel("Ler").check();
+  await page.getByLabel("Ouvir").uncheck();
+  await page.getByLabel("Escrever").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/pace$/);
+  await expect(
+    page.getByRole("heading", { name: "Como você prefere avançar?" }),
+  ).toBeVisible();
+  await page.getByLabel("Mais rápido").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
   await expect(page).toHaveURL(/\/private$/);
 });
