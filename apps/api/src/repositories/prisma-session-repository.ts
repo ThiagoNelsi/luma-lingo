@@ -34,6 +34,7 @@ export class PrismaSessionRepository implements SessionRepository {
   ): Promise<AuthenticatedSessionProfile | null> {
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },
+      relationLoadStrategy: "join",
       include: {
         user: userWithLearnerArgs,
       },
@@ -48,14 +49,19 @@ export class PrismaSessionRepository implements SessionRepository {
       return null;
     }
 
-    const updatedSession = await this.prisma.session.update({
+    this.prisma.session.update({
       where: { id: session.id },
       data: { lastSeenAt: now },
+    }).then(() => {
+      // We intentionally don't await this update to avoid delaying the response.
     });
 
     return {
       ...toAuthProfile(session.user),
-      session: updatedSession,
+      session: {
+        ...session,
+        lastSeenAt: now,
+      },
     };
   }
 

@@ -168,16 +168,12 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
 
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
           <Surface className="flex flex-col gap-5">
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
                 <Target aria-hidden="true" size={19} />
               </div>
               <div>
-                <h2 className="mb-1">Seu objetivo</h2>
-                <p className="mb-0 text-[var(--text-caption)] text-muted-foreground">
-                  Escolha uma prioridade. Depois, adicione até duas
-                  complementares.
-                </p>
+                <h2>Objetivo principal</h2>
               </div>
             </div>
 
@@ -185,7 +181,6 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
               className="flex flex-col gap-2"
               disabled={loading || saving}
             >
-              <legend className="mb-1 font-medium">Objetivo principal</legend>
               {goalOptions.map((option) => (
                 <label className={choiceClasses} key={option.value}>
                   <input
@@ -206,7 +201,7 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
                 className="flex flex-col gap-2"
                 disabled={loading || saving}
               >
-                <legend className="mb-1 font-medium">
+                <legend className="mb-4 font-medium">
                   Nível que deseja alcançar
                 </legend>
                 <div className="grid grid-cols-4 gap-2">
@@ -234,7 +229,7 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
               className="flex flex-col gap-2"
               disabled={loading || saving}
             >
-              <legend className="mb-1 font-medium">
+              <legend className="mb-2 font-medium">
                 Objetivos adicionais (opcional)
               </legend>
               {additionalGoalOptions.map((option) => {
