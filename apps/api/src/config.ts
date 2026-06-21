@@ -22,6 +22,10 @@ export interface RuntimeConfig {
     domain: string;
     region: string;
   };
+  gemini: {
+    apiKey: string;
+    model: string;
+  };
   port: number;
 }
 
@@ -51,6 +55,10 @@ export function readRuntimeConfig(
       appClientSecret: required(env, "COGNITO_APP_CLIENT_SECRET"),
       domain: required(env, "COGNITO_DOMAIN"),
       region: required(env, "AWS_REGION"),
+    },
+    gemini: {
+      apiKey: required(env, "GEMINI_API_KEY"),
+      model: env.GEMINI_MODEL ?? "gemini-3.5-flash",
     },
     port: parseInteger(env.PORT ?? "3000"),
   };

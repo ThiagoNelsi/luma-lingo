@@ -120,7 +120,7 @@ export function GoalsOnboardingPage({ apiOrigin }: GoalsOnboardingPageProps) {
     try {
       await saveAgeAndGoals(apiOrigin, formResult.selection);
       clearAboutYouDraft();
-      setSaved(true);
+      navigate("/onboarding/introduction");
     } catch (error) {
       if (error instanceof UnauthorizedAgeAndGoalsError) {
         navigate("/login", { replace: true });

@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
 }
 
@@ -14,6 +14,17 @@ enum OnboardingStatus {
   completed
 
   @@map("onboarding_status")
+}
+
+enum ProfileIntroductionStatus {
+  not_started
+  pending
+  processing
+  completed
+  failed
+  manual_required
+
+  @@map("profile_introduction_status")
 }
 
 model User {
@@ -61,20 +72,39 @@ model Session {
 }
 
 model Learner {
-  id                     String          @id @db.Uuid
-  userId                 String          @unique @map("user_id") @db.Uuid
-  displayName            String?         @map("display_name")
-  instructionLanguage    String?         @map("instruction_language")
-  ageRange               String?         @map("age_range")
-  ageRangeDeclaredAt     DateTime?       @map("age_range_declared_at") @db.Timestamptz(6)
-  currentLearningTrackId String?         @unique @map("current_learning_track_id") @db.Uuid
-  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user                   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentLearningTrack   LearningTrack?  @relation("CurrentLearningTrack", fields: [currentLearningTrackId], references: [id], onDelete: SetNull)
-  learningTracks         LearningTrack[] @relation("LearnerLearningTracks")
+  id                     String               @id @db.Uuid
+  userId                 String               @unique @map("user_id") @db.Uuid
+  displayName            String?              @map("display_name")
+  instructionLanguage    String?              @map("instruction_language")
+  ageRange               String?              @map("age_range")
+  ageRangeDeclaredAt     DateTime?            @map("age_range_declared_at") @db.Timestamptz(6)
+  currentLearningTrackId String?              @unique @map("current_learning_track_id") @db.Uuid
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                   User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentLearningTrack   LearningTrack?       @relation("CurrentLearningTrack", fields: [currentLearningTrackId], references: [id], onDelete: SetNull)
+  learningTracks         LearningTrack[]      @relation("LearnerLearningTracks")
+  profileIntroduction    ProfileIntroduction?
 
   @@map("learners")
+}
+
+model ProfileIntroduction {
+  id           String                    @id @db.Uuid
+  learnerId    String                    @unique @map("learner_id") @db.Uuid
+  status       ProfileIntroductionStatus @default(not_started)
+  attempts     Int                       @default(0)
+  errorCode    String?                   @map("error_code")
+  jobOrField   String?                   @map("job_or_field")
+  interests    String[]                  @default([])
+  dailyRoutine String[]                  @default([]) @map("daily_routine")
+  studyContext String?                   @map("study_context")
+  other        String[]                  @default([])
+  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learner      Learner                   @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+
+  @@map("profile_introductions")
 }
 
 model LearningTrack {

@@ -25,3 +25,27 @@
   --color-input-background: var(--input-background);
   --color-ring: var(--ring);
 }
+
+@keyframes luma-wave {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.recording-waveform-bar {
+  height: 3px;
+  transform-origin: bottom;
+  transition: height var(--duration-normal) ease;
+}
+
+.recording-waveform[data-recording="true"] .recording-waveform-bar {
+  height: var(--waveform-height);
+  animation: luma-wave 1.2s ease-in-out var(--waveform-delay) infinite;
+}

@@ -14,6 +14,7 @@
     "@aws-sdk/client-cognito-identity-provider": "latest",
     "@fastify/cookie": "latest",
     "@fastify/cors": "latest",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/swagger": "latest",
     "@fastify/swagger-ui": "latest",
     "@luma-lingo/database": "workspace:*",

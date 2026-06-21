@@ -6,6 +6,7 @@ import { GoalsOnboardingPage } from "../pages/goals-onboarding-page.js";
 import { LanguageOnboardingPage } from "../pages/language-onboarding-page.js";
 import { NotFoundPage } from "../pages/not-found-page.js";
 import { PrivatePage } from "../pages/private-page.js";
+import { ProfileIntroductionOnboardingPage } from "../pages/profile-introduction-onboarding-page.js";
 import { PublicPage } from "../pages/public-page.js";
 
 interface AppRoutesProps {
@@ -29,6 +30,10 @@ export function AppRoutes({ apiOrigin }: AppRoutesProps) {
       <Route
         path="/onboarding/goals"
         element={<GoalsOnboardingPage apiOrigin={apiOrigin} />}
+      />
+      <Route
+        path="/onboarding/introduction"
+        element={<ProfileIntroductionOnboardingPage apiOrigin={apiOrigin} />}
       />
       <Route
         path="/login"

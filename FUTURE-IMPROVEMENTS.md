@@ -1,13 +1,38 @@
 # Future Improvements
 
+## 2026-06-21
+
+### Recorded-Introduction Content Guardrails
+
+- **Deferred:** Add a moderation and data-minimization step before persisting
+  profile details extracted from a recorded introduction. Classify the
+  transcript and extracted fields, reject or redact disallowed content and
+  unnecessary sensitive personal data, and persist only allowlisted profile
+  facts. Store a safe processing status or error code instead of the filtered
+  content.
+- **Current scope boundary:** The current implementation does not persist raw
+  audio or transcripts and limits extraction to structured profile fields, but
+  it trusts the extraction provider's output after schema validation. Adding a
+  defined content policy, moderation provider, redaction rules, user feedback,
+  and false-positive handling is outside the current recorded-introduction
+  change.
+- **Future value:** Defense-in-depth prevents abusive, sexual, violent, hateful,
+  self-harm, illegal, or unnecessarily sensitive content from entering learner
+  profile records and later influencing generated lessons. Explicit rules also
+  make moderation behavior testable and auditable.
+- **Revisit when:** Before accepting recordings from real learners or using
+  extracted profiles in lesson generation; after defining the product's content
+  policy, sensitive-data allowlist, learner-facing fallback, and retention and
+  audit requirements.
+
 ## 2026-06-20
 
-### Durable Recorded-Introduction Processing
+### Production-Grade Recorded-Introduction Processing
 
-- **Deferred:** Move recorded-introduction transcription and profile extraction out of the API process into bounded worker concurrency backed by a durable queue and encrypted temporary audio storage with automatic TTL deletion.
+- **Deferred:** Move recorded-introduction transcription and profile extraction out of the API process into bounded worker concurrency backed by a durable queue and encrypted temporary audio storage with automatic TTL deletion. Before accepting real learner recordings, move Gemini usage from the development free tier to a paid account whose data terms do not allow prompts and responses to improve Google products, or choose another provider with equivalent controls through the existing adapters.
 - **Current scope boundary:** Issue #4 keeps each short recording in API memory, runs a small bounded retry policy, and persists only extraction status and structured results. Adding Redis/workers and temporary object storage conflicts with the cost-controlled development baseline and would expand the privacy surface before load requires it.
-- **Future value:** Dedicated workers isolate OpenAI latency and retries from API capacity, apply backpressure, survive API restarts, and let web traffic scale independently from media processing.
-- **Revisit when:** Concurrent recordings create material API memory pressure, event-loop latency or request throughput degrades, retries amplify OpenAI traffic, jobs are lost during deploys/restarts, or production already has secure queue and temporary object-storage infrastructure.
+- **Future value:** Dedicated workers isolate provider latency and retries from API capacity, apply backpressure, survive API restarts, and let web traffic scale independently from media processing. Paid production data controls allow recordings from real learners without relying on the free-tier training terms accepted only for synthetic development data.
+- **Revisit when:** Before the first test with real learner audio; or when concurrent recordings create material API memory pressure, event-loop latency or request throughput degrades, retries amplify provider traffic, jobs are lost during deploys/restarts, or production already has secure queue and temporary object-storage infrastructure.
 
 ### Verified Recorded-Introduction Duration
 

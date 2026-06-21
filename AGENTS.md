@@ -56,4 +56,6 @@ Keep API code organized by domain and boundary:
 
 Vitest is the test runner. Place focused unit or route tests next to implementation files with `*.test.ts`. Prefer deterministic in-memory fakes for service and HTTP tests, as in the API auth tests. Run `pnpm test` before submitting changes; run `pnpm check` when touching types, config, or Prisma schema.
 
+Always write unit tests for every function. For HTTP routes, test the route handler logic in unit tests with in-memory fakes, and use Playwright end-to-end tests for critical user flows and integration points.
+
 Do not delete any tests without explicit authorization first. If deletion seems necessary, request permission and explain why you want to remove the test; only continue after receiving approval. You may move tests between files to improve organization, but you must never delete them without authorization.

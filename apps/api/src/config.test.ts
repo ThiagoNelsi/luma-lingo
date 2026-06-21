@@ -15,6 +15,8 @@ const envKeys = [
   "COGNITO_APP_CLIENT_SECRET",
   "COGNITO_DOMAIN",
   "FRONTEND_ORIGIN",
+  "GEMINI_API_KEY",
+  "GEMINI_MODEL",
   "PORT",
   "SESSION_COOKIE_NAME",
   "SESSION_COOKIE_SECURE",
@@ -56,6 +58,8 @@ describe("runtime config", () => {
         "COGNITO_APP_CLIENT_SECRET=secret",
         "COGNITO_DOMAIN=https://auth.example.com",
         "FRONTEND_ORIGIN=http://localhost:5173",
+        "GEMINI_API_KEY=test-key",
+        "GEMINI_MODEL=gemini-test",
         "PORT=3000",
         "SESSION_COOKIE_NAME=luma_lingo_session",
         "SESSION_COOKIE_SECURE=false",
@@ -66,6 +70,7 @@ describe("runtime config", () => {
     try {
       loadRuntimeEnv(packageDirectory);
       expect(readRuntimeConfig().app.apiOrigin).toBe("http://localhost:3000");
+      expect(readRuntimeConfig().gemini.model).toBe("gemini-test");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

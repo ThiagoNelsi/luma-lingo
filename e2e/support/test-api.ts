@@ -9,6 +9,8 @@ import type { AuthProvider } from "../../apps/api/src/auth/auth-provider.js";
 import type { AppConfig } from "../../apps/api/src/config.js";
 import { createApp } from "../../apps/api/src/http/app.js";
 import type { LearnerRepository } from "../../apps/api/src/learners/learner-repository.js";
+import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
+import { ProfileIntroductionService } from "../../apps/api/src/profile/profile-introduction-service.js";
 import { toLanguageSelectionProgress } from "../../apps/api/src/learners/language-selection-progress.js";
 import type { UserRepository } from "../../apps/api/src/repositories/user-repository.js";
 import type { AuthProfile } from "../../apps/api/src/services/auth-profile.js";
@@ -149,12 +151,81 @@ const learners: LearnerRepository = {
   },
 };
 
+let profileIntroductionStatus = "not_started" as
+  | "not_started"
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "manual_required";
+const profileIntroductions: ProfileIntroductionRepository = {
+  async get() {
+    return {
+      status: profileIntroductionStatus,
+      attempts: 0,
+      errorCode: null,
+      profile: null,
+    };
+  },
+  async markPending() {
+    profileIntroductionStatus = "pending";
+    return {
+      status: profileIntroductionStatus,
+      attempts: 0,
+      errorCode: null,
+      profile: null,
+    };
+  },
+  async markProcessing() {},
+  async markCompleted() {
+    profileIntroductionStatus = "completed";
+  },
+  async markFailed() {
+    profileIntroductionStatus = "failed";
+  },
+  async markManualRequired() {
+    profileIntroductionStatus = "manual_required";
+    return {
+      status: profileIntroductionStatus,
+      attempts: 0,
+      errorCode: null,
+      profile: null,
+    };
+  },
+  async failInterrupted() {
+    return 0;
+  },
+};
+const profileIntroduction = new ProfileIntroductionService({
+  repository: profileIntroductions,
+  transcription: {
+    async transcribe() {
+      return "Gosto de viajar.";
+    },
+  },
+  extraction: {
+    async extract() {
+      return {
+        jobOrField: null,
+        interests: ["viagens"],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      };
+    },
+  },
+  schedule(task) {
+    setImmediate(() => void task());
+  },
+});
+
 const app = await createApp({
   authProvider,
   config,
   learners,
   sessions: sessionRepository,
   users,
+  profileIntroduction,
 });
 
 app.get("/test-auth/authorize", async (request, reply) => {

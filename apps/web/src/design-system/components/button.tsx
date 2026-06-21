@@ -16,7 +16,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const baseClasses =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-transparent font-medium leading-tight no-underline transition-[color,background-color,border-color,transform] duration-150 active:not-disabled:translate-y-px disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [&>svg]:shrink-0";
+  "inline-flex min-h-11 items-center justify-center gap-2 border border-transparent font-medium leading-tight no-underline transition-[color,background-color,border-color,transform] duration-150 active:not-disabled:translate-y-px disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [&>svg]:shrink-0";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
@@ -31,8 +31,8 @@ const variantClasses: Record<ButtonVariant, string> = {
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  default: "px-5 py-3",
-  full: "min-h-13 w-full px-5 py-3",
+  default: "rounded-lg px-5 py-3",
+  full: "min-h-13 w-full rounded-lg px-5 py-3",
   icon: "size-11 min-h-11 rounded-full p-0",
 };
 
