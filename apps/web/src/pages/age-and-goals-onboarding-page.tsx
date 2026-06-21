@@ -114,7 +114,7 @@ export function AgeAndGoalsOnboardingPage({
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
                 <UserRound aria-hidden="true" size={19} />
               </div>
-              <h2 className="mb-1">Sobre você</h2>
+              <h2>Sobre você</h2>
             </div>
 
             <div className="flex flex-col gap-2">

@@ -117,7 +117,7 @@ export function LanguageOnboardingPage({
         </section>
 
         <Surface className="flex flex-col gap-5">
-          <div className="flex items-start gap-3">
+          <div className="flex items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
               <Languages aria-hidden="true" size={19} />
             </div>
@@ -130,9 +130,9 @@ export function LanguageOnboardingPage({
           </div>
 
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="instruction-language" className="font-medium">
-                Eu falo
+            <div className="flex gap-2 items-center">
+              <label htmlFor="instruction-language" className="min-w-16 font-medium">
+                Sei falar
               </label>
               <select
                 id="instruction-language"
@@ -154,9 +154,9 @@ export function LanguageOnboardingPage({
               </select>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label htmlFor="target-language" className="font-medium">
-                E quero aprender
+            <div className="flex gap-2 items-center">
+              <label htmlFor="target-language" className="min-w-30 font-medium">
+                Quero aprender
               </label>
               <select
                 id="target-language"
