@@ -8,7 +8,7 @@ The product generates highly personalized language lessons. The lesson must stay
 
 A single monolithic agent would be simpler to start with, but it would mix concerns:
 - lesson creation
-- policy and level validation
+- policy and module validation
 - exercise correction and feedback
 - external content discovery
 
@@ -19,7 +19,7 @@ This makes the system harder to reason about and harder to evolve safely.
 We will split lesson generation into separate agent roles:
 
 - `Lesson generator`: creates the core lesson
-- `Validator`: checks consistency, level fit, and policy fit
+- `Validator`: checks consistency, module fit, and policy fit
 - `Exercise reviewer`: corrects answers and produces feedback/report output
 - `External content curator`: optional agent that finds external material and links it to a lesson when it makes sense
 
@@ -29,11 +29,12 @@ We will split lesson generation into separate agent roles:
    - `Goal`
    - `User profile`
    - `Lesson emphasis`
+   - `Module`
    - `Top mistakes`
    - `Review points`
    - `Lesson length`
 
-2. The `Validator` checks whether the lesson is coherent, aligned with the user profile, and appropriate for the chosen level and focus.
+2. The `Validator` checks whether the lesson is coherent, aligned with the user profile, and appropriate for the active module and focus.
 
 3. The `External content curator` may enrich the lesson or post-lesson experience with optional external material.
 
@@ -41,7 +42,7 @@ We will split lesson generation into separate agent roles:
 
 5. The `Exercise reviewer` evaluates the user's answers, records the lesson report, and generates friendly feedback.
 
-6. The next lesson uses the lesson report, with `Top mistakes` as the main input and `Review points` added lightly over time.
+6. The next lesson uses the lesson report, with the active `Module` as the main input and `Top mistakes` adapting the module outline over time.
 
 ## Consequences
 

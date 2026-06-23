@@ -1,0 +1,5 @@
+# ADR 0007: Use competencies for learning progression
+
+Learner progress will be represented by a `Competency profile` against one versioned `Competency catalog` per target language, rather than by a single CEFR level. Core competencies apply to every learner, goals change competency priorities, vocabulary remains separate learning content, and personalization topics shape lesson context without becoming mandatory requirements.
+
+The `Initial diagnostic` and subsequent lesson evidence update competency estimates and confidence. These produce internal `Learning priorities` and a revisable `Learning plan` made of `Module`s. A `Module` is a bounded sequence of lessons with a stable `Module objective` and an adaptable `Module outline` built from shared catalog competencies and prerequisites. The product does not require a general proficiency label. CEFR remains only an optional learning goal. This refines ADR 0001 so validation is based on the competency profile, active module, and current learning priorities.

@@ -101,21 +101,89 @@ When `CEFR level` is selected, the user must choose one level:
 - B1
 - B2
 
-## Level check
+## Initial diagnostic
 
-Onboarding step used to estimate the user's current level.
+Optional short adaptive assessment performed during onboarding. It provides initial evidence for the learner's `Competency profile`; the `Beginner path` skips it, and remaining uncertainty is resolved through lesson performance.
 
-## Level check policy
+## Onboarding starting point
 
-Ask the user to self-assess first with these friendly options:
+Learner's choice between a `Beginner path` and a `Diagnostic path` during onboarding.
 
-- Beginner (A1)
-- Beginner plus (A2)
-- Intermediate (B1)
-- Upper intermediate (B2)
-- I don't know
+## Beginner path
 
-Then optionally run a short diagnostic test to confirm or adjust the estimate.
+Onboarding route for a learner who is starting from zero. It skips the `Initial diagnostic`.
+
+## Diagnostic path
+
+Onboarding route for a learner who already knows some of the target language. It runs the `Initial diagnostic`.
+
+## Competency profile
+
+Per-target-language view of the learner's estimated ability across relevant competencies, together with the confidence of each estimate. It guides lesson focus and evolves as new evidence is collected.
+
+## Competency catalog
+
+Versioned set of measurable capabilities and their learning relationships for one target language. Core and goal-specific learning both reference this shared catalog.
+
+## Core competency
+
+Foundational target-language capability relevant to every learner. A learner may demonstrate it through diagnostic or lesson evidence without receiving dedicated instruction.
+
+## Module
+
+Bounded learning unit that organizes several lessons around a small set of competencies from the `Competency catalog`.
+
+## Module objective
+
+Primary competency or learning outcome the `Module` is designed to advance.
+
+## Module prerequisite
+
+Competency that should usually be present before a `Module` starts or before it advances to a harder step.
+
+## Module outline
+
+Ordered list of competencies and lesson focuses within a `Module`. The objective stays stable while the remaining outline may adapt to evidence from lessons.
+
+## Module completion
+
+State that the learner has shown enough evidence to leave a `Module` and move to the next planned unit.
+
+## Goal priority
+
+Relevance assigned to a catalog competency for a particular `Goal`. A competency may have priority for multiple goals without being duplicated.
+
+## Learning priorities
+
+Ordered competencies and vocabulary selected for a learner from profile evidence, core gaps, goals, and review needs. They define what the learning experience should address next.
+
+## Learning plan
+
+Internal, revisable sequence of upcoming `Module`s and lesson focuses derived from the learner's `Learning priorities`. It changes as lessons add evidence to the `Competency profile`.
+
+## Vocabulary set
+
+Related target-language terms associated with one or more competencies, goals, or personalization topics. Individual vocabulary terms are learning content, not competencies.
+
+## Personalization topics
+
+Learner-specific interests and contexts used to make examples, vocabulary, and activities relevant. They are not competencies or mandatory learning requirements.
+
+## Diagnostic item
+
+Assessment prompt designed to collect evidence primarily about one competency at a known difficulty.
+
+## Audited onboarding question bank
+
+Versioned collection of diagnostic items reviewed before learner use. Each item has a target language, primary competency, difficulty, response format, and scoring rule.
+
+## Word bank item
+
+Constrained diagnostic item answered by selecting or arranging provided words. It measures assisted sentence construction, not independent written production.
+
+## Independent production item
+
+Diagnostic item answered without provided language choices. In the initial diagnostic, it is an optional high-difficulty item unlocked by strong performance on assisted items.
 
 ## Study pace
 
@@ -166,7 +234,7 @@ The IA stores richer internal notes, and also shows the user a friendly feedback
 
 ## Next lesson policy
 
-`Top mistakes` from the previous lesson should be used as the main input for the next lesson.
+The active `Module` should be used as the main input for the next lesson. `Top mistakes` from the previous lesson should adapt the outline inside that module.
 
 ## Review points policy
 
@@ -179,7 +247,7 @@ Suggested cadence: 1 to 2 review points every 3 lessons.
 - Most frequent mistakes should reappear in the next lesson
 - Rare mistakes should be used only as light reference
 - If a mistake appears 2 times or more, it gets high priority
-- The AI should not repeat everything, only what blocks progress the most
+- The AI should not repeat everything, only what blocks progress the most inside the active `Module`
 
 ## Lesson generator guidelines
 
@@ -189,6 +257,7 @@ It should always consider:
 - Goal
 - User profile
 - Lesson emphasis
+- Module
 - Top mistakes
 - Review points
 - Lesson length
@@ -203,7 +272,7 @@ Agent responsible for creating the core lesson.
 
 ### Validator
 
-Agent responsible for checking consistency, level, and policy fit.
+Agent responsible for checking consistency, module fit, and policy fit.
 
 ### Exercise reviewer
 
