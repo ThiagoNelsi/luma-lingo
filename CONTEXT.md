@@ -82,8 +82,6 @@ Learning target chosen from fixed options:
 - Everyday conversation
 - Work
 - Travel
-- Exam prep
-- CEFR level
 
 Goal policy:
 
@@ -94,12 +92,11 @@ Goal policy:
   - Work
   - Travel
 
-When `CEFR level` is selected, the user must choose one level:
+`Exam prep` and learner-facing `CEFR level` goals are outside the MVP. CEFR-like levels may be used only as internal difficulty references for competency selection and lesson planning.
 
-- A1
-- A2
-- B1
-- B2
+## Internal difficulty reference
+
+Approximate proficiency band used internally to calibrate competencies, diagnostics, and lesson difficulty. It is not presented as a learner goal or certification promise.
 
 ## Initial diagnostic
 
@@ -125,6 +122,18 @@ Per-target-language view of the learner's estimated ability across relevant comp
 
 Versioned set of measurable capabilities and their learning relationships for one target language. Core and goal-specific learning both reference this shared catalog.
 
+## Published competency catalog
+
+Approved version of a `Competency catalog` used for learner planning, diagnostics, lesson generation, and progress tracking.
+
+## Competency tag
+
+Metadata label used to group or filter catalog competencies when the distinction is not already captured by level, family, mode, goal priority, or prerequisite relationship.
+
+## Competency evidence
+
+Observation from a diagnostic, lesson, review, or activity response that informs the learner's `Competency profile`.
+
 ## Core competency
 
 Foundational target-language capability relevant to every learner. A learner may demonstrate it through diagnostic or lesson evidence without receiving dedicated instruction.
@@ -148,6 +157,10 @@ Ordered list of competencies and lesson focuses within a `Module`. The objective
 ## Module completion
 
 State that the learner has shown enough evidence to leave a `Module` and move to the next planned unit.
+
+## Module candidate score
+
+Internal ranking of possible next `Module` objectives for a learner. It compares eligible candidates using prerequisite readiness, goal priority, competency gaps, uncertainty, review needs, lesson emphasis fit, and recent learning focus.
 
 ## Goal priority
 

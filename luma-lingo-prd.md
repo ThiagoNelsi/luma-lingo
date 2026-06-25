@@ -48,9 +48,6 @@ The app should:
 1. As a learner, I want to choose `Everyday conversation` as a goal, so that I can practice practical communication.
 1. As a learner, I want to choose `Work` as a goal, so that I can practice vocabulary and situations related to my job.
 1. As a learner, I want to choose `Travel` as a goal, so that I can prepare for common travel situations.
-1. As a learner, I want to choose `Exam prep` as a goal, so that I can study toward a test-oriented objective.
-1. As a learner, I want to choose a `CEFR level` as a goal, so that I can study toward a defined proficiency level.
-1. As a learner, I want the CEFR goal to be limited to `A1`, `A2`, `B1`, and `B2`, so that the MVP stays focused on beginners and intermediate learners.
 1. As a learner, I want to choose `Lesson emphasis`, so that lessons can weight reading, writing, and listening according to how I prefer to study.
 1. As a learner, I want `Lesson emphasis` to be multi-select, so that I can combine more than one mode in a lesson.
 1. As a learner, I want `Speaking` excluded from the MVP, so that the experience stays focused on modes the product can support reliably.
@@ -106,8 +103,9 @@ The app should:
 - The onboarding flow order will be: language entry; `Learner age range`, `Display name`, and `Goal`; recorded introduction with asynchronous `User profile` extraction; `Lesson emphasis` with `Study pace`; onboarding starting point; optional `Initial diagnostic`; extracted-profile review and missing-field completion; review summary; then first lesson generation.
 - The `Initial diagnostic` will use a deterministic, audited question bank and will be skipped on the `Beginner path`.
 - The onboarding flow will collect `Instruction language` and `Target language` only for language entry.
-- `Goal` will use fixed options, with one primary goal required and up to two optional goals.
-- `CEFR level` will be a selectable goal with explicit level choices from `A1` through `B2`.
+- `Goal` will use fixed options limited to `Everyday conversation`, `Work`, and `Travel`, with one primary goal required and up to two optional goals.
+- `Exam prep` and learner-facing `CEFR level` goals will be excluded from the MVP.
+- CEFR-like levels may be used only as internal difficulty references for competency selection, diagnostics, and lesson planning; they should not be presented as certification or proficiency-level goals.
 - `Lesson emphasis` will be a multi-select field limited to `Reading`, `Writing`, and `Listening`.
 - `Speaking` will be excluded from the MVP.
 - `Study pace` will exist as a lightweight onboarding option with relaxed and accelerated modes.
@@ -187,6 +185,8 @@ The app should:
 ## Out of Scope
 
 - Speaking practice in the MVP.
+- Exam preparation as a learner-facing goal.
+- CEFR level selection as a learner-facing goal.
 - Marketplace features for third-party content.
 - Social features.
 - Streak mechanics in the MVP.
@@ -200,7 +200,7 @@ The app should:
 ## Further Notes
 
 - The MVP should stay small and reliable: the core lesson must work even when optional external material is unavailable.
-- The MVP should focus on beginners and intermediate learners, with CEFR goal support limited to `A1` through `B2`.
+- The MVP should focus on beginners and intermediate learners through practical goals, using internal difficulty calibration without promising CEFR progression.
 - The product's main loop is: onboarding -> core lesson -> review and feedback -> next lesson.
 - The user experience should feel encouraging rather than punitive.
 - The AI should focus on the few mistakes that most strongly block progress.
