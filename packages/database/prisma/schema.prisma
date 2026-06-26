@@ -108,22 +108,181 @@ model ProfileIntroduction {
 }
 
 model LearningTrack {
-  id                String           @id @db.Uuid
-  learnerId         String           @map("learner_id") @db.Uuid
-  targetLanguage    String           @map("target_language")
-  level             String?
-  learningGoal      String?          @map("learning_goal")
-  goalCefrLevel     String?          @map("goal_cefr_level")
-  additionalGoals   String[]         @default([]) @map("additional_goals")
-  lessonEmphases    String[]         @default([]) @map("lesson_emphases")
-  studyPace         String?          @map("study_pace")
-  onboardingStatus  OnboardingStatus @default(not_started) @map("onboarding_status")
-  onboardingStep    String?          @map("onboarding_step")
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learner           Learner          @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
-  currentForLearner Learner?         @relation("CurrentLearningTrack")
+  id                  String                   @id @db.Uuid
+  learnerId           String                   @map("learner_id") @db.Uuid
+  targetLanguage      String                   @map("target_language")
+  level               String?
+  learningGoal        String?                  @map("learning_goal")
+  goalCefrLevel       String?                  @map("goal_cefr_level")
+  additionalGoals     String[]                 @default([]) @map("additional_goals")
+  lessonEmphases      String[]                 @default([]) @map("lesson_emphases")
+  studyPace           String?                  @map("study_pace")
+  competencyCatalogId String?                  @map("competency_catalog_id") @db.Uuid
+  onboardingStatus    OnboardingStatus         @default(not_started) @map("onboarding_status")
+  onboardingStep      String?                  @map("onboarding_step")
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learner             Learner                  @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
+  competencyCatalog   CompetencyCatalog?       @relation(fields: [competencyCatalogId], references: [id], onDelete: SetNull)
+  competencyStates    LearnerCompetencyState[]
+  competencyEvidence  CompetencyEvidence[]
+  currentForLearner   Learner?                 @relation("CurrentLearningTrack")
 
   @@unique([learnerId, targetLanguage])
+  @@index([competencyCatalogId])
   @@map("learning_tracks")
+}
+
+model CompetencyCatalog {
+  id              String           @id @db.Uuid
+  targetLanguage  String           @map("target_language")
+  version         String
+  status          String           @default("draft")
+  publishedAt     DateTime?        @map("published_at") @db.Timestamptz(6)
+  sourceChecksum  String?          @map("source_checksum")
+  metadata        Json             @default("{}")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTracks  LearningTrack[]
+  competencies    Competency[]
+  diagnosticItems DiagnosticItem[]
+
+  @@unique([targetLanguage, version])
+  @@index([targetLanguage, status])
+  @@map("competency_catalogs")
+}
+
+model Competency {
+  id                     String                           @id @db.Uuid
+  catalogId              String                           @map("catalog_id") @db.Uuid
+  key                    String
+  title                  String
+  description            String?
+  family                 String
+  mode                   String?
+  difficultyBand         String?                          @map("difficulty_band")
+  isCore                 Boolean                          @default(false) @map("is_core")
+  details                Json                             @default("{}")
+  createdAt              DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  prerequisites          CompetencyPrerequisite[]         @relation("CompetencyPrerequisites")
+  requiredBy             CompetencyPrerequisite[]         @relation("CompetencyRequiredBy")
+  goalPriorities         CompetencyGoalPriority[]
+  primaryDiagnosticItems DiagnosticItem[]                 @relation("PrimaryDiagnosticCompetency")
+  diagnosticItemTargets  DiagnosticItemCompetencyTarget[]
+  learnerStates          LearnerCompetencyState[]
+  evidence               CompetencyEvidence[]
+
+  @@unique([catalogId, key])
+  @@index([catalogId, family])
+  @@index([catalogId, difficultyBand])
+  @@map("competencies")
+}
+
+model CompetencyPrerequisite {
+  competencyId   String     @map("competency_id") @db.Uuid
+  prerequisiteId String     @map("prerequisite_id") @db.Uuid
+  strength       Int?
+  details        Json       @default("{}")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  competency     Competency @relation("CompetencyPrerequisites", fields: [competencyId], references: [id], onDelete: Cascade)
+  prerequisite   Competency @relation("CompetencyRequiredBy", fields: [prerequisiteId], references: [id], onDelete: Restrict)
+
+  @@id([competencyId, prerequisiteId])
+  @@index([prerequisiteId])
+  @@map("competency_prerequisites")
+}
+
+model CompetencyGoalPriority {
+  id           String     @id @db.Uuid
+  competencyId String     @map("competency_id") @db.Uuid
+  goal         String
+  priority     Int
+  details      Json       @default("{}")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([competencyId, goal])
+  @@index([goal, priority])
+  @@map("competency_goal_priorities")
+}
+
+model DiagnosticItem {
+  id                  String                           @id @db.Uuid
+  catalogId           String                           @map("catalog_id") @db.Uuid
+  key                 String
+  primaryCompetencyId String                           @map("primary_competency_id") @db.Uuid
+  difficultyBand      String                           @map("difficulty_band")
+  responseFormat      String                           @map("response_format")
+  status              String                           @default("draft")
+  prompt              Json
+  scoringRule         Json                             @map("scoring_rule")
+  details             Json                             @default("{}")
+  reviewedAt          DateTime?                        @map("reviewed_at") @db.Timestamptz(6)
+  publishedAt         DateTime?                        @map("published_at") @db.Timestamptz(6)
+  createdAt           DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog             CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  primaryCompetency   Competency                       @relation("PrimaryDiagnosticCompetency", fields: [primaryCompetencyId], references: [id], onDelete: Restrict)
+  competencyTargets   DiagnosticItemCompetencyTarget[]
+
+  @@unique([catalogId, key])
+  @@index([catalogId, status, difficultyBand])
+  @@index([primaryCompetencyId])
+  @@map("diagnostic_items")
+}
+
+model DiagnosticItemCompetencyTarget {
+  diagnosticItemId String         @map("diagnostic_item_id") @db.Uuid
+  competencyId     String         @map("competency_id") @db.Uuid
+  role             String
+  weight           Int?
+  details          Json           @default("{}")
+  diagnosticItem   DiagnosticItem @relation(fields: [diagnosticItemId], references: [id], onDelete: Cascade)
+  competency       Competency     @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+
+  @@id([diagnosticItemId, competencyId])
+  @@index([competencyId])
+  @@map("diagnostic_item_competency_targets")
+}
+
+model LearnerCompetencyState {
+  id              String        @id @db.Uuid
+  learningTrackId String        @map("learning_track_id") @db.Uuid
+  competencyId    String        @map("competency_id") @db.Uuid
+  abilityEstimate Float?        @map("ability_estimate")
+  confidence      Float         @default(0)
+  evidenceCount   Int           @default(0) @map("evidence_count")
+  lastEvidenceAt  DateTime?     @map("last_evidence_at") @db.Timestamptz(6)
+  details         Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack   LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  competency      Competency    @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+
+  @@unique([learningTrackId, competencyId])
+  @@index([competencyId])
+  @@map("learner_competency_states")
+}
+
+model CompetencyEvidence {
+  id              String        @id @db.Uuid
+  learningTrackId String        @map("learning_track_id") @db.Uuid
+  competencyId    String        @map("competency_id") @db.Uuid
+  sourceType      String        @map("source_type")
+  sourceId        String?       @map("source_id")
+  observedAt      DateTime      @default(now()) @map("observed_at") @db.Timestamptz(6)
+  score           Float?
+  confidence      Float?
+  details         Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  learningTrack   LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  competency      Competency    @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+
+  @@index([learningTrackId, observedAt])
+  @@index([competencyId])
+  @@index([sourceType, sourceId])
+  @@map("competency_evidence")
 }

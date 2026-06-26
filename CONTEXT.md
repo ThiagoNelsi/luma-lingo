@@ -118,6 +118,10 @@ Onboarding route for a learner who already knows some of the target language. It
 
 Per-target-language view of the learner's estimated ability across relevant competencies, together with the confidence of each estimate. It guides lesson focus and evolves as new evidence is collected.
 
+## Learner competency state
+
+Current estimate for one learner's ability and confidence in one catalog competency. It is a summary of evidence, not the evidence history itself.
+
 ## Competency catalog
 
 Versioned set of measurable capabilities and their learning relationships for one target language. Core and goal-specific learning both reference this shared catalog.
@@ -126,17 +130,45 @@ Versioned set of measurable capabilities and their learning relationships for on
 
 Approved version of a `Competency catalog` used for learner planning, diagnostics, lesson generation, and progress tracking.
 
+## Competency identifier
+
+Stable catalog-specific reference for one competency. It is used to connect catalog authoring, diagnostics, planning, and learner evidence without depending on learner-facing wording.
+
+## Competency family
+
+Broad kind of capability represented by a competency, such as situational communication, grammar, vocabulary, comprehension, or production.
+
+## Competency mode
+
+Learning or evidence mode most closely associated with a competency when one mode is dominant, such as reading, writing, or listening.
+
 ## Competency tag
 
 Metadata label used to group or filter catalog competencies when the distinction is not already captured by level, family, mode, goal priority, or prerequisite relationship.
+
+## Competency prerequisite
+
+Learning relationship where one competency should usually be present before another competency is taught, assessed, or used as a module objective.
+
+## Prerequisite strength
+
+Relative importance of a `Competency prerequisite` for readiness. Stronger prerequisites should have more influence on planning than weak supporting relationships.
 
 ## Competency evidence
 
 Observation from a diagnostic, lesson, review, or activity response that informs the learner's `Competency profile`.
 
+## Competency evidence source
+
+Origin of a `Competency evidence` observation, such as an initial diagnostic, lesson activity, review, or manual correction.
+
 ## Core competency
 
 Foundational target-language capability relevant to every learner. A learner may demonstrate it through diagnostic or lesson evidence without receiving dedicated instruction.
+
+## Supporting competency
+
+Competency practiced or observed inside a module, diagnostic item, or lesson activity without being the primary objective.
 
 ## Module
 
@@ -164,7 +196,7 @@ Internal ranking of possible next `Module` objectives for a learner. It compares
 
 ## Goal priority
 
-Relevance assigned to a catalog competency for a particular `Goal`. A competency may have priority for multiple goals without being duplicated.
+Relative relevance assigned to a catalog competency for a particular `Goal`. A competency may have priority for multiple goals without being duplicated.
 
 ## Learning priorities
 
@@ -185,6 +217,22 @@ Learner-specific interests and contexts used to make examples, vocabulary, and a
 ## Diagnostic item
 
 Assessment prompt designed to collect evidence primarily about one competency at a known difficulty.
+
+## Diagnostic target
+
+Competency that a `Diagnostic item` can collect evidence for. Each diagnostic item has one primary diagnostic target and may also have supporting targets.
+
+## Diagnostic target role
+
+Purpose of a `Diagnostic target` within a diagnostic item, such as primary or supporting.
+
+## Diagnostic target weight
+
+Relative contribution of a diagnostic item response to one `Diagnostic target`.
+
+## Scoring rule
+
+Reviewed rule that converts a diagnostic response into score and evidence. It should be deterministic for the `Initial diagnostic`.
 
 ## Audited onboarding question bank
 

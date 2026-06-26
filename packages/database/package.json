@@ -13,6 +13,7 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "check": "DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost:5432/luma_lingo} prisma validate && tsc --noEmit",
     "db:generate": "prisma generate",
+    "db:import:competencies": "dotenv -e ../../.env -- node scripts/import-competency-catalog.mjs",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
     "test": "vitest run --passWithNoTests"

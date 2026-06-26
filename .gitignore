@@ -24,3 +24,6 @@ teach-skill-dir/
 ignore
 
 test-results/
+
+data/
+data.zip
