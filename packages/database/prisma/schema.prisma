@@ -125,6 +125,7 @@ model LearningTrack {
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
   learner                 Learner                  @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
   competencyCatalog       CompetencyCatalog?       @relation(fields: [competencyCatalogId], references: [id], onDelete: SetNull)
+  diagnosticAttempts      DiagnosticAttempt[]
   competencyStates        LearnerCompetencyState[]
   competencyEvidence      CompetencyEvidence[]
   currentForLearner       Learner?                 @relation("CurrentLearningTrack")
@@ -135,18 +136,19 @@ model LearningTrack {
 }
 
 model CompetencyCatalog {
-  id              String           @id @db.Uuid
-  targetLanguage  String           @map("target_language")
-  version         String
-  status          String           @default("draft")
-  publishedAt     DateTime?        @map("published_at") @db.Timestamptz(6)
-  sourceChecksum  String?          @map("source_checksum")
-  metadata        Json             @default("{}")
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learningTracks  LearningTrack[]
-  competencies    Competency[]
-  diagnosticItems DiagnosticItem[]
+  id                 String              @id @db.Uuid
+  targetLanguage     String              @map("target_language")
+  version            String
+  status             String              @default("draft")
+  publishedAt        DateTime?           @map("published_at") @db.Timestamptz(6)
+  sourceChecksum     String?             @map("source_checksum")
+  metadata           Json                @default("{}")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTracks     LearningTrack[]
+  competencies       Competency[]
+  diagnosticItems    DiagnosticItem[]
+  diagnosticAttempts DiagnosticAttempt[]
 
   @@unique([targetLanguage, version])
   @@index([targetLanguage, status])
@@ -228,6 +230,7 @@ model DiagnosticItem {
   catalog             CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
   primaryCompetency   Competency                       @relation("PrimaryDiagnosticCompetency", fields: [primaryCompetencyId], references: [id], onDelete: Restrict)
   competencyTargets   DiagnosticItemCompetencyTarget[]
+  attemptItems        DiagnosticAttemptItem[]
 
   @@unique([catalogId, key])
   @@index([catalogId, status, difficultyBand])
@@ -247,6 +250,58 @@ model DiagnosticItemCompetencyTarget {
   @@id([diagnosticItemId, competencyId])
   @@index([competencyId])
   @@map("diagnostic_item_competency_targets")
+}
+
+model DiagnosticAttempt {
+  id                     String                  @id @db.Uuid
+  learningTrackId        String                  @map("learning_track_id") @db.Uuid
+  catalogId              String                  @map("catalog_id") @db.Uuid
+  purpose                String
+  status                 String                  @default("in_progress")
+  selectionPolicyVersion String                  @map("selection_policy_version")
+  scoringPolicyVersion   String                  @map("scoring_policy_version")
+  startedAt              DateTime                @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt            DateTime?               @map("completed_at") @db.Timestamptz(6)
+  abandonedAt            DateTime?               @map("abandoned_at") @db.Timestamptz(6)
+  summary                Json                    @default("{}")
+  details                Json                    @default("{}")
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack          LearningTrack           @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  catalog                CompetencyCatalog       @relation(fields: [catalogId], references: [id], onDelete: Restrict)
+  items                  DiagnosticAttemptItem[]
+
+  @@index([learningTrackId, status])
+  @@index([learningTrackId, purpose, status])
+  @@index([catalogId])
+  @@map("diagnostic_attempts")
+}
+
+model DiagnosticAttemptItem {
+  id               String            @id @db.Uuid
+  attemptId        String            @map("attempt_id") @db.Uuid
+  diagnosticItemId String            @map("diagnostic_item_id") @db.Uuid
+  position         Int
+  selectedForRole  String            @map("selected_for_role")
+  selectionRule    String            @map("selection_rule")
+  selectionTrace   Json              @default("{}") @map("selection_trace")
+  response         Json?
+  score            Float?
+  confidence       Float?
+  shownAt          DateTime          @default(now()) @map("shown_at") @db.Timestamptz(6)
+  answeredAt       DateTime?         @map("answered_at") @db.Timestamptz(6)
+  details          Json              @default("{}")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  attempt          DiagnosticAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  diagnosticItem   DiagnosticItem    @relation(fields: [diagnosticItemId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptId, position])
+  @@unique([attemptId, diagnosticItemId])
+  @@index([diagnosticItemId])
+  @@index([selectedForRole])
+  @@index([selectionRule])
+  @@map("diagnostic_attempt_items")
 }
 
 model LearnerCompetencyState {
