@@ -1,9 +1,10 @@
 # Competency database schema
 
 This document explains the competency-related database models in
-`packages/database/prisma/schema.prisma`. Use it when you need to author
-catalog importers, write planner queries, build diagnostic scoring, or review
-how learner progress is stored.
+`packages/database/prisma/schema.prisma` and agreed schema additions that are
+ready for implementation. Use it when you need to author catalog importers,
+write planner queries, build diagnostic scoring, or review how learner progress
+is stored.
 
 For domain language, use `CONTEXT.md`. For the architectural reasons behind
 this shape, use the competency ADRs in `docs/adr/`.
@@ -16,6 +17,9 @@ The schema separates three concerns:
   `CompetencyGoalPriority` define the versioned curriculum graph.
 - `DiagnosticItem` and `DiagnosticItemCompetencyTarget` define the audited
   onboarding question bank.
+- `DiagnosticAttempt` and `DiagnosticAttemptItem` record one learner's
+  diagnostic execution, selected items, responses, deterministic scores, and
+  audit trace.
 - `CompetencyEvidence` and `LearnerCompetencyState` store learner observations
   and the current learner estimate per competency.
 
@@ -28,12 +32,14 @@ onboarding or while a catalog is not published yet.
 ```text
 LearningTrack
   -> CompetencyCatalog?
+  -> DiagnosticAttempt[]
   -> LearnerCompetencyState[]
   -> CompetencyEvidence[]
 
 CompetencyCatalog
   -> Competency[]
   -> DiagnosticItem[]
+  -> DiagnosticAttempt[]
 
 Competency
   -> CompetencyPrerequisite[] as the competency being unlocked
@@ -47,6 +53,16 @@ Competency
 DiagnosticItem
   -> Competency as primaryCompetency
   -> DiagnosticItemCompetencyTarget[]
+  -> DiagnosticAttemptItem[]
+
+DiagnosticAttempt
+  -> LearningTrack
+  -> CompetencyCatalog
+  -> DiagnosticAttemptItem[]
+
+DiagnosticAttemptItem
+  -> DiagnosticAttempt
+  -> DiagnosticItem
 ```
 
 ## CompetencyCatalog
@@ -196,15 +212,27 @@ Important fields:
   deterministic item selection and the main evidence update.
 - `difficultyBand`: Internal difficulty for diagnostic selection.
 - `responseFormat`: Expected response shape. Example values:
-  `word_bank_sequence`, `multiple_choice`, and `independent_text`.
+  `word_bank_sequence`, `multiple_choice`, and `fill_blank_choice` for the MVP.
 - `status`: Authoring status. Current expected values are `draft`, `reviewed`,
   and `published`; validate these in application code.
 - `prompt`: JSONB prompt payload. Its shape depends on `responseFormat`.
 - `scoringRule`: JSONB deterministic scoring rule. See the examples below.
 - `details`: JSONB for authoring notes, distractor rationale, localization
-  notes, or item safety notes.
+  notes, item safety notes, and `diagnosticRoles`.
 - `reviewedAt`: Time the item was reviewed for learner use.
 - `publishedAt`: Time the item became available for runtime selection.
+
+Example `details`:
+
+```json
+{
+  "schemaVersion": 1,
+  "diagnosticRoles": ["foundation_probe", "ceiling_probe"],
+  "rationale": "Checks simple subject-verb-object construction.",
+  "safetyNotes": [],
+  "localizationNotes": []
+}
+```
 
 Example `prompt` for a word bank item:
 
@@ -245,6 +273,143 @@ weight: 60
 
 The primary competency gets the clearest evidence. The supporting grammar
 competency can also update the learner's profile, but with less influence.
+
+## DiagnosticAttempt
+
+`DiagnosticAttempt` records one execution of the initial diagnostic or a future
+diagnostic-like flow for one learning track. The MVP uses it for the onboarding
+initial diagnostic. An in-progress attempt may be resumed for up to 48 hours;
+stale attempts are marked abandoned before a new attempt starts.
+
+Important fields:
+
+- `learningTrackId`: The learning track being diagnosed.
+- `catalogId`: The catalog version used for item selection.
+- `purpose`: Why the attempt exists. The MVP value is
+  `onboarding_initial`; future values may include `recalibration` or
+  `internal_qa`.
+- `status`: Attempt state. Expected MVP values are `in_progress`,
+  `completed`, and `abandoned`; validate these in application code until an
+  enum is justified.
+- `selectionPolicyVersion`: Version of the deterministic item-selection policy.
+- `scoringPolicyVersion`: Version of the policy that converts item scores into
+  diagnostic evidence and learner competency state.
+- `startedAt`: Time the attempt started.
+- `completedAt`: Time the attempt completed automatically, if completed.
+- `abandonedAt`: Time the attempt was abandoned, if abandoned.
+- `summary`: JSONB final attempt summary. It is written when the attempt
+  completes, not incrementally after every item.
+- `details`: JSONB for algorithm notes, stale-attempt reason, or operational
+  metadata.
+
+Expected constraints and indexes:
+
+```text
+@@index([learningTrackId, status])
+@@index([learningTrackId, purpose, status])
+@@index([catalogId])
+```
+
+The MVP should enforce only one `in_progress` attempt per
+`learningTrackId + purpose` in application code. A partial unique index can be
+added manually later if runtime behavior shows it is needed.
+
+Example final `summary`:
+
+```json
+{
+  "schemaVersion": 1,
+  "answeredItemCount": 8,
+  "estimatedStartingBand": "A1",
+  "overallConfidence": 0.72,
+  "strongCompetencyKeys": ["pre-a1-core-be-present-affirmative"],
+  "weakCompetencyKeys": ["a1-core-present-simple-questions"],
+  "stopReason": "max_items_reached"
+}
+```
+
+## DiagnosticAttemptItem
+
+`DiagnosticAttemptItem` records one diagnostic item shown inside a diagnostic
+attempt. It is created when the item is shown, then updated when the learner
+answers. The MVP does not store a separate item status; an item with a null
+`answeredAt` or null `response` is not answered.
+
+Important fields:
+
+- `attemptId`: The diagnostic attempt containing this item.
+- `diagnosticItemId`: The audited item that was shown.
+- `position`: One-based item order inside the attempt.
+- `selectedForRole`: The single diagnostic role that caused the selector to
+  choose this item in this attempt.
+- `selectionRule`: Stable rule identifier for why the item was selected.
+- `selectionTrace`: JSONB deterministic audit trace for candidate ranking,
+  thresholds, secondary matches, or tie breakers.
+- `response`: Nullable JSONB structured learner response.
+- `score`: Nullable normalized score from `0` to `1`.
+- `confidence`: Nullable scoring confidence from `0` to `1`.
+- `shownAt`: Time the item was shown to the learner.
+- `answeredAt`: Time the learner answered, if answered.
+- `details`: JSONB for matched criteria, missed criteria, mistake codes, or
+  response-kind notes.
+- `createdAt`: Technical row creation time.
+- `updatedAt`: Technical row update time.
+
+Expected constraints and indexes:
+
+```text
+@@unique([attemptId, position])
+@@unique([attemptId, diagnosticItemId])
+@@index([diagnosticItemId])
+@@index([selectedForRole])
+@@index([selectionRule])
+```
+
+Example `selectionTrace`:
+
+```json
+{
+  "schemaVersion": 1,
+  "desiredRole": "ceiling_probe",
+  "candidateCount": 14,
+  "rankedPosition": 1,
+  "currentBandEstimate": "Pre-A1",
+  "foundationScore": 0.86,
+  "threshold": 0.75,
+  "secondaryMatches": ["goal_probe"],
+  "tieBreaker": "attempt_seed"
+}
+```
+
+Example multiple-choice response:
+
+```json
+{
+  "kind": "selected_options",
+  "selectedOptionIds": ["option_b"]
+}
+```
+
+Example word-bank response:
+
+```json
+{
+  "kind": "word_bank_sequence",
+  "submittedSequence": ["I", "am", "a", "teacher"]
+}
+```
+
+Example don't-know response:
+
+```json
+{
+  "kind": "dont_know"
+}
+```
+
+The don't-know response is an answered diagnostic item. It receives no positive
+score and should carry moderate confidence because it is a clearer signal than
+a wrong guess, but still may reflect fatigue, anxiety, or low effort.
 
 ## LearnerCompetencyState
 
@@ -288,7 +453,7 @@ Important fields:
   `initial_diagnostic`, `lesson_activity`, `lesson_review`, and
   `manual_adjustment`.
 - `sourceId`: Optional identifier of the source record. This may reference a
-  diagnostic item, activity response, lesson report, or internal event.
+  diagnostic attempt item, activity response, lesson report, or internal event.
 - `observedAt`: Time the learner produced the behavior being observed.
 - `score`: Optional normalized score from `0` to `1`.
 - `confidence`: Optional confidence from `0` to `1` for this observation.
@@ -300,7 +465,7 @@ Example evidence:
 ```json
 {
   "sourceType": "initial_diagnostic",
-  "sourceId": "en.diag.a1.word-bank.introduce-self.001",
+  "sourceId": "diagnostic-attempt-item-uuid",
   "score": 0.8,
   "confidence": 0.7,
   "details": {
@@ -336,6 +501,10 @@ reporting, or database constraints need to inspect it directly.
 `scoringRule` must be deterministic for the initial diagnostic. The runtime
 can use an LLM to author drafts offline, but runtime scoring must not depend on
 LLM judgment.
+
+For the MVP, the scorer produces one item-level `score` and `confidence`.
+Evidence is distributed to the primary and supporting diagnostic targets using
+target weights when the attempt completes.
 
 ### Word bank sequence
 
@@ -401,6 +570,28 @@ Use this shape when one or more fixed options are correct.
 Distractor metadata helps convert wrong answers into useful evidence and
 feedback without changing the deterministic score.
 
+### Fill blank choice
+
+Use this shape when the learner chooses one option for a blank inside a
+sentence or short text.
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "fill_blank_choice",
+  "maxScore": 1,
+  "blankId": "blank_1",
+  "correctOptionIds": ["option_an"],
+  "distractors": {
+    "option_a": {
+      "mistakeCode": "wrong_article_before_vowel_sound"
+    }
+  },
+  "passingScore": 1,
+  "evidenceConfidence": 0.75
+}
+```
+
 ### Independent text with checklist scoring
 
 Use this shape only for tightly constrained text answers. The initial
@@ -452,5 +643,11 @@ is narrow and well-tested.
   prerequisite graphs only inside JSONB.
 - Write every diagnostic item with one primary competency, even when it also
   produces supporting evidence.
-- Store raw observations in `CompetencyEvidence`; update
+- Keep `diagnosticRoles` in `DiagnosticItem.details` for the MVP. Promote them
+  to columns or a relation only if database-level role queries become necessary.
+- Treat don't-know responses as answered items, not skipped items.
+- Create formal diagnostic `CompetencyEvidence` only when a diagnostic attempt
+  completes. Abandoned attempt items remain available for analytics but do not
+  update the learner's competency profile.
+- Store formal observations in `CompetencyEvidence`; update
   `LearnerCompetencyState` as the current summary.

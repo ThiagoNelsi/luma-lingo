@@ -238,9 +238,47 @@ Reviewed rule that converts a diagnostic response into score and evidence. It sh
 
 Versioned collection of diagnostic items reviewed before learner use. Each item has a target language, primary competency, difficulty, response format, and scoring rule.
 
+## Diagnostic attempt
+
+One learner execution of the `Initial diagnostic` for a `LearningTrack`. A diagnostic attempt records which diagnostic items were presented, in what order, and how the attempt finished. An in-progress attempt may be resumed for up to 48 hours; stale incomplete attempts are abandoned before a new attempt starts.
+
+## Diagnostic attempt purpose
+
+Reason a `Diagnostic attempt` exists, such as initial onboarding calibration, future recalibration, or internal quality review. The MVP learner experience uses the initial onboarding purpose.
+
+## Diagnostic attempt item
+
+One `Diagnostic item` presented inside a `Diagnostic attempt`. It records the item's position in the attempt, the learner's structured response when answered, and the deterministic scoring result used to create competency evidence. In the MVP, whether an attempt item was answered is inferred from response data rather than stored as a separate item status.
+
+## Diagnostic selection policy
+
+Versioned deterministic rule set that chooses the next `Diagnostic item` during a `Diagnostic attempt`. It may use item roles, previous answers, goals, difficulty, and current evidence estimates, but it does not use runtime LLM judgment.
+
+## Diagnostic response duration
+
+Time between showing a `Diagnostic attempt item` and receiving the learner's response. It is collected for analysis, but should not affect MVP scoring or confidence until enough item-specific data exists to interpret it.
+
+Diagnostic response duration is derived from item timestamps rather than stored as a separate duration value.
+
+## Diagnostic don't-know response
+
+Explicit learner response that they do not know how to answer a `Diagnostic attempt item`. It is treated as an answered item with no positive score, not as a skipped item or abandoned attempt.
+
+## Diagnostic completion
+
+End of a `Diagnostic attempt` after the selection policy decides enough items have been answered or no useful next item remains. The MVP completes the diagnostic automatically instead of asking the learner to manually finish it.
+
 ## Word bank item
 
 Constrained diagnostic item answered by selecting or arranging provided words. It measures assisted sentence construction, not independent written production.
+
+## Fill blank choice item
+
+Constrained diagnostic item answered by choosing an option for a blank inside a sentence or short text.
+
+## Multiple choice item
+
+Constrained diagnostic item answered by choosing one option from a fixed option set.
 
 ## Independent production item
 
