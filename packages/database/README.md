@@ -10,9 +10,9 @@ This package owns the Prisma schema, migrations, and database client for LumaLin
 - Profile introduction records store processing status, retry count, errors,
   and extracted profile fields. The database never stores the raw recording or
   its transcript.
-- Learning tracks store the learner's selected Lesson emphasis values and
-  optional Study pace so Level check and lesson generation can consume the same
-  persisted preferences.
+- Learning tracks store the learner's selected Lesson emphasis values, optional
+  Study pace, and Onboarding starting point so onboarding resume and lesson
+  generation can consume the same persisted preferences.
 - Learning tracks may point to a versioned competency catalog. Catalog records,
   competencies, prerequisites, goal priorities, diagnostic items, competency
   evidence, and sparse learner competency state live in Postgres. Language- and

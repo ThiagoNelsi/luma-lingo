@@ -108,25 +108,26 @@ model ProfileIntroduction {
 }
 
 model LearningTrack {
-  id                  String                   @id @db.Uuid
-  learnerId           String                   @map("learner_id") @db.Uuid
-  targetLanguage      String                   @map("target_language")
-  level               String?
-  learningGoal        String?                  @map("learning_goal")
-  goalCefrLevel       String?                  @map("goal_cefr_level")
-  additionalGoals     String[]                 @default([]) @map("additional_goals")
-  lessonEmphases      String[]                 @default([]) @map("lesson_emphases")
-  studyPace           String?                  @map("study_pace")
-  competencyCatalogId String?                  @map("competency_catalog_id") @db.Uuid
-  onboardingStatus    OnboardingStatus         @default(not_started) @map("onboarding_status")
-  onboardingStep      String?                  @map("onboarding_step")
-  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learner             Learner                  @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
-  competencyCatalog   CompetencyCatalog?       @relation(fields: [competencyCatalogId], references: [id], onDelete: SetNull)
-  competencyStates    LearnerCompetencyState[]
-  competencyEvidence  CompetencyEvidence[]
-  currentForLearner   Learner?                 @relation("CurrentLearningTrack")
+  id                      String                   @id @db.Uuid
+  learnerId               String                   @map("learner_id") @db.Uuid
+  targetLanguage          String                   @map("target_language")
+  level                   String?
+  learningGoal            String?                  @map("learning_goal")
+  goalCefrLevel           String?                  @map("goal_cefr_level")
+  additionalGoals         String[]                 @default([]) @map("additional_goals")
+  lessonEmphases          String[]                 @default([]) @map("lesson_emphases")
+  studyPace               String?                  @map("study_pace")
+  onboardingStartingPoint String?                  @map("onboarding_starting_point")
+  competencyCatalogId     String?                  @map("competency_catalog_id") @db.Uuid
+  onboardingStatus        OnboardingStatus         @default(not_started) @map("onboarding_status")
+  onboardingStep          String?                  @map("onboarding_step")
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learner                 Learner                  @relation("LearnerLearningTracks", fields: [learnerId], references: [id], onDelete: Cascade)
+  competencyCatalog       CompetencyCatalog?       @relation(fields: [competencyCatalogId], references: [id], onDelete: SetNull)
+  competencyStates        LearnerCompetencyState[]
+  competencyEvidence      CompetencyEvidence[]
+  currentForLearner       Learner?                 @relation("CurrentLearningTrack")
 
   @@unique([learnerId, targetLanguage])
   @@index([competencyCatalogId])

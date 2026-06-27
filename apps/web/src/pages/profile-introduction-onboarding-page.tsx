@@ -193,8 +193,8 @@ export function ProfileIntroductionOnboardingPage({
         <div className="mx-auto flex w-full max-w-176 flex-col gap-5">
           <PageHeader />
           <Progress
-            label="Configuração inicial, etapa 4 de 6"
-            max={6}
+            label="Configuração inicial, etapa 4 de 7"
+            max={7}
             value={4}
           />
           <Surface className="flex flex-col gap-4">
@@ -221,12 +221,12 @@ export function ProfileIntroductionOnboardingPage({
         <PageHeader />
         <section className="pt-2">
           <Progress
-            label="Configuração inicial, etapa 4 de 6"
-            max={6}
+            label="Configuração inicial, etapa 4 de 7"
+            max={7}
             value={4}
           />
           <p className="mt-3 mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Etapa 4 de 6
+            Etapa 4 de 7
           </p>
           <h1 className="mb-2">Conte um pouco sobre você</h1>
           <p className="mb-0 max-w-[48ch] leading-[var(--line-height-relaxed)] text-muted-foreground">

@@ -6,6 +6,7 @@ import {
   languageCodeSchema,
   learnerAgeRangeSchema,
   lessonEmphasisSchema,
+  onboardingStartingPointSchema,
   studyPaceSchema,
 } from "@luma-lingo/shared";
 
@@ -64,6 +65,12 @@ export function toAuthProfile(user: UserWithLearner): AuthProfile {
           ),
           studyPace: user.learner.currentLearningTrack.studyPace
             ? studyPaceSchema.parse(user.learner.currentLearningTrack.studyPace)
+            : null,
+          onboardingStartingPoint: user.learner.currentLearningTrack
+            .onboardingStartingPoint
+            ? onboardingStartingPointSchema.parse(
+                user.learner.currentLearningTrack.onboardingStartingPoint,
+              )
             : null,
           onboardingStatus: user.learner.currentLearningTrack.onboardingStatus,
           onboardingStep: user.learner.currentLearningTrack.onboardingStep,

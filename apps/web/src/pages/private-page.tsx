@@ -26,6 +26,35 @@ export function renderPrivateRouteText(me: MeResponse): string {
   return `Boas-vindas, ${displayName}!`;
 }
 
+export function getNextOnboardingRoute(me: MeResponse): string {
+  if (me.currentLearningTrack?.onboardingStatus === "completed") {
+    return "/private";
+  }
+  if (!me.learner.instructionLanguage || !me.currentLearningTrack) {
+    return "/onboarding/languages";
+  }
+  if (me.currentLearningTrack.onboardingStep === "starting_point") {
+    return "/onboarding/starting-point";
+  }
+  if (!me.learner.ageRange) {
+    return "/onboarding/about-you";
+  }
+  if (!me.currentLearningTrack.learningGoal) {
+    return "/onboarding/goals";
+  }
+  if (me.currentLearningTrack.onboardingStep === "age_and_goals") {
+    return "/onboarding/introduction";
+  }
+  if (!me.currentLearningTrack.lessonEmphases?.length) {
+    return "/onboarding/preferences";
+  }
+  if (!me.currentLearningTrack.onboardingStartingPoint) {
+    return "/onboarding/starting-point";
+  }
+
+  return "/onboarding/starting-point";
+}
+
 export function PrivatePage({ apiOrigin }: PrivatePageProps) {
   const navigate = useNavigate();
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -118,17 +147,17 @@ export function PrivatePage({ apiOrigin }: PrivatePageProps) {
           </p>
           <div className="flex justify-between gap-4 text-[var(--text-overline)] font-medium">
             <span>Configuração inicial</span>
-            <span>1 de 6</span>
+            <span>1 de 7</span>
           </div>
           <Progress
             inverted
-            label="Configuração inicial, etapa 1 de 6"
-            max={6}
+            label="Configuração inicial, etapa 1 de 7"
+            max={7}
             value={1}
           />
 
           <Button
-            onClick={() => navigate("/onboarding/languages")}
+            onClick={() => navigate(getNextOnboardingRoute(me))}
             size="full"
             variant="emphasis"
           >

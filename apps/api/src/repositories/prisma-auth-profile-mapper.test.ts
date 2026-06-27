@@ -35,6 +35,7 @@ describe("toAuthProfile", () => {
           additionalGoals: ["travel"],
           lessonEmphases: ["listening", "reading"],
           studyPace: "relaxed",
+          onboardingStartingPoint: "diagnostic",
           onboardingStatus: "in_progress",
           onboardingStep: "age_and_goals",
           createdAt: now,
@@ -51,6 +52,7 @@ describe("toAuthProfile", () => {
         additionalGoals: ["travel"],
         lessonEmphases: ["listening", "reading"],
         studyPace: "relaxed",
+        onboardingStartingPoint: "diagnostic",
         onboardingStep: "age_and_goals",
       },
     });

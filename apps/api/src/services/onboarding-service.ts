@@ -2,6 +2,7 @@ import type {
   AgeAndGoalsSelection,
   LanguageSelection,
   LessonPreferencesSelection,
+  OnboardingStartingPointSelection,
 } from "@luma-lingo/shared";
 
 import type { LearnerRepository } from "../learners/learner-repository.js";
@@ -22,5 +23,12 @@ export class OnboardingService {
     selection: LessonPreferencesSelection,
   ) {
     return this.learners.saveLessonPreferences(learnerId, selection);
+  }
+
+  saveOnboardingStartingPoint(
+    learnerId: string,
+    selection: OnboardingStartingPointSelection,
+  ) {
+    return this.learners.saveOnboardingStartingPoint(learnerId, selection);
   }
 }

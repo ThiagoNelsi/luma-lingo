@@ -139,5 +139,21 @@ test("authenticated learner chooses and persists onboarding languages", async ({
   ).toBeVisible();
   await page.getByLabel("Mais rápido").check();
   await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/starting-point$/);
+  await expect(
+    page.getByRole("heading", { name: "Por onde você quer começar?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Escolha como quer começar.",
+  );
+  await page.getByLabel("Fazer um teste rápido").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/starting-point$/);
+  await expect(page.getByLabel("Fazer um teste rápido")).toBeChecked();
+  await page.getByLabel("Começar do zero").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
   await expect(page).toHaveURL(/\/private$/);
 });

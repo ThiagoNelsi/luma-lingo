@@ -2,6 +2,7 @@ import type {
   AgeAndGoalsSelection,
   LanguageSelection,
   LessonPreferencesSelection,
+  OnboardingStartingPointSelection,
 } from "@luma-lingo/shared";
 import { createId, PrismaClient } from "@luma-lingo/database";
 
@@ -18,6 +19,10 @@ import {
   toLessonPreferencesProgress,
   type LessonPreferencesProgress,
 } from "../learners/lesson-preferences-progress.js";
+import {
+  toOnboardingStartingPointProgress,
+  type OnboardingStartingPointProgress,
+} from "../learners/onboarding-starting-point-progress.js";
 
 export class PrismaLearnerRepository implements LearnerRepository {
   constructor(
@@ -106,5 +111,25 @@ export class PrismaLearnerRepository implements LearnerRepository {
     });
 
     return toLessonPreferencesProgress(selection);
+  }
+
+  async saveOnboardingStartingPoint(
+    learnerId: string,
+    selection: OnboardingStartingPointSelection,
+  ): Promise<OnboardingStartingPointProgress> {
+    await this.prisma.learner.update({
+      where: { id: learnerId },
+      data: {
+        currentLearningTrack: {
+          update: {
+            onboardingStartingPoint: selection.onboardingStartingPoint,
+            onboardingStatus: "in_progress",
+            onboardingStep: "starting_point",
+          },
+        },
+      },
+    });
+
+    return toOnboardingStartingPointProgress(selection);
   }
 }

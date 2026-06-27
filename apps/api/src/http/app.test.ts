@@ -4,6 +4,7 @@ import type {
   AgeAndGoalsSelection,
   LanguageSelection,
   LessonPreferencesSelection,
+  OnboardingStartingPointSelection,
 } from "@luma-lingo/shared";
 import { describe, expect, it } from "vitest";
 
@@ -153,6 +154,7 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
           additionalGoals: [],
           lessonEmphases: [],
           studyPace: null,
+          onboardingStartingPoint: null,
           onboardingStatus: "in_progress",
           onboardingStep: "languages",
         },
@@ -221,6 +223,32 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
         onboardingStep: "lesson_preferences" as const,
       };
     },
+    async saveOnboardingStartingPoint(
+      learnerId: string,
+      selection: OnboardingStartingPointSelection,
+    ) {
+      const entry = [...usersByIdentity.entries()].find(
+        ([, profile]) => profile.learner.id === learnerId,
+      );
+      if (!entry) throw new Error("learner_not_found");
+
+      const [key, profile] = entry;
+      usersByIdentity.set(key, {
+        ...profile,
+        currentLearningTrack: profile.currentLearningTrack
+          ? {
+              ...profile.currentLearningTrack,
+              onboardingStartingPoint: selection.onboardingStartingPoint,
+              onboardingStep: "starting_point",
+            }
+          : null,
+      });
+      return {
+        ...selection,
+        onboardingStatus: "in_progress" as const,
+        onboardingStep: "starting_point" as const,
+      };
+    },
   };
 
   return {
@@ -268,6 +296,7 @@ describe("auth routes", () => {
         "/me/languages": expect.any(Object),
         "/me/age-and-goals": expect.any(Object),
         "/me/lesson-preferences": expect.any(Object),
+        "/me/onboarding-starting-point": expect.any(Object),
       },
     });
   });
@@ -597,6 +626,70 @@ describe("auth routes", () => {
         payload: { lessonEmphases, studyPace: null },
       });
       expect(response.statusCode).toBe(400);
+    }
+  });
+
+  it("saves Onboarding starting point choices and exposes them through /me", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/me/lesson-preferences",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: {
+        lessonEmphases: ["listening", "reading"],
+        studyPace: "relaxed",
+      },
+    });
+
+    for (const onboardingStartingPoint of ["beginner", "diagnostic"]) {
+      const response = await app.inject({
+        method: "PUT",
+        url: "/me/onboarding-starting-point",
+        headers: { origin: "http://localhost:5173" },
+        cookies: { luma_lingo_session: sessionCookie },
+        payload: { onboardingStartingPoint },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        onboardingStartingPoint,
+        onboardingStatus: "in_progress",
+        onboardingStep: "starting_point",
+      });
+
+      const me = await app.inject({
+        method: "GET",
+        url: "/me",
+        cookies: { luma_lingo_session: sessionCookie },
+      });
+      expect(me.json()).toMatchObject({
+        currentLearningTrack: {
+          onboardingStartingPoint,
+          onboardingStep: "starting_point",
+        },
+      });
     }
   });
 

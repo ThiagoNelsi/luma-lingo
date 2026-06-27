@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { createLogoutAction, createLoginRedirect } from "./auth/auth-routes.js";
 import { normalizeApiOrigin, readApiOrigin } from "./config/api-origin.js";
-import { renderPrivateRouteText } from "./pages/private-page.js";
+import {
+  getNextOnboardingRoute,
+  renderPrivateRouteText,
+} from "./pages/private-page.js";
 import { renderPublicRouteText } from "./pages/public-page.js";
 
 describe("web routes", () => {
@@ -19,6 +22,76 @@ describe("web routes", () => {
         learner: { displayName: "Thiago" },
       }),
     ).toBe("Boas-vindas, Thiago!");
+  });
+
+  it("resumes onboarding at the correct next step", () => {
+    expect(
+      getNextOnboardingRoute({
+        user: { primaryEmail: "learner@example.com" },
+        learner: { displayName: "Thiago", instructionLanguage: null },
+        currentLearningTrack: null,
+      }),
+    ).toBe("/onboarding/languages");
+    expect(
+      getNextOnboardingRoute({
+        user: { primaryEmail: "learner@example.com" },
+        learner: {
+          displayName: "Thiago",
+          instructionLanguage: "pt",
+          ageRange: "25_39",
+        },
+        currentLearningTrack: {
+          targetLanguage: "en",
+          learningGoal: "travel",
+          additionalGoals: [],
+          lessonEmphases: ["reading"],
+          studyPace: null,
+          onboardingStartingPoint: null,
+          onboardingStatus: "in_progress",
+          onboardingStep: "lesson_preferences",
+        },
+      }),
+    ).toBe("/onboarding/starting-point");
+    expect(
+      getNextOnboardingRoute({
+        user: { primaryEmail: "learner@example.com" },
+        learner: {
+          displayName: "Thiago",
+          instructionLanguage: "pt",
+          ageRange: "25_39",
+        },
+        currentLearningTrack: {
+          targetLanguage: "en",
+          learningGoal: "travel",
+          additionalGoals: [],
+          lessonEmphases: ["reading"],
+          studyPace: "relaxed",
+          onboardingStartingPoint: "diagnostic",
+          onboardingStatus: "in_progress",
+          onboardingStep: "starting_point",
+        },
+      }),
+    ).toBe("/onboarding/starting-point");
+    expect(
+      getNextOnboardingRoute({
+        user: { primaryEmail: "learner@example.com" },
+        learner: {
+          displayName: "Thiago",
+          instructionLanguage: "pt",
+          ageRange: "25_39",
+        },
+        currentLearningTrack: {
+          targetLanguage: "en",
+          learningGoal: "travel",
+          additionalGoals: [],
+          lessonEmphases: ["reading"],
+          studyPace: "relaxed",
+          onboardingStartingPoint: "beginner",
+          onboardingStatus: "completed",
+          onboardingStep: "starting_point",
+        },
+      }),
+    ).toBe("/private");
   });
 
   it("redirects /login to the backend-managed Cognito login start", () => {

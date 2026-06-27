@@ -47,6 +47,7 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
       additionalGoals: [],
       lessonEmphases: [],
       studyPace: null,
+      onboardingStartingPoint: null,
       onboardingStatus: "in_progress",
       onboardingStep: "age_and_goals",
     },
@@ -128,6 +129,9 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
         throw new Error("unused");
       },
       async saveLessonPreferences() {
+        throw new Error("unused");
+      },
+      async saveOnboardingStartingPoint() {
         throw new Error("unused");
       },
     },

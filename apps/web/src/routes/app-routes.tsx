@@ -6,6 +6,7 @@ import { GoalsOnboardingPage } from "../pages/goals-onboarding-page.js";
 import { LanguageOnboardingPage } from "../pages/language-onboarding-page.js";
 import { LessonPreferencesOnboardingPage } from "../pages/lesson-preferences-onboarding-page.js";
 import { NotFoundPage } from "../pages/not-found-page.js";
+import { OnboardingStartingPointPage } from "../pages/onboarding-starting-point-page.js";
 import { PrivatePage } from "../pages/private-page.js";
 import { ProfileIntroductionOnboardingPage } from "../pages/profile-introduction-onboarding-page.js";
 import { PublicPage } from "../pages/public-page.js";
@@ -44,6 +45,10 @@ export function AppRoutes({ apiOrigin }: AppRoutesProps) {
       <Route
         path="/onboarding/pace"
         element={<StudyPaceOnboardingPage apiOrigin={apiOrigin} />}
+      />
+      <Route
+        path="/onboarding/starting-point"
+        element={<OnboardingStartingPointPage apiOrigin={apiOrigin} />}
       />
       <Route
         path="/login"

@@ -130,12 +130,12 @@ export function LessonPreferencesOnboardingPage({
 
         <section className="pt-2">
           <Progress
-            label="Configuração inicial, etapa 5 de 6"
-            max={6}
+            label="Configuração inicial, etapa 5 de 7"
+            max={7}
             value={5}
           />
           <p className="mt-3 mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
-            Etapa 5 de 6
+            Etapa 5 de 7
           </p>
           <h1 className="mb-2">Como você gosta de aprender?</h1>
           <p className="mb-0 leading-[var(--line-height-relaxed)] text-muted-foreground">

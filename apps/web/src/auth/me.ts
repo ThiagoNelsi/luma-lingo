@@ -5,6 +5,7 @@ import {
   languageCodeSchema,
   learnerAgeRangeSchema,
   lessonEmphasisSchema,
+  onboardingStartingPointSchema,
   studyPaceSchema,
 } from "@luma-lingo/shared";
 import { z } from "zod";
@@ -26,6 +27,9 @@ export const meResponseSchema = z.object({
       additionalGoals: z.array(additionalGoalSchema).optional(),
       lessonEmphases: z.array(lessonEmphasisSchema).optional(),
       studyPace: studyPaceSchema.nullable().optional(),
+      onboardingStartingPoint: onboardingStartingPointSchema
+        .nullable()
+        .optional(),
       onboardingStatus: z.string(),
       onboardingStep: z.string().nullable(),
     })

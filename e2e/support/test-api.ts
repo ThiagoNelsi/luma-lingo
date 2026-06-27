@@ -4,6 +4,7 @@ import type {
   AgeAndGoalsSelection,
   LanguageSelection,
   LessonPreferencesSelection,
+  OnboardingStartingPointSelection,
 } from "@luma-lingo/shared";
 
 import type { AuthProvider } from "../../apps/api/src/auth/auth-provider.js";
@@ -14,6 +15,7 @@ import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/p
 import { ProfileIntroductionService } from "../../apps/api/src/profile/profile-introduction-service.js";
 import { toLanguageSelectionProgress } from "../../apps/api/src/learners/language-selection-progress.js";
 import { toLessonPreferencesProgress } from "../../apps/api/src/learners/lesson-preferences-progress.js";
+import { toOnboardingStartingPointProgress } from "../../apps/api/src/learners/onboarding-starting-point-progress.js";
 import type { UserRepository } from "../../apps/api/src/repositories/user-repository.js";
 import type { AuthProfile } from "../../apps/api/src/services/auth-profile.js";
 import type { SessionRecord } from "../../apps/api/src/sessions/session-record.js";
@@ -124,6 +126,7 @@ const learners: LearnerRepository = {
         additionalGoals: [],
         lessonEmphases: [],
         studyPace: null,
+        onboardingStartingPoint: null,
         onboardingStatus: "in_progress",
         onboardingStep: "languages",
       },
@@ -168,6 +171,21 @@ const learners: LearnerRepository = {
       },
     };
     return toLessonPreferencesProgress(selection);
+  },
+  async saveOnboardingStartingPoint(
+    _learnerId,
+    selection: OnboardingStartingPointSelection,
+  ) {
+    if (!profile?.currentLearningTrack) throw new Error("learner_not_found");
+    profile = {
+      ...profile,
+      currentLearningTrack: {
+        ...profile.currentLearningTrack,
+        onboardingStartingPoint: selection.onboardingStartingPoint,
+        onboardingStep: "starting_point",
+      },
+    };
+    return toOnboardingStartingPointProgress(selection);
   },
 };
 

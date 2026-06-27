@@ -144,4 +144,38 @@ describe("PrismaLearnerRepository", () => {
       },
     });
   });
+
+  it("saves Onboarding starting point on the current learning track", async () => {
+    const learnerInput: { data?: unknown } = {};
+    const prisma = {
+      learner: {
+        update: async (input: { data: unknown }) => {
+          learnerInput.data = input.data;
+          return {};
+        },
+      },
+    };
+    const repository = new PrismaLearnerRepository(
+      prisma as unknown as PrismaClient,
+    );
+
+    await expect(
+      repository.saveOnboardingStartingPoint("learner-1", {
+        onboardingStartingPoint: "beginner",
+      }),
+    ).resolves.toEqual({
+      onboardingStartingPoint: "beginner",
+      onboardingStatus: "in_progress",
+      onboardingStep: "starting_point",
+    });
+    expect(learnerInput.data).toEqual({
+      currentLearningTrack: {
+        update: {
+          onboardingStartingPoint: "beginner",
+          onboardingStatus: "in_progress",
+          onboardingStep: "starting_point",
+        },
+      },
+    });
+  });
 });

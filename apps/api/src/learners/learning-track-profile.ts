@@ -4,6 +4,7 @@ import {
   goalSchema,
   languageCodeSchema,
   lessonEmphasisSchema,
+  onboardingStartingPointSchema,
   studyPaceSchema,
 } from "@luma-lingo/shared";
 import { z } from "zod/v4";
@@ -17,6 +18,7 @@ export const learningTrackProfileSchema = z.object({
   additionalGoals: z.array(additionalGoalSchema),
   lessonEmphases: z.array(lessonEmphasisSchema),
   studyPace: studyPaceSchema.nullable(),
+  onboardingStartingPoint: onboardingStartingPointSchema.nullable(),
   onboardingStatus: z.string(),
   onboardingStep: z.string().nullable(),
 });

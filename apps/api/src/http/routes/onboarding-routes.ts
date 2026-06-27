@@ -2,6 +2,7 @@ import {
   ageAndGoalsSelectionSchema,
   languageSelectionSchema,
   lessonPreferencesSelectionSchema,
+  onboardingStartingPointSelectionSchema,
 } from "@luma-lingo/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -10,6 +11,7 @@ import type { AppConfig } from "../../config.js";
 import { ageAndGoalsProgressSchema } from "../../learners/age-and-goals-progress.js";
 import { languageSelectionProgressSchema } from "../../learners/language-selection-progress.js";
 import { lessonPreferencesProgressSchema } from "../../learners/lesson-preferences-progress.js";
+import { onboardingStartingPointProgressSchema } from "../../learners/onboarding-starting-point-progress.js";
 import { AuthService } from "../../services/auth-service.js";
 import { OnboardingService } from "../../services/onboarding-service.js";
 import { errorDtoSchema } from "../dtos/error-dto.js";
@@ -115,6 +117,39 @@ export function registerOnboardingRoutes(
       }
 
       return deps.onboarding.saveLessonPreferences(
+        session.learner.id,
+        request.body,
+      );
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().put(
+    "/me/onboarding-starting-point",
+    {
+      schema: {
+        tags: ["Learner"],
+        summary: "Save Onboarding starting point",
+        body: onboardingStartingPointSelectionSchema,
+        response: {
+          200: onboardingStartingPointProgressSchema,
+          401: errorDtoSchema,
+          403: errorDtoSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!isTrustedOrigin(request.headers.origin, deps.config)) {
+        return reply.code(403).send({ error: "invalid_request_origin" });
+      }
+
+      const session = await deps.auth.resolveSession(
+        request.cookies[deps.config.sessionCookieName],
+      );
+      if (!session) {
+        return reply.code(401).send({ error: "unauthenticated" });
+      }
+
+      return deps.onboarding.saveOnboardingStartingPoint(
         session.learner.id,
         request.body,
       );
