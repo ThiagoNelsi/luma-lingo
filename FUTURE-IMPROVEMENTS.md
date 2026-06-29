@@ -1,5 +1,38 @@
 # Future Improvements
 
+## 2026-06-27
+
+### Reuse Audited Diagnostic Items In Lessons
+
+- **Deferred:** Reuse the audited onboarding question bank after onboarding as
+  one source of lesson activities, alongside fully generated lesson questions
+  and user-adapted variants prepared before a module starts. A future module
+  start flow could select relevant audited items for the module's focus
+  competencies, adapt them in the background to the learner's profile, goal, and
+  lesson context, and store the resulting learner-specific variants for
+  low-latency retrieval during lessons. Some common items may support
+  placeholders with safe defaults, such as replacing a default verb with a
+  learner-relevant verb when the substitution has been validated.
+- **Current scope boundary:** The current diagnostic work is focused on
+  deterministic onboarding item selection, scoring, and evidence capture. Using
+  the same item bank inside generated lessons introduces a separate lesson
+  activity sourcing strategy, variant lifecycle, validation rules, and caching
+  model that should not complicate the initial diagnostic.
+- **Future value:** Reusing audited items can improve lesson quality and reduce
+  dependence on fully generated questions, while learner-specific prepared
+  variants preserve personalization without adding runtime LLM latency during a
+  lesson. As learner volume grows, many learners will share similar interests,
+  goals, jobs, routines, and contexts; adapted variants created for one learner
+  may become reusable for others if they are tagged by reusable themes such as
+  cooking, football, animals, travel, office work, or parenting. A taggable
+  variant bank could let the app retrieve an already validated adaptation
+  instead of paying for another LLM generation for the same competency-context
+  combination.
+- **Revisit when:** Module planning and lesson generation both consume
+  competency targets, the audited question bank has enough coverage, and the
+  product needs a blended activity strategy with fully generated items, common
+  pregenerated items, and pre-adapted learner-specific variants.
+
 ## 2026-06-21
 
 ### Recorded-Introduction Content Guardrails

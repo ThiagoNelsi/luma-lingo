@@ -138,6 +138,9 @@ importers:
 
   packages/database:
     dependencies:
+      "@luma-lingo/shared":
+        specifier: workspace:*
+        version: link:../shared
       "@prisma/client":
         specifier: 6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@6.0.3))(typescript@6.0.3)
@@ -151,6 +154,9 @@ importers:
       prisma:
         specifier: 6.19.3
         version: 6.19.3(typescript@6.0.3)
+      tsx:
+        specifier: latest
+        version: 4.22.4
       typescript:
         specifier: latest
         version: 6.0.3

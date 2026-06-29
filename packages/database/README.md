@@ -70,3 +70,42 @@ pnpm --filter @luma-lingo/database db:import:competencies -- \
   --status published \
   --transaction-timeout-ms 120000
 ```
+
+## Import onboarding diagnostic questions
+
+Use the diagnostic question-bank import after importing the matching competency
+catalog version. The question bank declares its target catalog through
+`catalogVersion`, so import competencies with the same `--version` first:
+
+```sh
+pnpm --filter @luma-lingo/database db:import:competencies -- \
+  --version 2026-06-28-draft \
+  --status draft
+
+pnpm --filter @luma-lingo/database db:import:diagnostic-questions -- --dry-run
+pnpm --filter @luma-lingo/database db:import:diagnostic-questions
+```
+
+The default question-bank path is:
+
+```text
+../../data/catalogs/en/onboarding-diagnostic-question-bank-merged.json
+```
+
+Override it when importing another local draft:
+
+```sh
+pnpm --filter @luma-lingo/database db:import:diagnostic-questions -- \
+  --question-bank ../../data/catalogs/en/onboarding-diagnostic-question-bank-merged.json \
+  --transaction-timeout-ms 120000
+```
+
+The diagnostic question import validates the authored JSON against the shared
+Zod contract before writing. It then resolves every primary and supporting
+target against the imported `CompetencyCatalog`, upserts `DiagnosticItem` rows,
+rebuilds `DiagnosticItemCompetencyTarget` rows for the imported items, and
+stores question-bank import metadata on the catalog.
+
+`draft` diagnostic items are useful for local authoring and review. Runtime
+selection should read only `published` catalogs and `published` diagnostic
+items through the API repository contract.
