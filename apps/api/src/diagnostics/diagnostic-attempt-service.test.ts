@@ -33,6 +33,7 @@ class FakeDiagnosticAttemptRepository implements DiagnosticAttemptRepository {
     selectionPolicyVersion: string;
     scoringPolicyVersion: string;
     startedAt: Date;
+    details?: Record<string, unknown>;
   }): Promise<DiagnosticAttempt> {
     const attempt: DiagnosticAttempt = {
       id: `attempt-${this.attempts.length + 1}`,
@@ -46,10 +47,16 @@ class FakeDiagnosticAttemptRepository implements DiagnosticAttemptRepository {
       completedAt: null,
       abandonedAt: null,
       summary: {},
-      details: {},
+      details: input.details ?? {},
     };
     this.attempts.push(attempt);
     return attempt;
+  }
+
+  async findAttemptItems(attemptId: string): Promise<DiagnosticAttemptItem[]> {
+    return this.attemptItems
+      .filter((item) => item.attemptId === attemptId)
+      .sort((left, right) => left.position - right.position);
   }
 
   async abandonAttempt(input: {

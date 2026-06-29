@@ -66,8 +66,9 @@ export const createDiagnosticAttemptInputSchema = z.object({
   selectionPolicyVersion: z.string(),
   scoringPolicyVersion: z.string(),
   startedAt: z.date(),
+  details: diagnosticJsonObjectSchema.default({}),
 });
-export type CreateDiagnosticAttemptInput = z.infer<
+export type CreateDiagnosticAttemptInput = z.input<
   typeof createDiagnosticAttemptInputSchema
 >;
 
@@ -75,7 +76,7 @@ export const resumeOrCreateDiagnosticAttemptInputSchema =
   createDiagnosticAttemptInputSchema.omit({
     startedAt: true,
   });
-export type ResumeOrCreateDiagnosticAttemptInput = z.infer<
+export type ResumeOrCreateDiagnosticAttemptInput = z.input<
   typeof resumeOrCreateDiagnosticAttemptInputSchema
 >;
 

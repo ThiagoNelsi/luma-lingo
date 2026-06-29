@@ -46,6 +46,27 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
           id: "item-2",
           key: "en.diag.pre-a1.be-present.foundation.001",
           primaryCompetencyKey: "pre-a1-core-be-present-affirmative",
+          primaryCompetency: {
+            id: "competency-2",
+            key: "pre-a1-core-be-present-affirmative",
+            family: "grammar",
+            mode: "reading",
+            difficultyBand: "Pre-A1",
+            isCore: true,
+            prerequisites: [
+              {
+                competencyId: "competency-1",
+                competencyKey: "pre-a1-core-subject-pronouns",
+                strength: 80,
+              },
+            ],
+            goalPriorities: [
+              {
+                goal: "travel",
+                priority: 70,
+              },
+            ],
+          },
           targets: [
             {
               competencyId: "competency-2",
@@ -96,6 +117,35 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
               select: {
                 id: true,
                 key: true,
+                family: true,
+                mode: true,
+                difficultyBand: true,
+                isCore: true,
+                prerequisites: {
+                  select: {
+                    strength: true,
+                    prerequisite: {
+                      select: {
+                        id: true,
+                        key: true,
+                      },
+                    },
+                  },
+                  orderBy: {
+                    prerequisite: {
+                      key: "asc",
+                    },
+                  },
+                },
+                goalPriorities: {
+                  select: {
+                    goal: true,
+                    priority: true,
+                  },
+                  orderBy: {
+                    goal: "asc",
+                  },
+                },
               },
             },
             competencyTargets: {
@@ -189,6 +239,33 @@ function buildDiagnosticItemRow(input: {
     primaryCompetency: {
       id: input.primaryCompetencyId,
       key: input.primaryCompetencyKey,
+      family: "grammar",
+      mode: "reading",
+      difficultyBand: "Pre-A1",
+      isCore: true,
+      prerequisites:
+        input.primaryCompetencyId === "competency-2"
+          ? [
+              {
+                competencyId: input.primaryCompetencyId,
+                prerequisiteId: "competency-1",
+                strength: 80,
+                prerequisite: {
+                  id: "competency-1",
+                  key: "pre-a1-core-subject-pronouns",
+                },
+              },
+            ]
+          : [],
+      goalPriorities:
+        input.primaryCompetencyId === "competency-2"
+          ? [
+              {
+                goal: "travel",
+                priority: 70,
+              },
+            ]
+          : [],
     },
     competencyTargets: [
       {

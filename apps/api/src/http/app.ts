@@ -9,6 +9,7 @@ import {
 
 import type { AuthProvider } from "../auth/auth-provider.js";
 import type { AppConfig } from "../config.js";
+import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
 import type { LearnerRepository } from "../learners/learner-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
@@ -18,6 +19,7 @@ import { OnboardingService } from "../services/onboarding-service.js";
 import { registerOpenApi } from "./openapi.js";
 import { registerAuthRoutes } from "./routes/auth-routes.js";
 import { registerHealthRoutes } from "./routes/health-routes.js";
+import { registerInitialDiagnosticRoutes } from "./routes/initial-diagnostic-routes.js";
 import { registerMeRoutes } from "./routes/me-routes.js";
 import { registerOnboardingRoutes } from "./routes/onboarding-routes.js";
 import { registerProfileIntroductionRoutes } from "./routes/profile-introduction-routes.js";
@@ -28,6 +30,7 @@ export interface AppDependencies {
   learners: LearnerRepository;
   users: UserRepository;
   sessions: SessionRepository;
+  initialDiagnostic?: InitialDiagnosticRuntimeService;
   profileIntroduction?: ProfileIntroductionService;
 }
 
@@ -68,6 +71,13 @@ export async function createApp(deps: AppDependencies) {
     config: deps.config,
     onboarding,
   });
+  if (deps.initialDiagnostic) {
+    registerInitialDiagnosticRoutes(app, {
+      auth,
+      config: deps.config,
+      initialDiagnostic: deps.initialDiagnostic,
+    });
+  }
   if (deps.profileIntroduction) {
     registerProfileIntroductionRoutes(app, {
       auth,

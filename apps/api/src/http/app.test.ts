@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import type { AuthIdentity } from "../auth/auth-identity.js";
 import type { AuthProvider } from "../auth/auth-provider.js";
 import type { AppConfig } from "../config.js";
+import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRecord } from "../sessions/session-record.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
@@ -256,6 +257,31 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     learners,
     users,
     sessions,
+    initialDiagnostic: {
+      async startInitialDiagnostic() {
+        return {
+          attempt: {
+            id: "attempt-1",
+            status: "in_progress" as const,
+          },
+          item: null,
+        };
+      },
+      async answerInitialDiagnosticItem() {
+        return {
+          attempt: {
+            id: "attempt-1",
+            status: "completed" as const,
+            summary: {
+              schemaVersion: 1,
+              answeredItemCount: 1,
+              stopReason: "question_bank_exhausted",
+            },
+          },
+          item: null,
+        };
+      },
+    } as unknown as InitialDiagnosticRuntimeService,
     getUserCount: () => usersByIdentity.size,
     getSession: () => session,
   };
@@ -297,6 +323,8 @@ describe("auth routes", () => {
         "/me/age-and-goals": expect.any(Object),
         "/me/lesson-preferences": expect.any(Object),
         "/me/onboarding-starting-point": expect.any(Object),
+        "/me/initial-diagnostic/start": expect.any(Object),
+        "/me/initial-diagnostic/responses": expect.any(Object),
       },
     });
   });

@@ -52,6 +52,13 @@ export class DiagnosticAttemptService {
     });
   }
 
+  findInProgressAttempt(
+    learningTrackId: string,
+    purpose: string,
+  ): Promise<DiagnosticAttempt | null> {
+    return this.repository.findInProgressAttempt(learningTrackId, purpose);
+  }
+
   async recordShownItem(
     input: RecordShownDiagnosticAttemptItemInput,
   ): Promise<DiagnosticAttemptItem> {
@@ -62,6 +69,10 @@ export class DiagnosticAttemptService {
       ...parsedInput,
       shownAt: this.now(),
     });
+  }
+
+  findAttemptItems(attemptId: string): Promise<DiagnosticAttemptItem[]> {
+    return this.repository.findAttemptItems(attemptId);
   }
 
   async answerAttemptItem(

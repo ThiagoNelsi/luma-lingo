@@ -13,6 +13,7 @@ export interface DiagnosticAttemptRepository {
   createAttempt(
     input: CreateDiagnosticAttemptInput,
   ): Promise<DiagnosticAttempt>;
+  findAttemptItems(attemptId: string): Promise<DiagnosticAttemptItem[]>;
   abandonAttempt(input: {
     attemptId: string;
     abandonedAt: Date;

@@ -36,11 +36,43 @@ export type DiagnosticQuestionBankTarget = z.infer<
   typeof diagnosticQuestionBankTargetSchema
 >;
 
+export const diagnosticQuestionBankPrerequisiteSchema = z.object({
+  competencyId: z.string(),
+  competencyKey: z.string(),
+  strength: z.number().int().min(0).max(100).nullable(),
+});
+export type DiagnosticQuestionBankPrerequisite = z.infer<
+  typeof diagnosticQuestionBankPrerequisiteSchema
+>;
+
+export const diagnosticQuestionBankGoalPrioritySchema = z.object({
+  goal: z.string(),
+  priority: z.number().int().min(0).max(100),
+});
+export type DiagnosticQuestionBankGoalPriority = z.infer<
+  typeof diagnosticQuestionBankGoalPrioritySchema
+>;
+
+export const diagnosticQuestionBankCompetencySchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  family: z.string(),
+  mode: z.string().nullable(),
+  difficultyBand: z.string().nullable(),
+  isCore: z.boolean(),
+  prerequisites: z.array(diagnosticQuestionBankPrerequisiteSchema).default([]),
+  goalPriorities: z.array(diagnosticQuestionBankGoalPrioritySchema).default([]),
+});
+export type DiagnosticQuestionBankCompetency = z.infer<
+  typeof diagnosticQuestionBankCompetencySchema
+>;
+
 export const diagnosticQuestionBankItemSchema = z.object({
   id: z.string(),
   key: z.string(),
   primaryCompetencyId: z.string(),
   primaryCompetencyKey: z.string(),
+  primaryCompetency: diagnosticQuestionBankCompetencySchema.optional(),
   difficultyBand: z.string(),
   responseFormat: diagnosticQuestionResponseFormatSchema,
   status: diagnosticQuestionStatusSchema,
