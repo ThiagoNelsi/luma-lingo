@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 import type { AuthIdentity } from "../auth/auth-identity.js";
 import type { AuthProvider } from "../auth/auth-provider.js";
 import type { AppConfig } from "../config.js";
+import type { DiagnosticAttempt } from "../diagnostics/diagnostic-attempt.js";
+import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
+import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRecord } from "../sessions/session-record.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
@@ -39,6 +42,7 @@ const verifiedIdentity: AuthIdentity = {
 
 function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
   let session: SessionRecord | null = null;
+  let completedDiagnosticAttempt: DiagnosticAttempt | null = null;
   const usersByIdentity = new Map<string, AuthProfile>();
 
   const authProvider: AuthProvider = {
@@ -252,9 +256,107 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     },
   };
 
+  const onboardingCompletion: OnboardingCompletionRepository = {
+    async completeBeginnerOnboarding(input) {
+      return completeCurrentTrack(input.learningTrackId);
+    },
+    async completeDiagnosticOnboarding(input) {
+      return completeCurrentTrack(input.learningTrackId);
+    },
+  };
+
+  const diagnosticAttempts: DiagnosticAttemptRepository = {
+    async findInProgressAttempt() {
+      return null;
+    },
+    async findCompletedAttempt(learningTrackId, purpose) {
+      if (
+        completedDiagnosticAttempt?.learningTrackId === learningTrackId &&
+        completedDiagnosticAttempt.purpose === purpose
+      ) {
+        return completedDiagnosticAttempt;
+      }
+
+      return null;
+    },
+    async createAttempt() {
+      throw new Error("unused");
+    },
+    async findAttemptItems() {
+      return [];
+    },
+    async abandonAttempt() {
+      throw new Error("unused");
+    },
+    async createAttemptItem() {
+      throw new Error("unused");
+    },
+    async answerAttemptItem() {
+      throw new Error("unused");
+    },
+    async completeAttempt() {
+      throw new Error("unused");
+    },
+  };
+
+  function completeCurrentTrack(learningTrackId: string) {
+    const entry = [...usersByIdentity.entries()].find(
+      ([, profile]) => profile.currentLearningTrack?.id === learningTrackId,
+    );
+    if (!entry?.[1].currentLearningTrack) {
+      throw new Error("learning_track_not_found");
+    }
+
+    const [key, profile] = entry;
+    const currentLearningTrack = profile.currentLearningTrack;
+    if (!currentLearningTrack) throw new Error("learning_track_not_found");
+
+    usersByIdentity.set(key, {
+      ...profile,
+      currentLearningTrack: {
+        ...currentLearningTrack,
+        onboardingStatus: "completed",
+        onboardingStep: null,
+      },
+    });
+
+    return {
+      onboardingStatus: "completed" as const,
+      onboardingStep: null,
+    };
+  }
+
+  function completeDiagnosticAttempt() {
+    const profile = [...usersByIdentity.values()].find(
+      (candidate) => candidate.currentLearningTrack,
+    );
+    const track = profile?.currentLearningTrack;
+    if (!track) throw new Error("learning_track_not_found");
+
+    completedDiagnosticAttempt = {
+      id: "attempt-1",
+      learningTrackId: track.id,
+      catalogId: "catalog-1",
+      purpose: "onboarding_initial",
+      status: "completed",
+      selectionPolicyVersion: "initial-diagnostic-selection-v1",
+      scoringPolicyVersion: "initial-diagnostic-scoring-v1",
+      startedAt: new Date("2026-06-28T12:00:00.000Z"),
+      completedAt: new Date("2026-06-28T12:08:00.000Z"),
+      abandonedAt: null,
+      summary: {
+        schemaVersion: 1,
+        answeredItemCount: 2,
+      },
+      details: {},
+    };
+  }
+
   return {
     authProvider,
     learners,
+    onboardingCompletion,
+    diagnosticAttempts,
     users,
     sessions,
     initialDiagnostic: {
@@ -284,6 +386,7 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     } as unknown as InitialDiagnosticRuntimeService,
     getUserCount: () => usersByIdentity.size,
     getSession: () => session,
+    completeDiagnosticAttempt,
   };
 }
 
@@ -323,6 +426,7 @@ describe("auth routes", () => {
         "/me/age-and-goals": expect.any(Object),
         "/me/lesson-preferences": expect.any(Object),
         "/me/onboarding-starting-point": expect.any(Object),
+        "/me/onboarding/complete": expect.any(Object),
         "/me/initial-diagnostic/start": expect.any(Object),
         "/me/initial-diagnostic/responses": expect.any(Object),
       },
@@ -719,6 +823,220 @@ describe("auth routes", () => {
         },
       });
     }
+  });
+
+  it("requires authentication and trusted origins before completing onboarding", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticated.json()).toEqual({ error: "unauthenticated" });
+
+    const untrusted = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "https://evil.example.com" },
+      cookies: { luma_lingo_session: "not-a-real-session" },
+    });
+    expect(untrusted.statusCode).toBe(403);
+    expect(untrusted.json()).toEqual({ error: "invalid_request_origin" });
+  });
+
+  it("rejects onboarding completion without a current Learning track or starting point", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    const withoutTrack = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(withoutTrack.statusCode).toBe(409);
+    expect(withoutTrack.json()).toEqual({ error: "learning_track_required" });
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    const withoutStartingPoint = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(withoutStartingPoint.statusCode).toBe(409);
+    expect(withoutStartingPoint.json()).toEqual({
+      error: "onboarding_starting_point_required",
+    });
+  });
+
+  it("completes Beginner path onboarding and exposes completion through /me", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/me/onboarding-starting-point",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { onboardingStartingPoint: "beginner" },
+    });
+
+    const completed = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toEqual({
+      onboardingStatus: "completed",
+      onboardingStep: null,
+    });
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/me",
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+    expect(me.json()).toMatchObject({
+      currentLearningTrack: {
+        onboardingStartingPoint: "beginner",
+        onboardingStatus: "completed",
+        onboardingStep: null,
+      },
+    });
+  });
+
+  it("requires a completed Diagnostic attempt before completing Diagnostic path onboarding", async () => {
+    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/me/onboarding-starting-point",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { onboardingStartingPoint: "diagnostic" },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "completed_initial_diagnostic_required",
+    });
+  });
+
+  it("completes Diagnostic path onboarding after a completed Diagnostic attempt", async () => {
+    const deps = createMemoryDeps();
+    const app = await createApp({ config: baseConfig, ...deps });
+    const login = await app.inject({ method: "GET", url: "/auth/login" });
+    const state =
+      login.cookies.find(
+        (cookie) => cookie.name === "luma_lingo_session_oauth_state",
+      )?.value ?? "";
+    const callback = await app.inject({
+      method: "GET",
+      url: `/auth/callback?code=ok&state=${state}`,
+      cookies: { luma_lingo_session_oauth_state: state },
+    });
+    const sessionCookie =
+      callback.cookies.find((cookie) => cookie.name === "luma_lingo_session")
+        ?.value ?? "";
+
+    await app.inject({
+      method: "PUT",
+      url: "/me/languages",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { instructionLanguage: "pt", targetLanguage: "en" },
+    });
+    await app.inject({
+      method: "PUT",
+      url: "/me/onboarding-starting-point",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+      payload: { onboardingStartingPoint: "diagnostic" },
+    });
+    deps.completeDiagnosticAttempt();
+
+    const completed = await app.inject({
+      method: "POST",
+      url: "/me/onboarding/complete",
+      headers: { origin: "http://localhost:5173" },
+      cookies: { luma_lingo_session: sessionCookie },
+    });
+
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toEqual({
+      onboardingStatus: "completed",
+      onboardingStep: null,
+    });
   });
 
   it("rejects language selection without an authenticated session", async () => {

@@ -9,7 +9,9 @@ import {
 
 import type { AuthProvider } from "../auth/auth-provider.js";
 import type { AppConfig } from "../config.js";
+import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
+import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { LearnerRepository } from "../learners/learner-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
@@ -28,6 +30,8 @@ export interface AppDependencies {
   config: AppConfig;
   authProvider: AuthProvider;
   learners: LearnerRepository;
+  onboardingCompletion: OnboardingCompletionRepository;
+  diagnosticAttempts: DiagnosticAttemptRepository;
   users: UserRepository;
   sessions: SessionRepository;
   initialDiagnostic?: InitialDiagnosticRuntimeService;
@@ -45,7 +49,11 @@ export async function createApp(deps: AppDependencies) {
   );
 
   const auth = new AuthService(deps.users, deps.sessions, deps.config);
-  const onboarding = new OnboardingService(deps.learners);
+  const onboarding = new OnboardingService(
+    deps.learners,
+    deps.onboardingCompletion,
+    deps.diagnosticAttempts,
+  );
 
   await app.register(cookie);
   await app.register(multipart, {

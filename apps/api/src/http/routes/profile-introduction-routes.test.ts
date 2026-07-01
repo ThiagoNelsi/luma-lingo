@@ -135,6 +135,40 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
         throw new Error("unused");
       },
     },
+    onboardingCompletion: {
+      async completeBeginnerOnboarding() {
+        throw new Error("unused");
+      },
+      async completeDiagnosticOnboarding() {
+        throw new Error("unused");
+      },
+    },
+    diagnosticAttempts: {
+      async findInProgressAttempt() {
+        return null;
+      },
+      async findCompletedAttempt() {
+        return null;
+      },
+      async createAttempt() {
+        throw new Error("unused");
+      },
+      async findAttemptItems() {
+        return [];
+      },
+      async abandonAttempt() {
+        throw new Error("unused");
+      },
+      async createAttemptItem() {
+        throw new Error("unused");
+      },
+      async answerAttemptItem() {
+        throw new Error("unused");
+      },
+      async completeAttempt() {
+        throw new Error("unused");
+      },
+    },
     users: {
       async upsertVerifiedAuthIdentity() {
         throw new Error("unused");

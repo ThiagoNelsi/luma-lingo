@@ -9,8 +9,12 @@ import type {
 
 import type { AuthProvider } from "../../apps/api/src/auth/auth-provider.js";
 import type { AppConfig } from "../../apps/api/src/config.js";
+import type { DiagnosticAttempt } from "../../apps/api/src/diagnostics/diagnostic-attempt.js";
+import type { DiagnosticAttemptRepository } from "../../apps/api/src/diagnostics/diagnostic-attempt-repository.js";
+import type { InitialDiagnosticRuntimeService } from "../../apps/api/src/diagnostics/initial-diagnostic-runtime-service.js";
 import { createApp } from "../../apps/api/src/http/app.js";
 import type { LearnerRepository } from "../../apps/api/src/learners/learner-repository.js";
+import type { OnboardingCompletionRepository } from "../../apps/api/src/learners/onboarding-completion-repository.js";
 import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
 import { ProfileIntroductionService } from "../../apps/api/src/profile/profile-introduction-service.js";
 import { toLanguageSelectionProgress } from "../../apps/api/src/learners/language-selection-progress.js";
@@ -35,6 +39,7 @@ const config: AppConfig = {
 };
 
 let profile: AuthProfile | null = null;
+let completedDiagnosticAttempt: DiagnosticAttempt | null = null;
 const sessions = new Map<string, SessionRecord>();
 
 const authProvider: AuthProvider = {
@@ -189,6 +194,124 @@ const learners: LearnerRepository = {
   },
 };
 
+const onboardingCompletion: OnboardingCompletionRepository = {
+  async completeBeginnerOnboarding(input) {
+    return completeCurrentLearningTrack(input.learningTrackId);
+  },
+  async completeDiagnosticOnboarding(input) {
+    return completeCurrentLearningTrack(input.learningTrackId);
+  },
+};
+
+const diagnosticAttempts: DiagnosticAttemptRepository = {
+  async findInProgressAttempt() {
+    return null;
+  },
+  async findCompletedAttempt() {
+    return completedDiagnosticAttempt;
+  },
+  async createAttempt() {
+    throw new Error("unused");
+  },
+  async findAttemptItems() {
+    return [];
+  },
+  async abandonAttempt() {
+    throw new Error("unused");
+  },
+  async createAttemptItem() {
+    throw new Error("unused");
+  },
+  async answerAttemptItem() {
+    throw new Error("unused");
+  },
+  async completeAttempt() {
+    throw new Error("unused");
+  },
+};
+
+const initialDiagnostic = {
+  async startInitialDiagnostic() {
+    return {
+      attempt: {
+        id: "attempt-1",
+        status: "in_progress" as const,
+      },
+      item: {
+        attemptItemId: "attempt-item-1",
+        position: 1,
+        diagnosticItemId: "item-1",
+        key: "en.diag.pre-a1.subject-pronouns.001",
+        responseFormat: "multiple_choice" as const,
+        prompt: {
+          schemaVersion: 1 as const,
+          kind: "multiple_choice" as const,
+          instructionLocalizations: {
+            pt: "Escolha a melhor resposta.",
+          },
+          contentLanguage: "en" as const,
+          stem: "Maria is a teacher. ___ is from Brazil.",
+          options: [
+            { id: "option_she", text: "She" },
+            { id: "option_he", text: "He" },
+          ],
+        },
+      },
+    };
+  },
+  async answerInitialDiagnosticItem(input: { learningTrackId: string }) {
+    completedDiagnosticAttempt = {
+      id: "attempt-1",
+      learningTrackId: input.learningTrackId,
+      catalogId: "catalog-1",
+      purpose: "onboarding_initial",
+      status: "completed",
+      selectionPolicyVersion: "initial-diagnostic-selection-v1",
+      scoringPolicyVersion: "initial-diagnostic-scoring-v1",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      abandonedAt: null,
+      summary: {
+        schemaVersion: 1,
+        answeredItemCount: 1,
+      },
+      details: {},
+    };
+
+    return {
+      attempt: {
+        id: "attempt-1",
+        status: "completed" as const,
+        summary: completedDiagnosticAttempt.summary,
+      },
+      item: null,
+    };
+  },
+} as unknown as InitialDiagnosticRuntimeService;
+
+function completeCurrentLearningTrack(learningTrackId: string) {
+  if (
+    !profile?.currentLearningTrack ||
+    profile.currentLearningTrack.id !== learningTrackId
+  ) {
+    throw new Error("learning_track_not_found");
+  }
+
+  profile = {
+    ...profile,
+    currentLearningTrack: {
+      ...profile.currentLearningTrack,
+      onboardingStatus: "completed",
+      onboardingStep: null,
+    },
+  };
+
+  return {
+    onboardingStatus: "completed" as const,
+    onboardingStep: null,
+  };
+}
+
 let profileIntroductionStatus = "not_started" as
   | "not_started"
   | "pending"
@@ -261,9 +384,12 @@ const app = await createApp({
   authProvider,
   config,
   learners,
+  onboardingCompletion,
+  diagnosticAttempts,
   sessions: sessionRepository,
   users,
   profileIntroduction,
+  initialDiagnostic,
 });
 
 app.get("/test-auth/authorize", async (request, reply) => {

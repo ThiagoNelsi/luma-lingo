@@ -142,6 +142,50 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     });
   });
 
+  it("finds the latest completed diagnostic attempt for onboarding completion", async () => {
+    const row = {
+      id: "attempt-1",
+      learningTrackId: "track-1",
+      catalogId: "catalog-1",
+      purpose: "onboarding_initial",
+      status: "completed",
+      selectionPolicyVersion: "initial-diagnostic-selection-v1",
+      scoringPolicyVersion: "initial-diagnostic-scoring-v1",
+      startedAt: new Date("2026-06-27T12:00:00.000Z"),
+      completedAt: new Date("2026-06-27T12:08:00.000Z"),
+      abandonedAt: null,
+      summary: {
+        schemaVersion: 1,
+        answeredItemCount: 8,
+      },
+      details: {},
+    };
+    const diagnosticAttempt = {
+      findFirst: vi.fn(async () => row),
+    };
+    const repository = new PrismaDiagnosticAttemptRepository({
+      diagnosticAttempt,
+    } as never);
+
+    await expect(
+      repository.findCompletedAttempt("track-1", "onboarding_initial"),
+    ).resolves.toMatchObject({
+      id: "attempt-1",
+      status: "completed",
+      catalogId: "catalog-1",
+    });
+    expect(diagnosticAttempt.findFirst).toHaveBeenCalledWith({
+      where: {
+        learningTrackId: "track-1",
+        purpose: "onboarding_initial",
+        status: "completed",
+      },
+      orderBy: {
+        completedAt: "desc",
+      },
+    });
+  });
+
   it("creates shown attempt items and updates them when answered", async () => {
     const shownAt = new Date("2026-06-27T12:10:00.000Z");
     const answeredAt = new Date("2026-06-27T12:10:12.000Z");

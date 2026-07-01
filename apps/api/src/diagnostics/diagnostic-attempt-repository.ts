@@ -10,6 +10,10 @@ export interface DiagnosticAttemptRepository {
     learningTrackId: string,
     purpose: string,
   ): Promise<DiagnosticAttempt | null>;
+  findCompletedAttempt(
+    learningTrackId: string,
+    purpose: string,
+  ): Promise<DiagnosticAttempt | null>;
   createAttempt(
     input: CreateDiagnosticAttemptInput,
   ): Promise<DiagnosticAttempt>;

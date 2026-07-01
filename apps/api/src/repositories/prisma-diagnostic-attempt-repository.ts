@@ -158,6 +158,24 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
     return row ? toDiagnosticAttempt(row) : null;
   }
 
+  async findCompletedAttempt(
+    learningTrackId: string,
+    purpose: string,
+  ): Promise<DiagnosticAttempt | null> {
+    const row = await this.prisma.diagnosticAttempt.findFirst({
+      where: {
+        learningTrackId,
+        purpose,
+        status: "completed",
+      },
+      orderBy: {
+        completedAt: "desc",
+      },
+    });
+
+    return row ? toDiagnosticAttempt(row) : null;
+  }
+
   async createAttempt(
     input: CreateDiagnosticAttemptInput,
   ): Promise<DiagnosticAttempt> {

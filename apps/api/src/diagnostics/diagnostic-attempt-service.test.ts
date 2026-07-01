@@ -26,6 +26,20 @@ class FakeDiagnosticAttemptRepository implements DiagnosticAttemptRepository {
     );
   }
 
+  async findCompletedAttempt(
+    learningTrackId: string,
+    purpose: string,
+  ): Promise<DiagnosticAttempt | null> {
+    return (
+      this.attempts.find(
+        (attempt) =>
+          attempt.learningTrackId === learningTrackId &&
+          attempt.purpose === purpose &&
+          attempt.status === "completed",
+      ) ?? null
+    );
+  }
+
   async createAttempt(input: {
     learningTrackId: string;
     catalogId: string;

@@ -39,6 +39,30 @@
   }
 }
 
+@keyframes diagnostic-token-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes diagnostic-token-return {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .recording-waveform-bar {
   height: 3px;
   transform-origin: bottom;

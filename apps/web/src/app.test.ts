@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createLogoutAction, createLoginRedirect } from "./auth/auth-routes.js";
 import { normalizeApiOrigin, readApiOrigin } from "./config/api-origin.js";
+import { getInitialDiagnosticRedirect } from "./pages/initial-diagnostic-onboarding-page.js";
 import {
   getNextOnboardingRoute,
   renderPrivateRouteText,
@@ -71,7 +72,7 @@ describe("web routes", () => {
           onboardingStep: "starting_point",
         },
       }),
-    ).toBe("/onboarding/starting-point");
+    ).toBe("/onboarding/initial-diagnostic");
     expect(
       getNextOnboardingRoute({
         user: { primaryEmail: "learner@example.com" },
@@ -92,6 +93,65 @@ describe("web routes", () => {
         },
       }),
     ).toBe("/private");
+  });
+
+  it("redirects the Initial diagnostic page when onboarding prerequisites are missing", () => {
+    expect(
+      getInitialDiagnosticRedirect(
+        {
+          user: { primaryEmail: "learner@example.com" },
+          learner: { displayName: "Thiago", instructionLanguage: null },
+          currentLearningTrack: null,
+        },
+        "completed",
+      ),
+    ).toBe("/onboarding/languages");
+    expect(
+      getInitialDiagnosticRedirect(
+        {
+          user: { primaryEmail: "learner@example.com" },
+          learner: {
+            displayName: "Thiago",
+            instructionLanguage: "pt",
+            ageRange: "25_39",
+          },
+          currentLearningTrack: {
+            targetLanguage: "en",
+            learningGoal: "travel",
+            additionalGoals: [],
+            lessonEmphases: ["reading"],
+            studyPace: "relaxed",
+            onboardingStartingPoint: "beginner",
+            onboardingStatus: "in_progress",
+            onboardingStep: "starting_point",
+          },
+        },
+        "completed",
+      ),
+    ).toBe("/onboarding/starting-point");
+    expect(
+      getInitialDiagnosticRedirect(
+        {
+          user: { primaryEmail: "learner@example.com" },
+          learner: {
+            displayName: "Thiago",
+            instructionLanguage: "pt",
+            ageRange: "25_39",
+          },
+          currentLearningTrack: {
+            targetLanguage: "en",
+            learningGoal: "travel",
+            additionalGoals: [],
+            lessonEmphases: ["reading"],
+            studyPace: "relaxed",
+            onboardingStartingPoint: "diagnostic",
+            onboardingStatus: "in_progress",
+            onboardingStep: "starting_point",
+          },
+        },
+        "completed",
+      ),
+    ).toBeNull();
   });
 
   it("redirects /login to the backend-managed Cognito login start", () => {

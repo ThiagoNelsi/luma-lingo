@@ -3,6 +3,8 @@ import { Route, Routes } from "react-router";
 import { LoginRedirectPage } from "../pages/login-redirect-page.js";
 import { AgeAndGoalsOnboardingPage } from "../pages/age-and-goals-onboarding-page.js";
 import { GoalsOnboardingPage } from "../pages/goals-onboarding-page.js";
+import { InitialDiagnosticOnboardingPage } from "../pages/initial-diagnostic-onboarding-page.js";
+import { InitialDiagnosticUiPrototypePage } from "../pages/initial-diagnostic-ui-prototype-page.js";
 import { LanguageOnboardingPage } from "../pages/language-onboarding-page.js";
 import { LessonPreferencesOnboardingPage } from "../pages/lesson-preferences-onboarding-page.js";
 import { NotFoundPage } from "../pages/not-found-page.js";
@@ -49,6 +51,14 @@ export function AppRoutes({ apiOrigin }: AppRoutesProps) {
       <Route
         path="/onboarding/starting-point"
         element={<OnboardingStartingPointPage apiOrigin={apiOrigin} />}
+      />
+      <Route
+        path="/onboarding/initial-diagnostic"
+        element={<InitialDiagnosticOnboardingPage apiOrigin={apiOrigin} />}
+      />
+      <Route
+        path="/prototype/initial-diagnostic-ui"
+        element={<InitialDiagnosticUiPrototypePage />}
       />
       <Route
         path="/login"

@@ -33,9 +33,6 @@ export function getNextOnboardingRoute(me: MeResponse): string {
   if (!me.learner.instructionLanguage || !me.currentLearningTrack) {
     return "/onboarding/languages";
   }
-  if (me.currentLearningTrack.onboardingStep === "starting_point") {
-    return "/onboarding/starting-point";
-  }
   if (!me.learner.ageRange) {
     return "/onboarding/about-you";
   }
@@ -49,6 +46,15 @@ export function getNextOnboardingRoute(me: MeResponse): string {
     return "/onboarding/preferences";
   }
   if (!me.currentLearningTrack.onboardingStartingPoint) {
+    return "/onboarding/starting-point";
+  }
+  if (
+    me.currentLearningTrack.onboardingStartingPoint === "diagnostic" &&
+    me.currentLearningTrack.onboardingStatus === "in_progress"
+  ) {
+    return "/onboarding/initial-diagnostic";
+  }
+  if (me.currentLearningTrack.onboardingStep === "starting_point") {
     return "/onboarding/starting-point";
   }
 

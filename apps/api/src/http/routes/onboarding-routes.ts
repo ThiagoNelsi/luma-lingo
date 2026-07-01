@@ -11,6 +11,7 @@ import type { AppConfig } from "../../config.js";
 import { ageAndGoalsProgressSchema } from "../../learners/age-and-goals-progress.js";
 import { languageSelectionProgressSchema } from "../../learners/language-selection-progress.js";
 import { lessonPreferencesProgressSchema } from "../../learners/lesson-preferences-progress.js";
+import { onboardingCompletionSchema } from "../../learners/onboarding-completion.js";
 import { onboardingStartingPointProgressSchema } from "../../learners/onboarding-starting-point-progress.js";
 import { AuthService } from "../../services/auth-service.js";
 import { OnboardingService } from "../../services/onboarding-service.js";
@@ -154,5 +155,59 @@ export function registerOnboardingRoutes(
         request.body,
       );
     },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().post(
+    "/me/onboarding/complete",
+    {
+      schema: {
+        tags: ["Learner"],
+        summary: "Complete onboarding for the current Learning track",
+        response: {
+          200: onboardingCompletionSchema,
+          401: errorDtoSchema,
+          403: errorDtoSchema,
+          409: errorDtoSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!isTrustedOrigin(request.headers.origin, deps.config)) {
+        return reply.code(403).send({ error: "invalid_request_origin" });
+      }
+
+      const session = await deps.auth.resolveSession(
+        request.cookies[deps.config.sessionCookieName],
+      );
+      if (!session) {
+        return reply.code(401).send({ error: "unauthenticated" });
+      }
+      if (!session.currentLearningTrack) {
+        return reply.code(409).send({ error: "learning_track_required" });
+      }
+
+      try {
+        return await deps.onboarding.completeOnboarding({
+          learningTrackId: session.currentLearningTrack.id,
+          targetLanguage: session.currentLearningTrack.targetLanguage,
+          onboardingStartingPoint:
+            session.currentLearningTrack.onboardingStartingPoint,
+        });
+      } catch (error) {
+        if (error instanceof Error && isCompleteOnboardingConflict(error)) {
+          return reply.code(409).send({ error: error.message });
+        }
+
+        throw error;
+      }
+    },
+  );
+}
+
+function isCompleteOnboardingConflict(error: Error): boolean {
+  return (
+    error.message === "onboarding_starting_point_required" ||
+    error.message === "completed_initial_diagnostic_required" ||
+    error.message === "published_competency_catalog_required"
   );
 }

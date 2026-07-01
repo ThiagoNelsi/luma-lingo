@@ -17,6 +17,10 @@ import {
   saveOnboardingStartingPoint,
   UnauthorizedOnboardingStartingPointError,
 } from "../onboarding/onboarding-starting-point-client.js";
+import {
+  completeOnboarding,
+  UnauthorizedOnboardingCompletionError,
+} from "../onboarding/onboarding-completion-client.js";
 import { validateOnboardingStartingPointForm } from "../onboarding/onboarding-starting-point-form.js";
 import {
   getProfileIntroduction,
@@ -85,6 +89,7 @@ export function OnboardingStartingPointPage({
         if (
           error instanceof UnauthorizedSessionError ||
           error instanceof UnauthorizedOnboardingStartingPointError ||
+          error instanceof UnauthorizedOnboardingCompletionError ||
           error instanceof UnauthorizedProfileIntroductionError
         ) {
           navigate("/login", { replace: true });
@@ -115,9 +120,18 @@ export function OnboardingStartingPointPage({
     setFailed(false);
     try {
       await saveOnboardingStartingPoint(apiOrigin, formResult.selection);
-      navigate("/private");
+      if (formResult.selection.onboardingStartingPoint === "beginner") {
+        await completeOnboarding(apiOrigin);
+        navigate("/private");
+        return;
+      }
+
+      navigate("/onboarding/initial-diagnostic");
     } catch (error) {
-      if (error instanceof UnauthorizedOnboardingStartingPointError) {
+      if (
+        error instanceof UnauthorizedOnboardingStartingPointError ||
+        error instanceof UnauthorizedOnboardingCompletionError
+      ) {
         navigate("/login", { replace: true });
         return;
       }
