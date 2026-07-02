@@ -20,6 +20,7 @@
   "devDependencies": {
     "@playwright/test": "^1.61.0",
     "@types/node": "latest",
+    "@vitest/coverage-v8": "^4.1.9",
     "prettier": "latest",
     "tsx": "latest",
     "typescript": "latest",
