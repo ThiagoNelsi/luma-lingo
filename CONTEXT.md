@@ -226,6 +226,12 @@ Competency that a `Diagnostic item` can collect evidence for. Each diagnostic it
 
 Purpose of a `Diagnostic target` within a diagnostic item, such as primary or supporting.
 
+## Diagnostic item role
+
+Selection purpose of a `Diagnostic item` inside a `Diagnostic attempt`, such as
+foundation, ceiling, repair, confidence, or goal_probe. See
+`docs/diagnostic-question-roles.md`.
+
 ## Diagnostic target weight
 
 Relative contribution of a diagnostic item response to one `Diagnostic target`.

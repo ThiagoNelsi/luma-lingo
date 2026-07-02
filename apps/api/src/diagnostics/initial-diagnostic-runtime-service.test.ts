@@ -221,7 +221,7 @@ describe("InitialDiagnosticRuntimeService", () => {
     const attempts = new MemoryDiagnosticAttemptRepository();
     const questionBanks = new MemoryQuestionBankRepository(
       buildQuestionBank(
-        Array.from({ length: 13 }, (_, index) =>
+        Array.from({ length: 17 }, (_, index) =>
           buildQuestionBankItem({
             id: `item-${index + 1}`,
             key: `en.diag.a1.item-${String(index + 1).padStart(2, "0")}.001`,
@@ -244,7 +244,7 @@ describe("InitialDiagnosticRuntimeService", () => {
       startedAt: new Date("2026-06-28T11:00:00.000Z"),
       details: {},
     });
-    for (let position = 1; position <= 11; position += 1) {
+    for (let position = 1; position <= 15; position += 1) {
       const attemptItem = await attempts.createAttemptItem({
         attemptId: attempt.id,
         diagnosticItemId: `item-${position}`,
@@ -273,12 +273,12 @@ describe("InitialDiagnosticRuntimeService", () => {
     }
     await attempts.createAttemptItem({
       attemptId: attempt.id,
-      diagnosticItemId: "item-12",
-      position: 12,
+      diagnosticItemId: "item-16",
+      position: 16,
       selectedForRole: "foundation",
       selectionRule: "initial-diagnostic-selection-v1",
       selectionTrace: { schemaVersion: 1 },
-      shownAt: new Date("2026-06-28T11:12:00.000Z"),
+      shownAt: new Date("2026-06-28T11:16:00.000Z"),
     });
 
     const result = await runtime.answerInitialDiagnosticItem({
@@ -298,7 +298,7 @@ describe("InitialDiagnosticRuntimeService", () => {
         status: "completed",
         summary: {
           schemaVersion: 1,
-          answeredItemCount: 12,
+          answeredItemCount: 16,
           stopReason: "max_items_reached",
         },
       },
