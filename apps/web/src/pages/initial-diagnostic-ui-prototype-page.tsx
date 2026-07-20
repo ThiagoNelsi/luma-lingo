@@ -23,9 +23,7 @@ import {
 // /prototype/initial-diagnostic-ui route.
 
 type QuestionType =
-  | "multiple_choice"
-  | "word_bank_sequence"
-  | "fill_blank_choice";
+  "multiple_choice" | "word_bank_sequence" | "fill_blank_choice";
 
 interface BaseQuestion {
   id: string;
@@ -54,9 +52,7 @@ interface FillBlankQuestion extends BaseQuestion {
 }
 
 type DiagnosticQuestion =
-  | MultipleChoiceQuestion
-  | WordBankQuestion
-  | FillBlankQuestion;
+  MultipleChoiceQuestion | WordBankQuestion | FillBlankQuestion;
 
 type AnswerState = Record<string, string | string[]>;
 

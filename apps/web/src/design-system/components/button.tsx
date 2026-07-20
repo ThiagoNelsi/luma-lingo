@@ -1,12 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
 type ButtonVariant =
-  | "primary"
-  | "accent"
-  | "emphasis"
-  | "outline"
-  | "ghost"
-  | "tinted";
+  "primary" | "accent" | "emphasis" | "outline" | "ghost" | "tinted";
 
 type ButtonSize = "default" | "full" | "icon";
 

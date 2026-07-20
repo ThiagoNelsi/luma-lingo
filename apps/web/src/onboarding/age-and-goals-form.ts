@@ -28,8 +28,7 @@ export interface GoalsFormValues {
 }
 
 type AgeAndGoalsFormResult =
-  | { ok: true; selection: AgeAndGoalsSelection }
-  | { ok: false; error: string };
+  { ok: true; selection: AgeAndGoalsSelection } | { ok: false; error: string };
 
 export function validateAgeAndGoalsForm(
   values: AgeAndGoalsFormValues,

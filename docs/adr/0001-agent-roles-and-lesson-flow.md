@@ -7,6 +7,7 @@ Status: Accepted
 The product generates highly personalized language lessons. The lesson must stay fast to produce, consistent in quality, and adaptable to user context, lesson emphasis, and prior mistakes.
 
 A single monolithic agent would be simpler to start with, but it would mix concerns:
+
 - lesson creation
 - policy and module validation
 - exercise correction and feedback

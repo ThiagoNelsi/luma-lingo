@@ -2510,14 +2510,11 @@ function buildAttemptItemsFor(
   items: DiagnosticQuestionBankItem[],
   input?: {
     score?:
-      | number
-      | ((item: DiagnosticQuestionBankItem, index: number) => number);
+      number | ((item: DiagnosticQuestionBankItem, index: number) => number);
     confidence?:
-      | number
-      | ((item: DiagnosticQuestionBankItem, index: number) => number);
+      number | ((item: DiagnosticQuestionBankItem, index: number) => number);
     selectedForRole?:
-      | string
-      | ((item: DiagnosticQuestionBankItem, index: number) => string);
+      string | ((item: DiagnosticQuestionBankItem, index: number) => string);
   },
 ): DiagnosticAttemptItem[] {
   return items.map((item, index) =>

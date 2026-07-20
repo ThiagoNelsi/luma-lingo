@@ -49,12 +49,14 @@ export class PrismaSessionRepository implements SessionRepository {
       return null;
     }
 
-    this.prisma.session.update({
-      where: { id: session.id },
-      data: { lastSeenAt: now },
-    }).then(() => {
-      // We intentionally don't await this update to avoid delaying the response.
-    });
+    this.prisma.session
+      .update({
+        where: { id: session.id },
+        data: { lastSeenAt: now },
+      })
+      .then(() => {
+        // We intentionally don't await this update to avoid delaying the response.
+      });
 
     return {
       ...toAuthProfile(session.user),
