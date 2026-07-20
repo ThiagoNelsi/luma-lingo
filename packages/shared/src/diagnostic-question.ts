@@ -352,7 +352,11 @@ export const authoredDiagnosticQuestionSchema = z
     scoringRule: diagnosticQuestionScoringRuleSchema,
     evidenceMappings: z
       .array(authoredDiagnosticEvidenceMappingSchema)
-      .min(1)
+      // Componentless integrated competencies (for example greetings) can
+      // produce direct competency evidence without a defensible concept row.
+      // The catalog-aware importer enforces that empty mappings are limited to
+      // those primary competency targets.
+      .min(0)
       .max(12),
     details: authoredDiagnosticItemDetailsSchema,
   })

@@ -1,5 +1,35 @@
 # Future Improvements
 
+## 2026-07-20
+
+### Support Competencies In Diagnostic Evidence Mappings
+
+- **Deferred:** Generalize diagnostic evidence mappings so an item can declare
+  evidence for competencies as well as concepts, with an explicit target kind
+  and target-specific validation. Keep the existing primary target as the
+  item's single selection and reporting objective while allowing its Q-matrix
+  to describe additional competency evidence when the response genuinely
+  diagnoses an integrated performance.
+- **Current scope boundary:** Issue #31 is intentionally limited to a small A1
+  MVP bank. It keeps concept evidence mappings for competencies with components
+  and permits an empty concept mapping only for a primary componentless
+  competency such as `en.greetings.a1`, whose existing primary target already
+  produces direct competency evidence. A polymorphic Q-matrix would require a
+  broader domain contract, database constraints, importer changes, evidence
+  processing, selector semantics, retrieval APIs, and regression tests.
+- **Future value:** Competency mappings would support retrieving questions by
+  integrated performance even when that competency has no component concepts,
+  while concept mappings would continue to provide richer cross-competency
+  retrieval. Together they could find items whose primary target is different
+  but whose response still supplies useful evidence for the learner's current
+  competency context, without conflating a primary target with every skill an
+  item diagnoses.
+- **Revisit when:** Question discovery or lesson activity reuse needs to query
+  secondary competency evidence across primary targets, or when more
+  componentless competencies require reusable diagnostic coverage. Define how
+  competency-mapped evidence avoids duplicating the automatic evidence for the
+  primary competency before changing the schema.
+
 ## 2026-07-19
 
 ### Versioned Curriculum Artifact Metadata And Checksums

@@ -212,6 +212,86 @@ describe("diagnostic question bank import", () => {
     });
   });
 
+  it("rejects published items without authoring-source metadata", () => {
+    const authoredItem = buildQuestionBank().items[0];
+    if (!authoredItem) throw new Error("Expected a diagnostic item fixture");
+
+    const questionBank = parseDiagnosticQuestionBank(
+      buildQuestionBank({
+        items: [
+          {
+            ...authoredItem,
+            details: {
+              ...authoredItem.details,
+              authoringSource: undefined,
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(() =>
+      buildDiagnosticQuestionBankImportPlan({
+        questionBank,
+        catalog,
+        competencies,
+        concepts,
+        importedAt: new Date("2026-06-28T12:00:00.000Z"),
+      }),
+    ).toThrow(
+      /Published diagnostic item .* requires authoring-source metadata/,
+    );
+  });
+
+  it("allows empty evidence mappings only for a componentless competency target", () => {
+    const questionBank = parseDiagnosticQuestionBank(
+      buildQuestionBank({
+        items: [
+          {
+            ...buildQuestionBank().items[0],
+            primaryTarget: {
+              kind: "competency",
+              competencyKey: "pre-a1-core-subject-pronouns",
+            },
+            evidenceMappings: [],
+          },
+        ],
+      }),
+    );
+
+    expect(() =>
+      buildDiagnosticQuestionBankImportPlan({
+        questionBank,
+        catalog,
+        competencies: [
+          {
+            id: "competency-1",
+            key: "pre-a1-core-subject-pronouns",
+            componentConceptKeys: [],
+          },
+        ],
+        concepts,
+        importedAt: new Date("2026-06-28T12:00:00.000Z"),
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      buildDiagnosticQuestionBankImportPlan({
+        questionBank,
+        catalog,
+        competencies: [
+          {
+            id: "competency-1",
+            key: "pre-a1-core-subject-pronouns",
+            componentConceptKeys: ["form.synthetic.subject_pronoun"],
+          },
+        ],
+        concepts,
+        importedAt: new Date("2026-06-28T12:00:00.000Z"),
+      }),
+    ).toThrow(/not componentless/);
+  });
+
   it("rejects question banks that reference competencies outside the catalog", () => {
     const questionBank = parseDiagnosticQuestionBank(
       buildQuestionBank({

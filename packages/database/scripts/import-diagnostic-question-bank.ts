@@ -12,14 +12,14 @@ import {
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "../../..");
-const defaultQuestionBankPath = resolve(
+export const defaultDiagnosticQuestionBankPath = resolve(
   repoRoot,
-  "data/catalogs/en/onboarding-diagnostic-question-bank-merged.json",
+  "data/catalogs/en/authoral/onboarding-diagnostic-question-bank-a1-mvp.json",
 );
 
-function parseArgs(argv: string[]) {
+export function parseDiagnosticQuestionBankImportArgs(argv: string[]) {
   const options = {
-    questionBankPath: defaultQuestionBankPath,
+    questionBankPath: defaultDiagnosticQuestionBankPath,
     transactionTimeoutMs: 60000,
     dryRun: false,
   };
@@ -76,7 +76,7 @@ Options:
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const options = parseDiagnosticQuestionBankImportArgs(process.argv.slice(2));
   const { questionBank } = await readDiagnosticQuestionBankFile(
     options.questionBankPath,
   );
@@ -96,7 +96,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

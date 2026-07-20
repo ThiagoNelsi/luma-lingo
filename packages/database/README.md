@@ -69,8 +69,22 @@ Prisma migrations.
 
 ## Import onboarding diagnostic questions
 
-The legacy diagnostic bank doesn't share competency identities with the
-authorial catalog. Don't import or remap it into the published catalog. The API
-reports the diagnostic as unavailable until a new question bank with explicit
-evidence mappings is published. The existing diagnostic tables remain available
-for that replacement pipeline.
+The default command imports the private authorial A1 bank at
+`data/catalogs/en/authoral/onboarding-diagnostic-question-bank-a1-mvp.json`.
+It uses only canonical catalog references; do not import or remap the legacy
+bank into the published catalog.
+
+Validate the private bank and its references without writes first:
+
+```sh
+pnpm --filter @luma-lingo/database db:import:diagnostic-questions -- --dry-run
+```
+
+Publish it transactionally after the dry run succeeds:
+
+```sh
+pnpm --filter @luma-lingo/database db:import:diagnostic-questions
+```
+
+The importer emits aggregate counts only. Published items must retain their
+authoring-source metadata, and the same artifact can be imported again safely.

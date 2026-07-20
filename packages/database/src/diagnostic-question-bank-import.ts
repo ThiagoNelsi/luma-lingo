@@ -19,6 +19,12 @@ export interface DiagnosticQuestionBankImportCatalog {
 export interface DiagnosticQuestionBankImportCompetency {
   id: string;
   key: string;
+  componentConceptKeys?: string[];
+  conceptRelationships?: Array<{
+    concept: {
+      key: string;
+    };
+  }>;
 }
 
 export interface DiagnosticQuestionBankImportConcept {
@@ -148,6 +154,8 @@ export function buildDiagnosticQuestionBankImportPlan(
     competencyByKey,
     conceptByKey,
   );
+  assertEmptyEvidenceMappingsAllowed(input.questionBank, competencyByKey);
+  assertPublishedQuestionBankHasAuthoringMetadata(input.questionBank);
 
   const duplicateItemKeys = findDuplicates(
     input.questionBank.items.map((item) => item.key),
@@ -275,6 +283,18 @@ async function writeDiagnosticQuestionBank(
         select: {
           id: true,
           key: true,
+          conceptRelationships: {
+            where: {
+              role: "component",
+            },
+            select: {
+              concept: {
+                select: {
+                  key: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -297,10 +317,22 @@ async function writeDiagnosticQuestionBank(
     },
   });
 
+  const catalogForImport = {
+    ...catalog,
+    competencies: catalog.competencies.map(
+      ({ conceptRelationships, ...competency }) => ({
+        ...competency,
+        componentConceptKeys: (conceptRelationships ?? []).map(
+          (relationship) => relationship.concept.key,
+        ),
+      }),
+    ),
+  };
+
   const plan = buildDiagnosticQuestionBankImportPlan({
     questionBank: input.questionBank,
-    catalog,
-    competencies: catalog.competencies,
+    catalog: catalogForImport,
+    competencies: catalogForImport.competencies,
     concepts,
     importedAt: input.now?.() ?? new Date(),
     sourceFile: input.sourceFile,
@@ -460,6 +492,44 @@ function assertQuestionBankReferencesKnownTargets(
         .sort()
         .join(", ")}`,
     );
+  }
+}
+
+function assertEmptyEvidenceMappingsAllowed(
+  questionBank: AuthoredDiagnosticQuestionBank,
+  competencyByKey: Map<string, DiagnosticQuestionBankImportCompetency>,
+) {
+  for (const item of questionBank.items) {
+    if (item.evidenceMappings.length > 0) continue;
+
+    if (item.primaryTarget.kind !== "competency") {
+      throw new Error(
+        `Diagnostic item ${item.key} requires concept evidence mappings unless its primary target is a componentless competency`,
+      );
+    }
+
+    const competency = competencyByKey.get(item.primaryTarget.competencyKey);
+    if (
+      !competency ||
+      competency.componentConceptKeys === undefined ||
+      competency.componentConceptKeys.length > 0
+    ) {
+      throw new Error(
+        `Diagnostic item ${item.key} has empty evidence mappings but its primary competency is not componentless`,
+      );
+    }
+  }
+}
+
+function assertPublishedQuestionBankHasAuthoringMetadata(
+  questionBank: AuthoredDiagnosticQuestionBank,
+) {
+  for (const item of questionBank.items) {
+    if (item.status === "published" && !item.details.authoringSource) {
+      throw new Error(
+        `Published diagnostic item ${item.key} requires authoring-source metadata`,
+      );
+    }
   }
 }
 

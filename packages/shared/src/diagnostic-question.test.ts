@@ -218,7 +218,7 @@ describe("diagnostic question contracts", () => {
     ).toBe(false);
   });
 
-  it("requires one or more unique concept-capability evidence mappings", () => {
+  it("requires unique concept-capability evidence mappings when mappings are declared", () => {
     expect(
       authoredDiagnosticQuestionSchema.safeParse({
         ...validFillBlankQuestion,
@@ -242,7 +242,7 @@ describe("diagnostic question contracts", () => {
         ...validFillBlankQuestion,
         evidenceMappings: [],
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("accepts a concept-targeted Q-matrix item with an independent question mode", () => {
