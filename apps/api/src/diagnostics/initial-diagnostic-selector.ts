@@ -27,6 +27,12 @@ type CandidateScore = {
   selectedForRole: DiagnosticQuestionRole;
 };
 
+function primaryTargetId(item: DiagnosticQuestionBankItem): string {
+  const targetId = item.primaryCompetencyId ?? item.primaryConceptId;
+  if (!targetId) throw new Error("diagnostic_item_primary_target_missing");
+  return targetId;
+}
+
 export function selectNextInitialDiagnosticItem(input: {
   questionBank: DiagnosticQuestionBank;
   attemptItems: DiagnosticAttemptItem[];
@@ -157,8 +163,8 @@ function selectFinalValidationCandidate(
     return selectHighestScoringCandidate({
       ...input,
       phase: "final_validation",
-      requiredPrimaryCompetencyId: repairedItem.primaryCompetencyId,
-      allowedPrimaryCompetencyOverflowId: repairedItem.primaryCompetencyId,
+      requiredPrimaryCompetencyId: primaryTargetId(repairedItem),
+      allowedPrimaryCompetencyOverflowId: primaryTargetId(repairedItem),
       allowedRoles: new Set(["confidence"]),
     });
   }
@@ -221,7 +227,7 @@ function selectHighestScoringCandidate(
     .filter(
       (item) =>
         !input.requiredPrimaryCompetencyId ||
-        item.primaryCompetencyId === input.requiredPrimaryCompetencyId,
+        primaryTargetId(item) === input.requiredPrimaryCompetencyId,
     )
     .filter(
       (item) =>
@@ -314,13 +320,13 @@ function canSelectPrimaryCompetencyCandidate(input: {
 }): boolean {
   if (
     input.allowedPrimaryCompetencyOverflowId &&
-    input.item.primaryCompetencyId === input.allowedPrimaryCompetencyOverflowId
+    primaryTargetId(input.item) === input.allowedPrimaryCompetencyOverflowId
   ) {
     return true;
   }
 
   return (
-    (input.primaryCompetencyCounts.get(input.item.primaryCompetencyId) ?? 0) <
+    (input.primaryCompetencyCounts.get(primaryTargetId(input.item)) ?? 0) <
     input.policy.config.maxItemsPerCompetency
   );
 }
@@ -345,7 +351,7 @@ function canSelectRepairCandidate(input: {
   }
 
   return (
-    (input.repairCompetencyCounts.get(input.item.primaryCompetencyId) ?? 0) <
+    (input.repairCompetencyCounts.get(primaryTargetId(input.item)) ?? 0) <
     input.policy.config.maxRepairItemsPerCompetency
   );
 }
@@ -360,7 +366,7 @@ function scoreCandidate(input: {
   allowedRoles?: Set<DiagnosticQuestionRole>;
 }): CandidateScore {
   const repeatedPrimaryCount =
-    input.primaryCompetencyCounts.get(input.item.primaryCompetencyId) ?? 0;
+    input.primaryCompetencyCounts.get(primaryTargetId(input.item)) ?? 0;
   const directNewCompetencyValue = repeatedPrimaryCount === 0 ? 100 : 0;
   const repeatedCompetencyPenalty = repeatedPrimaryCount * 40;
   const prerequisites = input.item.primaryCompetency?.prerequisites ?? [];
@@ -648,8 +654,8 @@ function countPrimaryCompetencyAttempts(input: {
     if (!item) continue;
 
     counts.set(
-      item.primaryCompetencyId,
-      (counts.get(item.primaryCompetencyId) ?? 0) + 1,
+      primaryTargetId(item),
+      (counts.get(primaryTargetId(item)) ?? 0) + 1,
     );
   }
 
@@ -891,10 +897,11 @@ function findMissedCompetenciesByRepairPriority(
       targetLevel: input.attemptContext.targetLevel,
       goals: input.goals,
     });
-    const current = missedCompetencies.get(item.primaryCompetencyId);
+    const targetId = primaryTargetId(item);
+    const current = missedCompetencies.get(targetId);
     if (!current || impactScore > current.impactScore) {
-      missedCompetencies.set(item.primaryCompetencyId, {
-        primaryCompetencyId: item.primaryCompetencyId,
+      missedCompetencies.set(targetId, {
+        primaryCompetencyId: targetId,
         impactScore,
       });
     }

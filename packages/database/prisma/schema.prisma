@@ -129,6 +129,8 @@ model LearningTrack {
   diagnosticAttempts      DiagnosticAttempt[]
   competencyStates        LearnerCompetencyState[]
   competencyEvidence      CompetencyEvidence[]
+  conceptStates           LearnerConceptState[]
+  conceptEvidence         ConceptEvidence[]
   currentForLearner       Learner?                 @relation("CurrentLearningTrack")
 
   @@unique([learnerId, targetLanguage])
@@ -157,23 +159,22 @@ model CompetencyCatalog {
 }
 
 model Competency {
-  id                       String                           @id @db.Uuid
-  catalogId                String                           @map("catalog_id") @db.Uuid
+  id                       String                   @id @db.Uuid
+  catalogId                String                   @map("catalog_id") @db.Uuid
   key                      String
   title                    String
   description              String?
   family                   String
-  difficultyBand           String?                          @map("difficulty_band")
-  taxonomyId               String                           @map("taxonomy_id")
-  estimatedDifficultyScore Float?                           @map("estimated_difficulty_score")
-  status                   String                           @default("draft")
-  details                  Json                             @default("{}")
-  createdAt                DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  catalog                  CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  difficultyBand           String?                  @map("difficulty_band")
+  taxonomyId               String                   @map("taxonomy_id")
+  estimatedDifficultyScore Float?                   @map("estimated_difficulty_score")
+  status                   String                   @default("draft")
+  details                  Json                     @default("{}")
+  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                  CompetencyCatalog        @relation(fields: [catalogId], references: [id], onDelete: Cascade)
   conceptRelationships     CompetencyConcept[]
-  primaryDiagnosticItems   DiagnosticItem[]                 @relation("PrimaryDiagnosticCompetency")
-  diagnosticItemTargets    DiagnosticItemCompetencyTarget[]
+  primaryDiagnosticItems   DiagnosticItem[]         @relation("PrimaryDiagnosticCompetency")
   learnerStates            LearnerCompetencyState[]
   evidence                 CompetencyEvidence[]
 
@@ -186,19 +187,23 @@ model Competency {
 }
 
 model Concept {
-  id                      String              @id @db.Uuid
-  targetLanguage          String              @map("target_language")
-  key                     String
-  label                   String
-  aliases                 String[]            @default([])
-  status                  String              @default("draft")
-  replacedByConceptId     String?             @map("replaced_by_concept_id") @db.Uuid
-  details                 Json                @default("{}")
-  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
-  replacedBy              Concept?            @relation("ConceptReplacement", fields: [replacedByConceptId], references: [id], onDelete: Restrict)
-  replacements            Concept[]           @relation("ConceptReplacement")
-  competencyRelationships CompetencyConcept[]
+  id                         String                                 @id @db.Uuid
+  targetLanguage             String                                 @map("target_language")
+  key                        String
+  label                      String
+  aliases                    String[]                               @default([])
+  status                     String                                 @default("draft")
+  replacedByConceptId        String?                                @map("replaced_by_concept_id") @db.Uuid
+  details                    Json                                   @default("{}")
+  createdAt                  DateTime                               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime                               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  replacedBy                 Concept?                               @relation("ConceptReplacement", fields: [replacedByConceptId], references: [id], onDelete: Restrict)
+  replacements               Concept[]                              @relation("ConceptReplacement")
+  competencyRelationships    CompetencyConcept[]
+  primaryDiagnosticItems     DiagnosticItem[]                       @relation("PrimaryDiagnosticConcept")
+  diagnosticEvidenceMappings DiagnosticItemConceptEvidenceMapping[]
+  learnerStates              LearnerConceptState[]
+  evidence                   ConceptEvidence[]
 
   @@unique([targetLanguage, key])
   @@index([targetLanguage, status])
@@ -223,43 +228,46 @@ model CompetencyConcept {
 }
 
 model DiagnosticItem {
-  id                  String                           @id @db.Uuid
-  catalogId           String                           @map("catalog_id") @db.Uuid
-  key                 String
-  primaryCompetencyId String                           @map("primary_competency_id") @db.Uuid
-  difficultyBand      String                           @map("difficulty_band")
-  responseFormat      String                           @map("response_format")
-  status              String                           @default("draft")
-  prompt              Json
-  scoringRule         Json                             @map("scoring_rule")
-  details             Json                             @default("{}")
-  reviewedAt          DateTime?                        @map("reviewed_at") @db.Timestamptz(6)
-  publishedAt         DateTime?                        @map("published_at") @db.Timestamptz(6)
-  createdAt           DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  catalog             CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
-  primaryCompetency   Competency                       @relation("PrimaryDiagnosticCompetency", fields: [primaryCompetencyId], references: [id], onDelete: Restrict)
-  competencyTargets   DiagnosticItemCompetencyTarget[]
-  attemptItems        DiagnosticAttemptItem[]
+  id                      String                                 @id @db.Uuid
+  catalogId               String                                 @map("catalog_id") @db.Uuid
+  key                     String
+  primaryCompetencyId     String?                                @map("primary_competency_id") @db.Uuid
+  primaryConceptId        String?                                @map("primary_concept_id") @db.Uuid
+  difficultyBand          String                                 @map("difficulty_band")
+  mode                    String
+  responseFormat          String                                 @map("response_format")
+  status                  String                                 @default("draft")
+  prompt                  Json
+  scoringRule             Json                                   @map("scoring_rule")
+  details                 Json                                   @default("{}")
+  reviewedAt              DateTime?                              @map("reviewed_at") @db.Timestamptz(6)
+  publishedAt             DateTime?                              @map("published_at") @db.Timestamptz(6)
+  createdAt               DateTime                               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                 CompetencyCatalog                      @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  primaryCompetency       Competency?                            @relation("PrimaryDiagnosticCompetency", fields: [primaryCompetencyId], references: [id], onDelete: Restrict)
+  primaryConcept          Concept?                               @relation("PrimaryDiagnosticConcept", fields: [primaryConceptId], references: [id], onDelete: Restrict)
+  conceptEvidenceMappings DiagnosticItemConceptEvidenceMapping[]
+  attemptItems            DiagnosticAttemptItem[]
 
   @@unique([catalogId, key])
   @@index([catalogId, status, difficultyBand])
   @@index([primaryCompetencyId])
+  @@index([primaryConceptId])
   @@map("diagnostic_items")
 }
 
-model DiagnosticItemCompetencyTarget {
+model DiagnosticItemConceptEvidenceMapping {
   diagnosticItemId String         @map("diagnostic_item_id") @db.Uuid
-  competencyId     String         @map("competency_id") @db.Uuid
-  role             String
-  weight           Int?
-  details          Json           @default("{}")
+  conceptId        String         @map("concept_id") @db.Uuid
+  capability       String
+  strength         Int
   diagnosticItem   DiagnosticItem @relation(fields: [diagnosticItemId], references: [id], onDelete: Cascade)
-  competency       Competency     @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+  concept          Concept        @relation(fields: [conceptId], references: [id], onDelete: Restrict)
 
-  @@id([diagnosticItemId, competencyId])
-  @@index([competencyId])
-  @@map("diagnostic_item_competency_targets")
+  @@id([diagnosticItemId, conceptId, capability])
+  @@index([conceptId, capability])
+  @@map("diagnostic_item_concept_evidence_mappings")
 }
 
 model DiagnosticAttempt {
@@ -333,6 +341,27 @@ model LearnerCompetencyState {
   @@map("learner_competency_states")
 }
 
+model LearnerConceptState {
+  id                    String        @id @db.Uuid
+  learningTrackId       String        @map("learning_track_id") @db.Uuid
+  conceptId             String        @map("concept_id") @db.Uuid
+  capability            String
+  mastery               Float?        @map("mastery")
+  confidence            Float         @default(0)
+  directEvidenceCount   Int           @default(0) @map("direct_evidence_count")
+  inferredEvidenceCount Int           @default(0) @map("inferred_evidence_count")
+  lastEvidenceAt        DateTime?     @map("last_evidence_at") @db.Timestamptz(6)
+  details               Json          @default("{}")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack         LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  concept               Concept       @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+
+  @@unique([learningTrackId, conceptId, capability])
+  @@index([conceptId, capability])
+  @@map("learner_concept_states")
+}
+
 model CompetencyEvidence {
   id              String        @id @db.Uuid
   learningTrackId String        @map("learning_track_id") @db.Uuid
@@ -351,4 +380,27 @@ model CompetencyEvidence {
   @@index([competencyId])
   @@index([sourceType, sourceId])
   @@map("competency_evidence")
+}
+
+model ConceptEvidence {
+  id              String        @id @db.Uuid
+  learningTrackId String        @map("learning_track_id") @db.Uuid
+  conceptId       String        @map("concept_id") @db.Uuid
+  capability      String
+  evidenceKind    String        @map("evidence_kind")
+  sourceType      String        @map("source_type")
+  sourceId        String?       @map("source_id")
+  observedAt      DateTime      @default(now()) @map("observed_at") @db.Timestamptz(6)
+  score           Float?
+  confidence      Float?
+  strength        Int
+  details         Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  learningTrack   LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  concept         Concept       @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+
+  @@index([learningTrackId, observedAt])
+  @@index([conceptId, capability])
+  @@index([sourceType, sourceId])
+  @@map("concept_evidence")
 }

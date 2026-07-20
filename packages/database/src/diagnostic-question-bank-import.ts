@@ -21,12 +21,19 @@ export interface DiagnosticQuestionBankImportCompetency {
   key: string;
 }
 
+export interface DiagnosticQuestionBankImportConcept {
+  id: string;
+  key: string;
+}
+
 export interface DiagnosticQuestionBankImportItemRow {
   id: string;
   catalogId: string;
   key: string;
-  primaryCompetencyId: string;
+  primaryCompetencyId: string | null;
+  primaryConceptId: string | null;
   difficultyBand: string;
+  mode: string;
   responseFormat: string;
   status: string;
   prompt: JsonObject;
@@ -36,12 +43,11 @@ export interface DiagnosticQuestionBankImportItemRow {
   publishedAt: Date | null;
 }
 
-export interface DiagnosticQuestionBankImportTargetRow {
+export interface DiagnosticQuestionBankImportEvidenceMappingRow {
   diagnosticItemId: string;
-  competencyId: string;
-  role: string;
-  weight: number;
-  details: JsonObject;
+  conceptId: string;
+  capability: string;
+  strength: number;
 }
 
 export interface DiagnosticQuestionBankImportPlan {
@@ -51,11 +57,11 @@ export interface DiagnosticQuestionBankImportPlan {
     version: string;
   };
   diagnosticItems: DiagnosticQuestionBankImportItemRow[];
-  diagnosticTargets: DiagnosticQuestionBankImportTargetRow[];
+  evidenceMappings: DiagnosticQuestionBankImportEvidenceMappingRow[];
   catalogMetadata: JsonObject;
   summary: {
     diagnosticItems: number;
-    diagnosticTargets: number;
+    evidenceMappings: number;
   };
 }
 
@@ -63,6 +69,7 @@ export interface BuildDiagnosticQuestionBankImportPlanInput {
   questionBank: AuthoredDiagnosticQuestionBank;
   catalog: DiagnosticQuestionBankImportCatalog;
   competencies: DiagnosticQuestionBankImportCompetency[];
+  concepts: DiagnosticQuestionBankImportConcept[];
   importedAt: Date;
   sourceFile?: string;
 }
@@ -76,11 +83,11 @@ export interface DiagnosticQuestionBankImportSummary {
   };
   imported: {
     diagnosticItems: number;
-    diagnosticTargets: number;
+    evidenceMappings: number;
   };
   catalogTotals: {
     diagnosticItems: number;
-    diagnosticTargets: number;
+    evidenceMappings: number;
   } | null;
 }
 
@@ -98,7 +105,10 @@ type DiagnosticQuestionBankImportTransaction = {
     upsert(input: unknown): Promise<unknown>;
     count(input: unknown): Promise<number>;
   };
-  diagnosticItemCompetencyTarget: {
+  concept: {
+    findMany(input: unknown): Promise<DiagnosticQuestionBankImportConcept[]>;
+  };
+  diagnosticItemConceptEvidenceMapping: {
     deleteMany(input: unknown): Promise<unknown>;
     createMany(input: unknown): Promise<unknown>;
     count(input: unknown): Promise<number>;
@@ -130,9 +140,13 @@ export function buildDiagnosticQuestionBankImportPlan(
   const competencyByKey = new Map(
     input.competencies.map((competency) => [competency.key, competency]),
   );
-  assertQuestionBankReferencesKnownCompetencies(
+  const conceptByKey = new Map(
+    input.concepts.map((concept) => [concept.key, concept]),
+  );
+  assertQuestionBankReferencesKnownTargets(
     input.questionBank,
     competencyByKey,
+    conceptByKey,
   );
 
   const duplicateItemKeys = findDuplicates(
@@ -147,12 +161,14 @@ export function buildDiagnosticQuestionBankImportPlan(
   }
 
   const diagnosticItems = input.questionBank.items.map((item) => {
-    const primaryCompetency = competencyByKey.get(item.primaryCompetencyKey);
-    if (!primaryCompetency) {
-      throw new Error(
-        `Question bank references unknown competency: ${item.primaryCompetencyKey}`,
-      );
-    }
+    const primaryCompetency =
+      item.primaryTarget.kind === "competency"
+        ? competencyByKey.get(item.primaryTarget.competencyKey)
+        : undefined;
+    const primaryConcept =
+      item.primaryTarget.kind === "concept"
+        ? conceptByKey.get(item.primaryTarget.conceptKey)
+        : undefined;
 
     return {
       id: deterministicUuid(
@@ -161,8 +177,10 @@ export function buildDiagnosticQuestionBankImportPlan(
       ),
       catalogId: input.catalog.id,
       key: item.key,
-      primaryCompetencyId: primaryCompetency.id,
+      primaryCompetencyId: primaryCompetency?.id ?? null,
+      primaryConceptId: primaryConcept?.id ?? null,
       difficultyBand: item.difficultyBand,
+      mode: item.mode,
       responseFormat: item.responseFormat,
       status: item.status,
       prompt: compactJson(item.prompt),
@@ -179,22 +197,21 @@ export function buildDiagnosticQuestionBankImportPlan(
   const diagnosticItemIdByKey = new Map(
     diagnosticItems.map((item) => [item.key, item.id]),
   );
-  const diagnosticTargets = input.questionBank.items.flatMap((item) =>
-    item.targets.map((target) => {
+  const evidenceMappings = input.questionBank.items.flatMap((item) =>
+    item.evidenceMappings.map((mapping) => {
       const diagnosticItemId = diagnosticItemIdByKey.get(item.key);
-      const competency = competencyByKey.get(target.competencyKey);
-      if (!diagnosticItemId || !competency) {
+      const concept = conceptByKey.get(mapping.conceptKey);
+      if (!diagnosticItemId || !concept) {
         throw new Error(
-          `Question bank references unknown diagnostic item target: ${item.key}/${target.competencyKey}`,
+          `Question bank references unknown concept evidence mapping: ${item.key}/${mapping.conceptKey}`,
         );
       }
 
       return {
         diagnosticItemId,
-        competencyId: competency.id,
-        role: target.role,
-        weight: target.weight,
-        details: compactJson(target.details),
+        conceptId: concept.id,
+        capability: mapping.capability,
+        strength: mapping.strength,
       };
     }),
   );
@@ -206,11 +223,11 @@ export function buildDiagnosticQuestionBankImportPlan(
       version: input.catalog.version,
     },
     diagnosticItems,
-    diagnosticTargets,
+    evidenceMappings,
     catalogMetadata: buildCatalogMetadata(input),
     summary: {
       diagnosticItems: diagnosticItems.length,
-      diagnosticTargets: diagnosticTargets.length,
+      evidenceMappings: evidenceMappings.length,
     },
   };
 }
@@ -269,10 +286,22 @@ async function writeDiagnosticQuestionBank(
     );
   }
 
+  const concepts = await tx.concept.findMany({
+    where: {
+      targetLanguage: input.questionBank.targetLanguage,
+      status: "active",
+    },
+    select: {
+      id: true,
+      key: true,
+    },
+  });
+
   const plan = buildDiagnosticQuestionBankImportPlan({
     questionBank: input.questionBank,
     catalog,
     competencies: catalog.competencies,
+    concepts,
     importedAt: input.now?.() ?? new Date(),
     sourceFile: input.sourceFile,
   });
@@ -283,7 +312,7 @@ async function writeDiagnosticQuestionBank(
       catalog: plan.catalog,
       imported: {
         diagnosticItems: plan.summary.diagnosticItems,
-        diagnosticTargets: plan.summary.diagnosticTargets,
+        evidenceMappings: plan.summary.evidenceMappings,
       },
       catalogTotals: null,
     };
@@ -300,7 +329,9 @@ async function writeDiagnosticQuestionBank(
       create: item,
       update: {
         primaryCompetencyId: item.primaryCompetencyId,
+        primaryConceptId: item.primaryConceptId,
         difficultyBand: item.difficultyBand,
+        mode: item.mode,
         responseFormat: item.responseFormat,
         status: item.status,
         prompt: item.prompt,
@@ -312,7 +343,7 @@ async function writeDiagnosticQuestionBank(
     });
   }
 
-  await tx.diagnosticItemCompetencyTarget.deleteMany({
+  await tx.diagnosticItemConceptEvidenceMapping.deleteMany({
     where: {
       diagnosticItemId: {
         in: plan.diagnosticItems.map((item) => item.id),
@@ -320,9 +351,9 @@ async function writeDiagnosticQuestionBank(
     },
   });
 
-  if (plan.diagnosticTargets.length > 0) {
-    await tx.diagnosticItemCompetencyTarget.createMany({
-      data: plan.diagnosticTargets,
+  if (plan.evidenceMappings.length > 0) {
+    await tx.diagnosticItemConceptEvidenceMapping.createMany({
+      data: plan.evidenceMappings,
     });
   }
 
@@ -335,13 +366,13 @@ async function writeDiagnosticQuestionBank(
     },
   });
 
-  const [diagnosticItems, diagnosticTargets] = await Promise.all([
+  const [diagnosticItems, evidenceMappings] = await Promise.all([
     tx.diagnosticItem.count({
       where: {
         catalogId: catalog.id,
       },
     }),
-    tx.diagnosticItemCompetencyTarget.count({
+    tx.diagnosticItemConceptEvidenceMapping.count({
       where: {
         diagnosticItem: {
           catalogId: catalog.id,
@@ -355,11 +386,11 @@ async function writeDiagnosticQuestionBank(
     catalog: plan.catalog,
     imported: {
       diagnosticItems: plan.summary.diagnosticItems,
-      diagnosticTargets: plan.summary.diagnosticTargets,
+      evidenceMappings: plan.summary.evidenceMappings,
     },
     catalogTotals: {
       diagnosticItems,
-      diagnosticTargets,
+      evidenceMappings,
     },
   };
 }
@@ -381,20 +412,32 @@ function assertCatalogMatchesQuestionBank(
   }
 }
 
-function assertQuestionBankReferencesKnownCompetencies(
+function assertQuestionBankReferencesKnownTargets(
   questionBank: AuthoredDiagnosticQuestionBank,
   competencyByKey: Map<string, DiagnosticQuestionBankImportCompetency>,
+  conceptByKey: Map<string, DiagnosticQuestionBankImportConcept>,
 ) {
   const missingCompetencyKeys = new Set<string>();
+  const missingConceptKeys = new Set<string>();
 
   for (const item of questionBank.items) {
-    if (!competencyByKey.has(item.primaryCompetencyKey)) {
-      missingCompetencyKeys.add(item.primaryCompetencyKey);
+    if (
+      item.primaryTarget.kind === "competency" &&
+      !competencyByKey.has(item.primaryTarget.competencyKey)
+    ) {
+      missingCompetencyKeys.add(item.primaryTarget.competencyKey);
     }
 
-    for (const target of item.targets) {
-      if (!competencyByKey.has(target.competencyKey)) {
-        missingCompetencyKeys.add(target.competencyKey);
+    if (
+      item.primaryTarget.kind === "concept" &&
+      !conceptByKey.has(item.primaryTarget.conceptKey)
+    ) {
+      missingConceptKeys.add(item.primaryTarget.conceptKey);
+    }
+
+    for (const mapping of item.evidenceMappings) {
+      if (!conceptByKey.has(mapping.conceptKey)) {
+        missingConceptKeys.add(mapping.conceptKey);
       }
     }
   }
@@ -403,6 +446,16 @@ function assertQuestionBankReferencesKnownCompetencies(
     throw new Error(
       `Question bank references unknown competencies: ${Array.from(
         missingCompetencyKeys,
+      )
+        .sort()
+        .join(", ")}`,
+    );
+  }
+
+  if (missingConceptKeys.size > 0) {
+    throw new Error(
+      `Question bank references unknown concepts: ${Array.from(
+        missingConceptKeys,
       )
         .sort()
         .join(", ")}`,

@@ -1,11 +1,19 @@
 import { z } from "zod";
 
+import { capabilityValues } from "./competency-catalog.js";
 import { languageCodeSchema, languageCodes } from "./languages.js";
 
 export const diagnosticQuestionResponseFormatValues = [
   "multiple_choice",
   "fill_blank_choice",
   "word_bank_sequence",
+] as const;
+
+export const diagnosticQuestionModeValues = [
+  "reading",
+  "writing",
+  "listening",
+  "speaking",
 ] as const;
 
 export const diagnosticQuestionRoleValues = [
@@ -32,6 +40,9 @@ export const diagnosticDifficultyBandValues = [
 
 export const diagnosticQuestionResponseFormatSchema = z.enum(
   diagnosticQuestionResponseFormatValues,
+);
+export const diagnosticQuestionModeSchema = z.enum(
+  diagnosticQuestionModeValues,
 );
 export const diagnosticQuestionRoleSchema = z.enum(
   diagnosticQuestionRoleValues,
@@ -309,28 +320,40 @@ export const authoredDiagnosticItemDetailsSchema = z.object({
     .optional(),
 });
 
-export const authoredDiagnosticItemTargetSchema = z.object({
-  competencyKey: itemKeySchema,
-  role: z.enum(["primary", "supporting"]),
-  weight: z.number().int().min(0).max(100),
-  details: z
-    .object({
-      schemaVersion: z.literal(1),
-      scoringNotes: z.string().trim().min(1).max(500).optional(),
-    })
-    .default({ schemaVersion: 1 }),
+export const authoredDiagnosticPrimaryTargetSchema = z.discriminatedUnion(
+  "kind",
+  [
+    z.object({
+      kind: z.literal("competency"),
+      competencyKey: itemKeySchema,
+    }),
+    z.object({
+      kind: z.literal("concept"),
+      conceptKey: itemKeySchema,
+    }),
+  ],
+);
+
+export const authoredDiagnosticEvidenceMappingSchema = z.object({
+  conceptKey: itemKeySchema,
+  capability: z.enum(capabilityValues),
+  strength: z.number().int().min(1).max(100),
 });
 
 export const authoredDiagnosticQuestionSchema = z
   .object({
     key: itemKeySchema,
     status: diagnosticQuestionStatusSchema,
-    primaryCompetencyKey: itemKeySchema,
+    primaryTarget: authoredDiagnosticPrimaryTargetSchema,
     difficultyBand: diagnosticDifficultyBandSchema,
+    mode: diagnosticQuestionModeSchema,
     responseFormat: diagnosticQuestionResponseFormatSchema,
     prompt: diagnosticQuestionPromptSchema,
     scoringRule: diagnosticQuestionScoringRuleSchema,
-    targets: z.array(authoredDiagnosticItemTargetSchema).min(1).max(5),
+    evidenceMappings: z
+      .array(authoredDiagnosticEvidenceMappingSchema)
+      .min(1)
+      .max(12),
     details: authoredDiagnosticItemDetailsSchema,
   })
   .superRefine((item, context) => {
@@ -350,23 +373,17 @@ export const authoredDiagnosticQuestionSchema = z
       });
     }
 
-    const primaryTargets = item.targets.filter(
-      (target) => target.role === "primary",
-    );
-    if (primaryTargets.length !== 1) {
-      context.addIssue({
-        code: "custom",
-        message: "exactly_one_primary_target_required",
-        path: ["targets"],
-      });
-    }
-
-    if (primaryTargets[0]?.competencyKey !== item.primaryCompetencyKey) {
-      context.addIssue({
-        code: "custom",
-        message: "primary_target_must_match_primary_competency",
-        path: ["targets"],
-      });
+    const duplicateMappings = new Set<string>();
+    for (const mapping of item.evidenceMappings) {
+      const mappingKey = `${mapping.conceptKey}:${mapping.capability}`;
+      if (duplicateMappings.has(mappingKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "evidence_mappings_must_be_unique_per_concept_capability",
+          path: ["evidenceMappings"],
+        });
+      }
+      duplicateMappings.add(mappingKey);
     }
   });
 
@@ -380,6 +397,9 @@ export const authoredDiagnosticQuestionBankSchema = z.object({
 
 export type DiagnosticQuestionResponseFormat = z.infer<
   typeof diagnosticQuestionResponseFormatSchema
+>;
+export type DiagnosticQuestionMode = z.infer<
+  typeof diagnosticQuestionModeSchema
 >;
 export type DiagnosticQuestionRole = z.infer<
   typeof diagnosticQuestionRoleSchema
@@ -404,6 +424,12 @@ export type DiagnosticQuestionResponse = z.infer<
 >;
 export type AuthoredDiagnosticQuestion = z.infer<
   typeof authoredDiagnosticQuestionSchema
+>;
+export type AuthoredDiagnosticPrimaryTarget = z.infer<
+  typeof authoredDiagnosticPrimaryTargetSchema
+>;
+export type AuthoredDiagnosticEvidenceMapping = z.infer<
+  typeof authoredDiagnosticEvidenceMappingSchema
 >;
 export type AuthoredDiagnosticQuestionBank = z.infer<
   typeof authoredDiagnosticQuestionBankSchema

@@ -26,6 +26,17 @@ const competencies = [
   },
 ];
 
+const concepts = [
+  {
+    id: "concept-1",
+    key: "form.synthetic.subject_pronoun",
+  },
+  {
+    id: "concept-2",
+    key: "form.synthetic.be_present",
+  },
+];
+
 function buildQuestionBank(overrides: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
@@ -36,8 +47,12 @@ function buildQuestionBank(overrides: Record<string, unknown> = {}) {
       {
         key: "en.diag.pre-a1.subject-pronouns.foundation.001",
         status: "published",
-        primaryCompetencyKey: "pre-a1-core-subject-pronouns",
+        primaryTarget: {
+          kind: "competency",
+          competencyKey: "pre-a1-core-subject-pronouns",
+        },
         difficultyBand: "Pre-A1",
+        mode: "reading",
         responseFormat: "multiple_choice",
         prompt: {
           schemaVersion: 1,
@@ -73,24 +88,16 @@ function buildQuestionBank(overrides: Record<string, unknown> = {}) {
             },
           },
         },
-        targets: [
+        evidenceMappings: [
           {
-            competencyKey: "pre-a1-core-subject-pronouns",
-            role: "primary",
-            weight: 100,
-            details: {
-              schemaVersion: 1,
-            },
+            conceptKey: "form.synthetic.subject_pronoun",
+            capability: "recognition",
+            strength: 100,
           },
           {
-            competencyKey: "pre-a1-core-be-present-affirmative",
-            role: "supporting",
-            weight: 60,
-            details: {
-              schemaVersion: 1,
-              scoringNotes:
-                "Supporting prerequisite signal for be present forms.",
-            },
+            conceptKey: "form.synthetic.be_present",
+            capability: "recognition",
+            strength: 60,
           },
         ],
         details: {
@@ -137,6 +144,7 @@ describe("diagnostic question bank import", () => {
       questionBank: parseDiagnosticQuestionBank(buildQuestionBank()),
       catalog,
       competencies,
+      concepts,
       importedAt,
       sourceFile: "data/catalogs/en/onboarding-diagnostic-question-bank.json",
     });
@@ -146,37 +154,61 @@ describe("diagnostic question bank import", () => {
         catalogId: "catalog-1",
         key: "en.diag.pre-a1.subject-pronouns.foundation.001",
         primaryCompetencyId: "competency-1",
+        primaryConceptId: null,
         difficultyBand: "Pre-A1",
+        mode: "reading",
         responseFormat: "multiple_choice",
         status: "published",
         reviewedAt: importedAt,
         publishedAt: importedAt,
       }),
     ]);
-    expect(plan.diagnosticTargets).toEqual([
+    expect(plan.evidenceMappings).toEqual([
       {
         diagnosticItemId: plan.diagnosticItems[0]?.id,
-        competencyId: "competency-1",
-        role: "primary",
-        weight: 100,
-        details: {
-          schemaVersion: 1,
-        },
+        conceptId: "concept-1",
+        capability: "recognition",
+        strength: 100,
       },
       {
         diagnosticItemId: plan.diagnosticItems[0]?.id,
-        competencyId: "competency-2",
-        role: "supporting",
-        weight: 60,
-        details: {
-          schemaVersion: 1,
-          scoringNotes: "Supporting prerequisite signal for be present forms.",
-        },
+        conceptId: "concept-2",
+        capability: "recognition",
+        strength: 60,
       },
     ]);
     expect(plan.summary).toEqual({
       diagnosticItems: 1,
-      diagnosticTargets: 2,
+      evidenceMappings: 2,
+    });
+  });
+
+  it("maps a concept primary target independently from its evidence mapping", () => {
+    const questionBank = parseDiagnosticQuestionBank(
+      buildQuestionBank({
+        items: [
+          {
+            ...buildQuestionBank().items[0],
+            primaryTarget: {
+              kind: "concept",
+              conceptKey: "form.synthetic.subject_pronoun",
+            },
+          },
+        ],
+      }),
+    );
+
+    const plan = buildDiagnosticQuestionBankImportPlan({
+      questionBank,
+      catalog,
+      competencies,
+      concepts,
+      importedAt: new Date("2026-06-28T12:00:00.000Z"),
+    });
+
+    expect(plan.diagnosticItems[0]).toMatchObject({
+      primaryCompetencyId: null,
+      primaryConceptId: "concept-1",
     });
   });
 
@@ -186,15 +218,37 @@ describe("diagnostic question bank import", () => {
         items: [
           {
             ...buildQuestionBank().items[0],
-            primaryCompetencyKey: "unknown-competency",
-            targets: [
+            primaryTarget: {
+              kind: "competency",
+              competencyKey: "unknown-competency",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(() =>
+      buildDiagnosticQuestionBankImportPlan({
+        questionBank,
+        catalog,
+        competencies,
+        concepts,
+        importedAt: new Date("2026-06-28T12:00:00.000Z"),
+      }),
+    ).toThrow(/unknown-competency/);
+  });
+
+  it("rejects question banks that map evidence to an unknown concept", () => {
+    const questionBank = parseDiagnosticQuestionBank(
+      buildQuestionBank({
+        items: [
+          {
+            ...buildQuestionBank().items[0],
+            evidenceMappings: [
               {
-                competencyKey: "unknown-competency",
-                role: "primary",
-                weight: 100,
-                details: {
-                  schemaVersion: 1,
-                },
+                conceptKey: "form.synthetic.unknown",
+                capability: "recognition",
+                strength: 100,
               },
             ],
           },
@@ -207,12 +261,13 @@ describe("diagnostic question bank import", () => {
         questionBank,
         catalog,
         competencies,
+        concepts,
         importedAt: new Date("2026-06-28T12:00:00.000Z"),
       }),
-    ).toThrow(/unknown-competency/);
+    ).toThrow(/form\.synthetic\.unknown/);
   });
 
-  it("imports items idempotently and rebuilds imported diagnostic targets", async () => {
+  it("imports items idempotently and rebuilds Q-matrix evidence mappings", async () => {
     const importedAt = new Date("2026-06-28T12:00:00.000Z");
     const tx: {
       competencyCatalog: {
@@ -227,7 +282,10 @@ describe("diagnostic question bank import", () => {
         upsert(input: unknown): Promise<object>;
         count(input: unknown): Promise<number>;
       };
-      diagnosticItemCompetencyTarget: {
+      concept: {
+        findMany(input: unknown): Promise<typeof concepts>;
+      };
+      diagnosticItemConceptEvidenceMapping: {
         deleteMany(input: unknown): Promise<{ count: number }>;
         createMany(input: unknown): Promise<{ count: number }>;
         count(input: unknown): Promise<number>;
@@ -244,7 +302,10 @@ describe("diagnostic question bank import", () => {
         upsert: async (_input) => ({}),
         count: async (_input) => 1,
       },
-      diagnosticItemCompetencyTarget: {
+      concept: {
+        findMany: async (_input) => concepts,
+      },
+      diagnosticItemConceptEvidenceMapping: {
         deleteMany: async (_input) => ({ count: 2 }),
         createMany: async (_input) => ({ count: 2 }),
         count: async (_input) => 2,
@@ -278,18 +339,24 @@ describe("diagnostic question bank import", () => {
               return tx.diagnosticItem.count(input);
             },
           },
-          diagnosticItemCompetencyTarget: {
+          concept: {
+            findMany: async (input: unknown) => {
+              calls.push("concept.findMany");
+              return tx.concept.findMany(input);
+            },
+          },
+          diagnosticItemConceptEvidenceMapping: {
             deleteMany: async (input: unknown) => {
-              calls.push("target.deleteMany");
-              return tx.diagnosticItemCompetencyTarget.deleteMany(input);
+              calls.push("mapping.deleteMany");
+              return tx.diagnosticItemConceptEvidenceMapping.deleteMany(input);
             },
             createMany: async (input: unknown) => {
-              calls.push("target.createMany");
-              return tx.diagnosticItemCompetencyTarget.createMany(input);
+              calls.push("mapping.createMany");
+              return tx.diagnosticItemConceptEvidenceMapping.createMany(input);
             },
             count: async (input: unknown) => {
-              calls.push("target.count");
-              return tx.diagnosticItemCompetencyTarget.count(input);
+              calls.push("mapping.count");
+              return tx.diagnosticItemConceptEvidenceMapping.count(input);
             },
           },
         });
@@ -311,22 +378,23 @@ describe("diagnostic question bank import", () => {
       },
       imported: {
         diagnosticItems: 1,
-        diagnosticTargets: 2,
+        evidenceMappings: 2,
       },
       catalogTotals: {
         diagnosticItems: 1,
-        diagnosticTargets: 2,
+        evidenceMappings: 2,
       },
     });
     expect(calls).toEqual([
       "transaction:120000",
       "catalog.findUnique",
+      "concept.findMany",
       "item.upsert",
-      "target.deleteMany",
-      "target.createMany",
+      "mapping.deleteMany",
+      "mapping.createMany",
       "catalog.update",
       "item.count",
-      "target.count",
+      "mapping.count",
     ]);
   });
 });

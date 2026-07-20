@@ -56,12 +56,12 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
             prerequisites: [],
             goalPriorities: [],
           },
-          targets: [
+          evidenceMappings: [
             {
-              competencyId: "competency-2",
-              competencyKey: "pre-a1-core-be-present-affirmative",
-              role: "primary",
-              weight: 100,
+              conceptId: "concept-1",
+              conceptKey: "form.synthetic.be_present",
+              capability: "recognition",
+              strength: 100,
             },
           ],
         },
@@ -69,12 +69,12 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
           id: "item-1",
           key: "en.diag.pre-a1.subject-pronouns.foundation.001",
           primaryCompetencyKey: "pre-a1-core-subject-pronouns",
-          targets: [
+          evidenceMappings: [
             {
-              competencyId: "competency-1",
-              competencyKey: "pre-a1-core-subject-pronouns",
-              role: "primary",
-              weight: 100,
+              conceptId: "concept-1",
+              conceptKey: "form.synthetic.be_present",
+              capability: "recognition",
+              strength: 100,
             },
           ],
         },
@@ -115,9 +115,15 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
                 difficultyBand: true,
               },
             },
-            competencyTargets: {
+            primaryConcept: {
+              select: {
+                id: true,
+                key: true,
+              },
+            },
+            conceptEvidenceMappings: {
               include: {
-                competency: {
+                concept: {
                   select: {
                     id: true,
                     key: true,
@@ -234,18 +240,14 @@ function buildDiagnosticItemRow(input: {
             ]
           : [],
     },
-    competencyTargets: [
+    conceptEvidenceMappings: [
       {
-        diagnosticItemId: input.id,
-        competencyId: input.primaryCompetencyId,
-        role: "primary",
-        weight: 100,
-        details: {
-          schemaVersion: 1,
-        },
-        competency: {
-          id: input.primaryCompetencyId,
-          key: input.primaryCompetencyKey,
+        conceptId: "concept-1",
+        capability: "recognition",
+        strength: 100,
+        concept: {
+          id: "concept-1",
+          key: "form.synthetic.be_present",
         },
       },
     ],

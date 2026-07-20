@@ -344,7 +344,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     });
   });
 
-  it("completes an attempt and publishes evidence from answered attempt items", async () => {
+  it("completes an attempt with direct Q-matrix concept evidence and state", async () => {
     const completedAt = new Date("2026-06-27T12:12:00.000Z");
     const answeredAt = new Date("2026-06-27T12:10:12.000Z");
     const summary = {
@@ -374,28 +374,16 @@ describe("PrismaDiagnosticAttemptRepository", () => {
           answeredAt,
           diagnosticItem: {
             primaryCompetencyId: "competency-1",
-            primaryCompetency: {
-              id: "competency-1",
-              prerequisites: [
-                {
-                  strength: 90,
-                  prerequisite: {
-                    id: "competency-0",
-                    prerequisites: [],
-                  },
-                },
-              ],
-            },
-            competencyTargets: [
+            conceptEvidenceMappings: [
               {
-                competencyId: "competency-1",
-                role: "primary",
-                weight: 100,
+                conceptId: "concept-1",
+                capability: "recognition",
+                strength: 100,
               },
               {
-                competencyId: "competency-2",
-                role: "supporting",
-                weight: 50,
+                conceptId: "concept-2",
+                capability: "controlled_production",
+                strength: 50,
               },
             ],
           },
@@ -407,9 +395,15 @@ describe("PrismaDiagnosticAttemptRepository", () => {
         update: vi.fn(async () => completedAttempt),
       },
       competencyEvidence: {
-        createMany: vi.fn(async () => ({ count: 3 })),
+        createMany: vi.fn(async () => ({ count: 1 })),
       },
       learnerCompetencyState: {
+        upsert: vi.fn(async () => ({})),
+      },
+      conceptEvidence: {
+        createMany: vi.fn(async () => ({ count: 2 })),
+      },
+      learnerConceptState: {
         upsert: vi.fn(async () => ({})),
       },
     };
@@ -457,8 +451,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
           include: {
             diagnosticItem: {
               include: {
-                competencyTargets: true,
-                primaryCompetency: true,
+                conceptEvidenceMappings: true,
               },
             },
           },
@@ -480,54 +473,30 @@ describe("PrismaDiagnosticAttemptRepository", () => {
             schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
             attemptId: "attempt-1",
             diagnosticItemId: "item-1",
-            targetRole: "primary",
-            targetWeight: 100,
-            scoringPolicyVersion: "initial-diagnostic-scoring-v1",
-          },
-        },
-        {
-          id: expect.any(String),
-          learningTrackId: "track-1",
-          competencyId: "competency-2",
-          sourceType: "initial_diagnostic",
-          sourceId: "attempt-item-1",
-          observedAt: answeredAt,
-          score: 0.95,
-          confidence: 0.4,
-          details: {
-            schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
-            attemptId: "attempt-1",
-            diagnosticItemId: "item-1",
-            targetRole: "supporting",
-            targetWeight: 50,
-            scoringPolicyVersion: "initial-diagnostic-scoring-v1",
-          },
-        },
-        {
-          id: expect.any(String),
-          learningTrackId: "track-1",
-          competencyId: "competency-0",
-          sourceType: "initial_diagnostic_prerequisite_inference",
-          sourceId: "attempt-item-1",
-          observedAt: answeredAt,
-          score: 0.85,
-          confidence: 0.6,
-          details: {
-            schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
-            attemptId: "attempt-1",
-            sourceAttemptItemId: "attempt-item-1",
-            sourceDiagnosticItemId: "item-1",
-            sourceCompetencyId: "competency-1",
-            inferredCompetencyId: "competency-0",
-            inferenceReason: "correct_higher_band_item",
-            prerequisiteDepth: 1,
-            prerequisiteStrength: 90,
             scoringPolicyVersion: "initial-diagnostic-scoring-v1",
           },
         },
       ],
     });
-    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledTimes(3);
+    expect(tx.conceptEvidence.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          conceptId: "concept-1",
+          capability: "recognition",
+          evidenceKind: "direct",
+          confidence: 0.8,
+          strength: 100,
+        }),
+        expect.objectContaining({
+          conceptId: "concept-2",
+          capability: "controlled_production",
+          evidenceKind: "direct",
+          confidence: 0.4,
+          strength: 50,
+        }),
+      ],
+    });
+    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledTimes(1);
     expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledWith({
       where: {
         learningTrackId_competencyId: {
@@ -562,6 +531,26 @@ describe("PrismaDiagnosticAttemptRepository", () => {
           scoringPolicyVersion: "initial-diagnostic-scoring-v1",
         },
       },
+    });
+    expect(tx.learnerConceptState.upsert).toHaveBeenCalledWith({
+      where: {
+        learningTrackId_conceptId_capability: {
+          learningTrackId: "track-1",
+          conceptId: "concept-1",
+          capability: "recognition",
+        },
+      },
+      create: expect.objectContaining({
+        mastery: 0.95,
+        confidence: 0.8,
+        directEvidenceCount: 1,
+        inferredEvidenceCount: 0,
+      }),
+      update: expect.objectContaining({
+        mastery: 0.95,
+        confidence: 0.8,
+        directEvidenceCount: { increment: 1 },
+      }),
     });
   });
 
@@ -642,7 +631,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     },
   );
 
-  it("respects prerequisite spread depth and lowers inferred certainty by depth", async () => {
+  it("does not propagate generic prerequisite evidence after a strong answer", async () => {
     const completedAt = new Date("2026-06-27T12:12:00.000Z");
     const completedAttempt = buildCompletedAttemptWithPrerequisites({
       includeDepth2Prerequisite: true,
@@ -661,52 +650,15 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     });
 
     const evidenceRows = createdEvidenceRows(tx);
-    const inferenceRows = evidenceRows.filter(
-      (row) => row.sourceType === "initial_diagnostic_prerequisite_inference",
-    );
-    const depth1 = inferenceRows.find(
-      (row) => row.details.prerequisiteDepth === 1,
-    );
-    const depth2 = inferenceRows.find(
-      (row) => row.details.prerequisiteDepth === 2,
-    );
-
-    expect(inferenceRows).toHaveLength(2);
-    expect(depth1).toBeDefined();
-    expect(depth2).toBeDefined();
-    if (!depth1 || !depth2) {
-      throw new Error("expected_depth_1_and_depth_2_inference_rows");
-    }
-    expect(depth1).toMatchObject({
-      competencyId: "competency-depth-1",
-      score: 0.85,
-      confidence: 0.6,
-      details: {
-        prerequisiteDepth: 1,
-        prerequisiteStrength: 90,
-      },
-    });
-    expect(depth2).toMatchObject({
-      competencyId: "competency-depth-2",
-      score: 0.75,
-      confidence: 0.5,
-      details: {
-        prerequisiteDepth: 2,
-        prerequisiteStrength: 80,
-      },
-    });
-    expect(depth2.score).toBeLessThan(depth1.score);
-    expect(depth2.confidence).toBeLessThan(depth1.confidence);
-    expect(evidenceRows).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          competencyId: "competency-depth-3",
-        }),
-      ]),
-    );
+    expect(evidenceRows).toEqual([
+      expect.objectContaining({
+        competencyId: "competency-primary",
+        sourceType: "initial_diagnostic",
+      }),
+    ]);
   });
 
-  it("uses stored scoring policy config to decide prerequisite spread eligibility", async () => {
+  it("does not use stored scoring policy config to spread prerequisite evidence", async () => {
     const completedAt = new Date("2026-06-27T12:12:00.000Z");
     const completedAttempt = buildCompletedAttemptWithPrerequisites({
       score: 0.95,
@@ -745,7 +697,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     ]);
   });
 
-  it("does not publish weaker inferred evidence for a directly targeted competency", async () => {
+  it("does not distribute competency evidence to legacy supporting targets", async () => {
     const completedAt = new Date("2026-06-27T12:12:00.000Z");
     const completedAttempt = buildCompletedAttemptWithPrerequisites({
       competencyTargets: [
@@ -776,12 +728,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
     const evidenceRows = createdEvidenceRows(tx);
     expect(
       evidenceRows.filter((row) => row.competencyId === "competency-depth-1"),
-    ).toEqual([
-      expect.objectContaining({
-        competencyId: "competency-depth-1",
-        sourceType: "initial_diagnostic",
-      }),
-    ]);
+    ).toEqual([]);
   });
 });
 

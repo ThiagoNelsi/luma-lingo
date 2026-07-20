@@ -16,7 +16,6 @@ import {
   learnerCompetencyStateDetailsSchemaVersion,
 } from "../diagnostics/diagnostic-attempt.js";
 import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
-import { defaultInitialDiagnosticPolicyConfig } from "../diagnostics/initial-diagnostic-policy.js";
 
 type DiagnosticAttemptRow = {
   id: string;
@@ -57,26 +56,17 @@ type CompletedAttemptItemRow = {
   answeredAt: Date | null;
   details: unknown;
   diagnosticItem: {
-    primaryCompetencyId: string;
-    primaryCompetency: CompetencyWithPrerequisitesRow;
-    competencyTargets: Array<{
-      competencyId: string;
-      role: string;
-      weight: number | null;
+    primaryCompetencyId: string | null;
+    conceptEvidenceMappings: Array<{
+      conceptId: string;
+      capability: string;
+      strength: number;
     }>;
   };
 };
 
 type CompletedAttemptRow = DiagnosticAttemptRow & {
   items: CompletedAttemptItemRow[];
-};
-
-type CompetencyWithPrerequisitesRow = {
-  id: string;
-  prerequisites?: Array<{
-    strength: number | null;
-    prerequisite: CompetencyWithPrerequisitesRow;
-  }>;
 };
 
 function toDiagnosticAttempt(row: DiagnosticAttemptRow): DiagnosticAttempt {
@@ -132,8 +122,8 @@ function toInputJsonObject(
   return value as Prisma.InputJsonObject;
 }
 
-function weightedConfidence(confidence: number, weight: number | null): number {
-  return confidence * ((weight ?? 100) / 100);
+function weightedConfidence(confidence: number, strength: number): number {
+  return confidence * (strength / 100);
 }
 
 export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepository {
@@ -299,25 +289,33 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
             include: {
               diagnosticItem: {
                 include: {
-                  competencyTargets: true,
-                  primaryCompetency: true,
+                  conceptEvidenceMappings: true,
                 },
               },
             },
           },
         },
       });
-      const evidenceRows = buildEvidenceRows(
+      const competencyEvidenceRows = buildCompetencyEvidenceRows(
+        attempt as unknown as CompletedAttemptRow,
+      );
+      const conceptEvidenceRows = buildConceptEvidenceRows(
         attempt as unknown as CompletedAttemptRow,
       );
 
-      if (evidenceRows.length > 0) {
+      if (competencyEvidenceRows.length > 0) {
         await tx.competencyEvidence.createMany({
-          data: evidenceRows,
+          data: competencyEvidenceRows,
         });
       }
 
-      for (const evidence of evidenceRows) {
+      if (conceptEvidenceRows.length > 0) {
+        await tx.conceptEvidence.createMany({
+          data: conceptEvidenceRows,
+        });
+      }
+
+      for (const evidence of competencyEvidenceRows) {
         const stateDetails = {
           schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
           lastUpdateReason: evidence.sourceType,
@@ -352,6 +350,44 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
         });
       }
 
+      for (const evidence of conceptEvidenceRows) {
+        const stateDetails = {
+          schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
+          lastUpdateReason: evidence.sourceType,
+          scoringPolicyVersion: attempt.scoringPolicyVersion,
+        };
+        await tx.learnerConceptState.upsert({
+          where: {
+            learningTrackId_conceptId_capability: {
+              learningTrackId: evidence.learningTrackId,
+              conceptId: evidence.conceptId,
+              capability: evidence.capability,
+            },
+          },
+          create: {
+            id: createId(),
+            learningTrackId: evidence.learningTrackId,
+            conceptId: evidence.conceptId,
+            capability: evidence.capability,
+            mastery: evidence.score,
+            confidence: evidence.confidence,
+            directEvidenceCount: 1,
+            inferredEvidenceCount: 0,
+            lastEvidenceAt: evidence.observedAt,
+            details: stateDetails,
+          },
+          update: {
+            mastery: evidence.score,
+            confidence: evidence.confidence,
+            directEvidenceCount: {
+              increment: 1,
+            },
+            lastEvidenceAt: evidence.observedAt,
+            details: stateDetails,
+          },
+        });
+      }
+
       return attempt;
     });
 
@@ -359,174 +395,52 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
   }
 }
 
-function buildEvidenceRows(attempt: CompletedAttemptRow) {
-  const directEvidenceRows = attempt.items
-    .filter(isPublishableAttemptItem)
-    .flatMap((item) => {
-      const itemScore = item.score;
-      const itemConfidence = item.confidence;
-      const observedAt = item.answeredAt;
+function buildCompetencyEvidenceRows(attempt: CompletedAttemptRow) {
+  return attempt.items.filter(isPublishableAttemptItem).flatMap((item) => {
+    const competencyId = item.diagnosticItem.primaryCompetencyId;
+    if (!competencyId) return [];
 
-      return item.diagnosticItem.competencyTargets.map((target) => {
-        const targetWeight = target.weight ?? 100;
+    return {
+      id: createId(),
+      learningTrackId: attempt.learningTrackId,
+      competencyId,
+      sourceType: "initial_diagnostic",
+      sourceId: item.id,
+      observedAt: item.answeredAt,
+      score: item.score,
+      confidence: item.confidence,
+      details: {
+        schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
+        attemptId: attempt.id,
+        diagnosticItemId: item.diagnosticItemId,
+        scoringPolicyVersion: attempt.scoringPolicyVersion,
+      },
+    };
+  });
+}
 
-        return {
-          id: createId(),
-          learningTrackId: attempt.learningTrackId,
-          competencyId: target.competencyId,
-          sourceType: "initial_diagnostic",
-          sourceId: item.id,
-          observedAt,
-          score: itemScore,
-          confidence: weightedConfidence(itemConfidence, target.weight),
-          details: {
-            schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
-            attemptId: attempt.id,
-            diagnosticItemId: item.diagnosticItemId,
-            targetRole: target.role,
-            targetWeight,
-            scoringPolicyVersion: attempt.scoringPolicyVersion,
-          },
-        };
-      });
-    });
-  const directCompetencyIds = new Set(
-    directEvidenceRows.map((evidence) => evidence.competencyId),
+function buildConceptEvidenceRows(attempt: CompletedAttemptRow) {
+  return attempt.items.filter(isPublishableAttemptItem).flatMap((item) =>
+    (item.diagnosticItem.conceptEvidenceMappings ?? []).map((mapping) => ({
+      id: createId(),
+      learningTrackId: attempt.learningTrackId,
+      conceptId: mapping.conceptId,
+      capability: mapping.capability,
+      evidenceKind: "direct",
+      sourceType: "initial_diagnostic",
+      sourceId: item.id,
+      observedAt: item.answeredAt,
+      score: item.score,
+      confidence: weightedConfidence(item.confidence, mapping.strength),
+      strength: mapping.strength,
+      details: {
+        schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
+        attemptId: attempt.id,
+        diagnosticItemId: item.diagnosticItemId,
+        scoringPolicyVersion: attempt.scoringPolicyVersion,
+      },
+    })),
   );
-  const prerequisiteInferenceRows = attempt.items
-    .filter(isPublishableAttemptItem)
-    .flatMap((item) =>
-      buildPrerequisiteInferenceRows({
-        attempt,
-        item,
-        directCompetencyIds,
-      }),
-    );
-
-  return [...directEvidenceRows, ...prerequisiteInferenceRows];
-}
-
-function buildPrerequisiteInferenceRows(input: {
-  attempt: CompletedAttemptRow;
-  item: PublishableAttemptItemRow;
-  directCompetencyIds: Set<string>;
-}) {
-  const scoringConfig = readScoringPolicyConfig(input.attempt.details);
-  if (!canSpreadPrerequisiteEvidence({ item: input.item, scoringConfig })) {
-    return [];
-  }
-
-  const rows = [];
-  const seenCompetencyIds = new Set<string>();
-  const queue = (
-    input.item.diagnosticItem.primaryCompetency.prerequisites ?? []
-  ).map((prerequisite) => ({
-    depth: 1,
-    edge: prerequisite,
-  }));
-
-  while (queue.length > 0) {
-    const next = queue.shift();
-    if (!next) break;
-
-    const prerequisiteCompetency = next.edge.prerequisite;
-    if (
-      next.depth > scoringConfig.prerequisiteSpreadMaxDepth ||
-      seenCompetencyIds.has(prerequisiteCompetency.id)
-    ) {
-      continue;
-    }
-
-    seenCompetencyIds.add(prerequisiteCompetency.id);
-
-    if (!input.directCompetencyIds.has(prerequisiteCompetency.id)) {
-      const inferredScore = prerequisiteInferenceScore(next.depth);
-      const inferredConfidence = prerequisiteInferenceConfidence(next.depth);
-      rows.push({
-        id: createId(),
-        learningTrackId: input.attempt.learningTrackId,
-        competencyId: prerequisiteCompetency.id,
-        sourceType: "initial_diagnostic_prerequisite_inference",
-        sourceId: input.item.id,
-        observedAt: input.item.answeredAt,
-        score: inferredScore,
-        confidence: inferredConfidence,
-        details: {
-          schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
-          attemptId: input.attempt.id,
-          sourceAttemptItemId: input.item.id,
-          sourceDiagnosticItemId: input.item.diagnosticItemId,
-          sourceCompetencyId: input.item.diagnosticItem.primaryCompetencyId,
-          inferredCompetencyId: prerequisiteCompetency.id,
-          inferenceReason: "correct_higher_band_item",
-          prerequisiteDepth: next.depth,
-          prerequisiteStrength: next.edge.strength ?? 100,
-          scoringPolicyVersion: input.attempt.scoringPolicyVersion,
-        },
-      });
-    }
-
-    if (next.depth < scoringConfig.prerequisiteSpreadMaxDepth) {
-      for (const nestedEdge of prerequisiteCompetency.prerequisites ?? []) {
-        queue.push({
-          depth: next.depth + 1,
-          edge: nestedEdge,
-        });
-      }
-    }
-  }
-
-  return rows;
-}
-
-function canSpreadPrerequisiteEvidence(input: {
-  item: PublishableAttemptItemRow;
-  scoringConfig: typeof defaultInitialDiagnosticPolicyConfig;
-}): boolean {
-  const itemScore = input.item.score;
-  const itemConfidence = input.item.confidence;
-
-  if (
-    itemScore < input.scoringConfig.strongCorrectMinScore ||
-    itemConfidence < input.scoringConfig.strongCorrectMinConfidence
-  ) {
-    return false;
-  }
-
-  const details = toObject(input.item.details);
-  if (details.responseKind === "dont_know") {
-    return false;
-  }
-
-  return (
-    details.responseKind !== "word_bank_sequence" ||
-    !input.scoringConfig.requireExactWordBankSequenceForSpread ||
-    details.matchedAcceptedTokenSequence === true
-  );
-}
-
-function readScoringPolicyConfig(details: unknown) {
-  const detailsObject = toObject(details);
-  const scoringPolicy = toObject(detailsObject.scoringPolicy);
-  const config = toObject(scoringPolicy.config);
-
-  return {
-    ...defaultInitialDiagnosticPolicyConfig,
-    ...config,
-  };
-}
-
-function prerequisiteInferenceScore(depth: number): number {
-  return clamp01(0.85 - (depth - 1) * 0.1);
-}
-
-function prerequisiteInferenceConfidence(depth: number): number {
-  return clamp01(0.6 - (depth - 1) * 0.1);
-}
-
-function clamp01(value: number): number {
-  const clampedValue = Math.min(1, Math.max(0, value));
-  return Math.round(clampedValue * 1_000_000) / 1_000_000;
 }
 
 type PublishableAttemptItemRow = CompletedAttemptItemRow & {

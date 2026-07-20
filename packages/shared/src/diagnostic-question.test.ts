@@ -8,8 +8,12 @@ import {
 const validFillBlankQuestion = {
   key: "en.diag.pre-a1.be-present.foundation.001",
   status: "draft",
-  primaryCompetencyKey: "pre-a1-core-be-present-affirmative",
+  primaryTarget: {
+    kind: "competency",
+    competencyKey: "pre-a1-core-be-present-affirmative",
+  },
   difficultyBand: "Pre-A1",
+  mode: "reading",
   responseFormat: "fill_blank_choice",
   prompt: {
     schemaVersion: 1,
@@ -42,11 +46,11 @@ const validFillBlankQuestion = {
     passingScore: 1,
     evidenceConfidence: 0.8,
   },
-  targets: [
+  evidenceMappings: [
     {
-      competencyKey: "pre-a1-core-be-present-affirmative",
-      role: "primary",
-      weight: 100,
+      conceptKey: "form.synthetic.be_present",
+      capability: "recognition",
+      strength: 100,
     },
   ],
   details: {
@@ -70,8 +74,12 @@ const validFillBlankQuestion = {
 const validWordBankQuestion = {
   key: "en.diag.pre-a1.be-present.repair.001",
   status: "draft",
-  primaryCompetencyKey: "pre-a1-core-be-present-affirmative",
+  primaryTarget: {
+    kind: "competency",
+    competencyKey: "pre-a1-core-be-present-affirmative",
+  },
   difficultyBand: "Pre-A1",
+  mode: "writing",
   responseFormat: "word_bank_sequence",
   prompt: {
     schemaVersion: 1,
@@ -127,11 +135,11 @@ const validWordBankQuestion = {
     passingScore: 1,
     evidenceConfidence: 0.79,
   },
-  targets: [
+  evidenceMappings: [
     {
-      competencyKey: "pre-a1-core-be-present-affirmative",
-      role: "primary",
-      weight: 100,
+      conceptKey: "form.synthetic.be_present",
+      capability: "controlled_production",
+      strength: 100,
     },
   ],
   details: {
@@ -210,15 +218,20 @@ describe("diagnostic question contracts", () => {
     ).toBe(false);
   });
 
-  it("requires exactly one primary target matching the primary competency", () => {
+  it("requires one or more unique concept-capability evidence mappings", () => {
     expect(
       authoredDiagnosticQuestionSchema.safeParse({
         ...validFillBlankQuestion,
-        targets: [
+        evidenceMappings: [
           {
-            competencyKey: "pre-a1-core-subject-pronouns",
-            role: "primary",
-            weight: 100,
+            conceptKey: "form.synthetic.be_present",
+            capability: "recognition",
+            strength: 100,
+          },
+          {
+            conceptKey: "form.synthetic.be_present",
+            capability: "recognition",
+            strength: 50,
           },
         ],
       }).success,
@@ -227,14 +240,39 @@ describe("diagnostic question contracts", () => {
     expect(
       authoredDiagnosticQuestionSchema.safeParse({
         ...validFillBlankQuestion,
-        targets: [
-          {
-            competencyKey: "pre-a1-core-be-present-affirmative",
-            role: "supporting",
-            weight: 60,
-          },
-        ],
+        evidenceMappings: [],
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts a concept-targeted Q-matrix item with an independent question mode", () => {
+    const parsed = authoredDiagnosticQuestionSchema.parse({
+      ...validFillBlankQuestion,
+      primaryTarget: {
+        kind: "concept",
+        conceptKey: "form.synthetic.subject_agreement",
+      },
+      mode: "reading",
+      evidenceMappings: [
+        {
+          conceptKey: "form.synthetic.subject_agreement",
+          capability: "recognition",
+          strength: 80,
+        },
+      ],
+    });
+
+    expect(parsed.mode).toBe("reading");
+    expect(parsed.primaryTarget).toEqual({
+      kind: "concept",
+      conceptKey: "form.synthetic.subject_agreement",
+    });
+    expect(parsed.evidenceMappings).toEqual([
+      {
+        conceptKey: "form.synthetic.subject_agreement",
+        capability: "recognition",
+        strength: 80,
+      },
+    ]);
   });
 });

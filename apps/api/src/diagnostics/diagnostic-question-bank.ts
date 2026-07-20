@@ -1,5 +1,6 @@
 import {
   authoredDiagnosticItemDetailsSchema,
+  diagnosticQuestionModeSchema,
   diagnosticQuestionPromptSchema,
   diagnosticQuestionResponseFormatSchema,
   diagnosticQuestionScoringRuleSchema,
@@ -70,8 +71,11 @@ export type DiagnosticQuestionBankCompetency = z.infer<
 export const diagnosticQuestionBankItemSchema = z.object({
   id: z.string(),
   key: z.string(),
-  primaryCompetencyId: z.string(),
-  primaryCompetencyKey: z.string(),
+  primaryCompetencyId: z.string().nullable(),
+  primaryCompetencyKey: z.string().nullable(),
+  primaryConceptId: z.string().nullable().default(null),
+  primaryConceptKey: z.string().nullable().default(null),
+  mode: diagnosticQuestionModeSchema.default("reading"),
   primaryCompetency: diagnosticQuestionBankCompetencySchema.optional(),
   difficultyBand: z.string(),
   responseFormat: diagnosticQuestionResponseFormatSchema,
@@ -81,14 +85,47 @@ export const diagnosticQuestionBankItemSchema = z.object({
   details: authoredDiagnosticItemDetailsSchema,
   reviewedAt: z.date().nullable(),
   publishedAt: z.date().nullable(),
-  targets: z.array(diagnosticQuestionBankTargetSchema).min(1),
+  targets: z.array(diagnosticQuestionBankTargetSchema).default([]),
+  evidenceMappings: z
+    .array(
+      z.object({
+        conceptId: z.string(),
+        conceptKey: z.string(),
+        capability: z.enum([
+          "recognition",
+          "controlled_production",
+          "contextualized_use",
+          "independent_use",
+        ]),
+        strength: z.number().int().min(1).max(100),
+      }),
+    )
+    .default([]),
 });
 export type DiagnosticQuestionBankItem = Omit<
   z.infer<typeof diagnosticQuestionBankItemSchema>,
-  "prompt" | "scoringRule"
+  | "prompt"
+  | "scoringRule"
+  | "primaryConceptId"
+  | "primaryConceptKey"
+  | "mode"
+  | "evidenceMappings"
 > & {
   prompt: DiagnosticQuestionPrompt;
   scoringRule: DiagnosticQuestionScoringRule;
+  primaryConceptId?: string | null;
+  primaryConceptKey?: string | null;
+  mode?: z.infer<typeof diagnosticQuestionModeSchema>;
+  evidenceMappings?: Array<{
+    conceptId: string;
+    conceptKey: string;
+    capability:
+      | "recognition"
+      | "controlled_production"
+      | "contextualized_use"
+      | "independent_use";
+    strength: number;
+  }>;
 };
 
 export const diagnosticQuestionBankSchema = z.object({

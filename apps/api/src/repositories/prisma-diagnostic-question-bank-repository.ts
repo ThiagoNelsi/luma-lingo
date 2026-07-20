@@ -19,8 +19,10 @@ type DiagnosticQuestionBankCatalogRow = {
 type DiagnosticQuestionBankItemRow = {
   id: string;
   key: string;
-  primaryCompetencyId: string;
+  primaryCompetencyId: string | null;
+  primaryConceptId: string | null;
   difficultyBand: string;
+  mode: string;
   responseFormat: string;
   status: string;
   prompt: unknown;
@@ -33,16 +35,19 @@ type DiagnosticQuestionBankItemRow = {
     key: string;
     family: string;
     difficultyBand: string | null;
-  };
-  competencyTargets: DiagnosticQuestionBankTargetRow[];
+  } | null;
+  primaryConcept: {
+    id: string;
+    key: string;
+  } | null;
+  conceptEvidenceMappings: DiagnosticQuestionBankEvidenceMappingRow[];
 };
 
-type DiagnosticQuestionBankTargetRow = {
-  competencyId: string;
-  role: string;
-  weight: number | null;
-  details: unknown;
-  competency: {
+type DiagnosticQuestionBankEvidenceMappingRow = {
+  conceptId: string;
+  capability: string;
+  strength: number;
+  concept: {
     id: string;
     key: string;
   };
@@ -89,9 +94,15 @@ export class PrismaDiagnosticQuestionBankRepository implements DiagnosticQuestio
                 difficultyBand: true,
               },
             },
-            competencyTargets: {
+            primaryConcept: {
+              select: {
+                id: true,
+                key: true,
+              },
+            },
+            conceptEvidenceMappings: {
               include: {
-                competency: {
+                concept: {
                   select: {
                     id: true,
                     key: true,
@@ -132,17 +143,22 @@ function toDiagnosticQuestionBankItem(row: DiagnosticQuestionBankItemRow) {
     id: row.id,
     key: row.key,
     primaryCompetencyId: row.primaryCompetencyId,
-    primaryCompetencyKey: row.primaryCompetency.key,
-    primaryCompetency: {
-      id: row.primaryCompetency.id,
-      key: row.primaryCompetency.key,
-      family: row.primaryCompetency.family,
-      mode: null,
-      difficultyBand: row.primaryCompetency.difficultyBand,
-      isCore: false,
-      prerequisites: [],
-      goalPriorities: [],
-    },
+    primaryCompetencyKey: row.primaryCompetency?.key ?? null,
+    primaryConceptId: row.primaryConceptId,
+    primaryConceptKey: row.primaryConcept?.key ?? null,
+    mode: row.mode,
+    primaryCompetency: row.primaryCompetency
+      ? {
+          id: row.primaryCompetency.id,
+          key: row.primaryCompetency.key,
+          family: row.primaryCompetency.family,
+          mode: null,
+          difficultyBand: row.primaryCompetency.difficultyBand,
+          isCore: false,
+          prerequisites: [],
+          goalPriorities: [],
+        }
+      : undefined,
     difficultyBand: row.difficultyBand,
     responseFormat: row.responseFormat,
     status: row.status,
@@ -151,30 +167,24 @@ function toDiagnosticQuestionBankItem(row: DiagnosticQuestionBankItemRow) {
     details: row.details,
     reviewedAt: row.reviewedAt,
     publishedAt: row.publishedAt,
-    targets: [...row.competencyTargets].sort(compareTargets).map((target) => ({
-      competencyId: target.competencyId,
-      competencyKey: target.competency.key,
-      role: target.role,
-      weight: target.weight ?? 100,
-      details: toObject(target.details),
-    })),
+    targets: [],
+    evidenceMappings: [...(row.conceptEvidenceMappings ?? [])]
+      .sort(compareEvidenceMappings)
+      .map((mapping) => ({
+        conceptId: mapping.conceptId,
+        conceptKey: mapping.concept.key,
+        capability: mapping.capability,
+        strength: mapping.strength,
+      })),
   });
 }
 
-function compareTargets(
-  left: DiagnosticQuestionBankTargetRow,
-  right: DiagnosticQuestionBankTargetRow,
+function compareEvidenceMappings(
+  left: DiagnosticQuestionBankEvidenceMappingRow,
+  right: DiagnosticQuestionBankEvidenceMappingRow,
 ): number {
-  if (left.role !== right.role) {
-    if (left.role === "primary") return -1;
-    if (right.role === "primary") return 1;
-  }
-
-  return left.competency.key.localeCompare(right.competency.key);
-}
-
-function toObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? { ...value }
-    : {};
+  return (
+    left.concept.key.localeCompare(right.concept.key) ||
+    left.capability.localeCompare(right.capability)
+  );
 }
