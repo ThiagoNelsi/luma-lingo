@@ -50,22 +50,11 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
             id: "competency-2",
             key: "pre-a1-core-be-present-affirmative",
             family: "grammar",
-            mode: "reading",
+            mode: null,
             difficultyBand: "Pre-A1",
-            isCore: true,
-            prerequisites: [
-              {
-                competencyId: "competency-1",
-                competencyKey: "pre-a1-core-subject-pronouns",
-                strength: 80,
-              },
-            ],
-            goalPriorities: [
-              {
-                goal: "travel",
-                priority: 70,
-              },
-            ],
+            isCore: false,
+            prerequisites: [],
+            goalPriorities: [],
           },
           targets: [
             {
@@ -95,6 +84,11 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
       where: {
         targetLanguage: "en",
         status: "published",
+        diagnosticItems: {
+          some: {
+            status: "published",
+          },
+        },
       },
       orderBy: [
         {
@@ -118,34 +112,7 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
                 id: true,
                 key: true,
                 family: true,
-                mode: true,
                 difficultyBand: true,
-                isCore: true,
-                prerequisites: {
-                  select: {
-                    strength: true,
-                    prerequisite: {
-                      select: {
-                        id: true,
-                        key: true,
-                      },
-                    },
-                  },
-                  orderBy: {
-                    prerequisite: {
-                      key: "asc",
-                    },
-                  },
-                },
-                goalPriorities: {
-                  select: {
-                    goal: true,
-                    priority: true,
-                  },
-                  orderBy: {
-                    goal: "asc",
-                  },
-                },
               },
             },
             competencyTargets: {

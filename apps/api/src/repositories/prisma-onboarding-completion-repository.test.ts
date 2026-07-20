@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PrismaOnboardingCompletionRepository } from "./prisma-onboarding-completion-repository.js";
 
 describe("PrismaOnboardingCompletionRepository", () => {
-  it("completes beginner onboarding and seeds only root Pre-A1 core competency states", async () => {
+  it("completes beginner onboarding without inventing legacy core competency states", async () => {
     const tx = {
       competencyCatalog: {
         findFirst: vi.fn(async () => ({ id: "catalog-1" })),
@@ -44,22 +44,7 @@ describe("PrismaOnboardingCompletionRepository", () => {
         id: true,
       },
     });
-    expect(tx.competency.findMany).toHaveBeenCalledWith({
-      where: {
-        catalogId: "catalog-1",
-        difficultyBand: "Pre-A1",
-        isCore: true,
-        prerequisites: {
-          none: {},
-        },
-      },
-      orderBy: {
-        key: "asc",
-      },
-      select: {
-        id: true,
-      },
-    });
+    expect(tx.competency.findMany).not.toHaveBeenCalled();
     expect(tx.learningTrack.update).toHaveBeenCalledWith({
       where: {
         id: "track-1",
@@ -70,40 +55,7 @@ describe("PrismaOnboardingCompletionRepository", () => {
         onboardingStep: null,
       },
     });
-    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledTimes(2);
-    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledWith({
-      where: {
-        learningTrackId_competencyId: {
-          learningTrackId: "track-1",
-          competencyId: "competency-root-1",
-        },
-      },
-      create: {
-        id: expect.any(String),
-        learningTrackId: "track-1",
-        competencyId: "competency-root-1",
-        abilityEstimate: 0,
-        confidence: 0.2,
-        evidenceCount: 0,
-        lastEvidenceAt: null,
-        details: {
-          schemaVersion: 1,
-          lastUpdateReason: "beginner_onboarding_assumption",
-          onboardingStartingPoint: "beginner",
-        },
-      },
-      update: {
-        abilityEstimate: 0,
-        confidence: 0.2,
-        evidenceCount: 0,
-        lastEvidenceAt: null,
-        details: {
-          schemaVersion: 1,
-          lastUpdateReason: "beginner_onboarding_assumption",
-          onboardingStartingPoint: "beginner",
-        },
-      },
-    });
+    expect(tx.learnerCompetencyState.upsert).not.toHaveBeenCalled();
   });
 
   it("does not complete beginner onboarding when no published catalog exists", async () => {

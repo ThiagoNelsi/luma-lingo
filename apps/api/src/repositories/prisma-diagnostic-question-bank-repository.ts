@@ -32,20 +32,7 @@ type DiagnosticQuestionBankItemRow = {
     id: string;
     key: string;
     family: string;
-    mode: string | null;
     difficultyBand: string | null;
-    isCore: boolean;
-    prerequisites: Array<{
-      strength: number | null;
-      prerequisite: {
-        id: string;
-        key: string;
-      };
-    }>;
-    goalPriorities: Array<{
-      goal: string;
-      priority: number;
-    }>;
   };
   competencyTargets: DiagnosticQuestionBankTargetRow[];
 };
@@ -71,6 +58,11 @@ export class PrismaDiagnosticQuestionBankRepository implements DiagnosticQuestio
       where: {
         targetLanguage,
         status: "published",
+        diagnosticItems: {
+          some: {
+            status: "published",
+          },
+        },
       },
       orderBy: [
         {
@@ -94,34 +86,7 @@ export class PrismaDiagnosticQuestionBankRepository implements DiagnosticQuestio
                 id: true,
                 key: true,
                 family: true,
-                mode: true,
                 difficultyBand: true,
-                isCore: true,
-                prerequisites: {
-                  select: {
-                    strength: true,
-                    prerequisite: {
-                      select: {
-                        id: true,
-                        key: true,
-                      },
-                    },
-                  },
-                  orderBy: {
-                    prerequisite: {
-                      key: "asc",
-                    },
-                  },
-                },
-                goalPriorities: {
-                  select: {
-                    goal: true,
-                    priority: true,
-                  },
-                  orderBy: {
-                    goal: "asc",
-                  },
-                },
               },
             },
             competencyTargets: {
@@ -140,7 +105,9 @@ export class PrismaDiagnosticQuestionBankRepository implements DiagnosticQuestio
     });
 
     return row
-      ? toDiagnosticQuestionBank(row as DiagnosticQuestionBankCatalogRow)
+      ? toDiagnosticQuestionBank(
+          row as unknown as DiagnosticQuestionBankCatalogRow,
+        )
       : null;
   }
 }
@@ -170,20 +137,11 @@ function toDiagnosticQuestionBankItem(row: DiagnosticQuestionBankItemRow) {
       id: row.primaryCompetency.id,
       key: row.primaryCompetency.key,
       family: row.primaryCompetency.family,
-      mode: row.primaryCompetency.mode,
+      mode: null,
       difficultyBand: row.primaryCompetency.difficultyBand,
-      isCore: row.primaryCompetency.isCore,
-      prerequisites: row.primaryCompetency.prerequisites.map(
-        (prerequisite) => ({
-          competencyId: prerequisite.prerequisite.id,
-          competencyKey: prerequisite.prerequisite.key,
-          strength: prerequisite.strength,
-        }),
-      ),
-      goalPriorities: row.primaryCompetency.goalPriorities.map((priority) => ({
-        goal: priority.goal,
-        priority: priority.priority,
-      })),
+      isCore: false,
+      prerequisites: [],
+      goalPriorities: [],
     },
     difficultyBand: row.difficultyBand,
     responseFormat: row.responseFormat,

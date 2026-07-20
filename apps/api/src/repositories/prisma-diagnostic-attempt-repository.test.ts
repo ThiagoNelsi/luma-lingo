@@ -458,23 +458,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
             diagnosticItem: {
               include: {
                 competencyTargets: true,
-                primaryCompetency: {
-                  include: {
-                    prerequisites: {
-                      include: {
-                        prerequisite: {
-                          include: {
-                            prerequisites: {
-                              include: {
-                                prerequisite: true,
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
+                primaryCompetency: true,
               },
             },
           },

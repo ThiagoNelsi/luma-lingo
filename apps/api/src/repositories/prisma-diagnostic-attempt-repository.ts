@@ -300,30 +300,16 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
               diagnosticItem: {
                 include: {
                   competencyTargets: true,
-                  primaryCompetency: {
-                    include: {
-                      prerequisites: {
-                        include: {
-                          prerequisite: {
-                            include: {
-                              prerequisites: {
-                                include: {
-                                  prerequisite: true,
-                                },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
+                  primaryCompetency: true,
                 },
               },
             },
           },
         },
       });
-      const evidenceRows = buildEvidenceRows(attempt as CompletedAttemptRow);
+      const evidenceRows = buildEvidenceRows(
+        attempt as unknown as CompletedAttemptRow,
+      );
 
       if (evidenceRows.length > 0) {
         await tx.competencyEvidence.createMany({
