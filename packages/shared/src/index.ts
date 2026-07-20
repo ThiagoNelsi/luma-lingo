@@ -1,4 +1,5 @@
 export * from "./age-and-goals.js";
+export * from "./competency-catalog.js";
 export * from "./diagnostic-question.js";
 export * from "./languages.js";
 export * from "./lesson-preferences.js";
