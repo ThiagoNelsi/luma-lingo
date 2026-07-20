@@ -49,14 +49,14 @@ export function selectNextInitialDiagnosticItem(input: {
   const shownDiagnosticItemIds = new Set(
     input.attemptItems.map((item) => item.diagnosticItemId),
   );
-  const primaryCompetencyCounts = countPrimaryCompetencyAttempts({
+  const primaryTargetCounts = countPrimaryTargetAttempts({
     questionBank: input.questionBank,
     attemptItems: input.attemptItems,
   });
   const repairSelectionCount = input.attemptItems.filter(
     (item) => item.selectedForRole === "repair",
   ).length;
-  const repairCompetencyCounts = countPrimaryCompetencyAttempts({
+  const repairTargetCounts = countPrimaryTargetAttempts({
     questionBank: input.questionBank,
     attemptItems: input.attemptItems.filter(
       (item) => item.selectedForRole === "repair",
@@ -79,9 +79,9 @@ export function selectNextInitialDiagnosticItem(input: {
   const baseSelectionInput = {
     questionBank: input.questionBank,
     shownDiagnosticItemIds,
-    primaryCompetencyCounts,
+    primaryTargetCounts,
     repairSelectionCount,
-    repairCompetencyCounts,
+    repairTargetCounts,
     coveredCompetencyIds,
     attemptContext,
     policy: input.policy,
@@ -163,20 +163,18 @@ function selectFinalValidationCandidate(
     return selectHighestScoringCandidate({
       ...input,
       phase: "final_validation",
-      requiredPrimaryCompetencyId: primaryTargetId(repairedItem),
-      allowedPrimaryCompetencyOverflowId: primaryTargetId(repairedItem),
+      requiredPrimaryTargetId: primaryTargetId(repairedItem),
+      allowedPrimaryTargetOverflowId: primaryTargetId(repairedItem),
       allowedRoles: new Set(["confidence"]),
     });
   }
 
-  for (const missedCompetency of findMissedCompetenciesByRepairPriority(
-    input,
-  )) {
+  for (const missedTarget of findMissedTargetsByRepairPriority(input)) {
     const repairCandidate = selectHighestScoringCandidate({
       ...input,
       phase: "final_validation",
-      requiredPrimaryCompetencyId: missedCompetency.primaryCompetencyId,
-      allowedPrimaryCompetencyOverflowId: missedCompetency.primaryCompetencyId,
+      requiredPrimaryTargetId: missedTarget.primaryTargetId,
+      allowedPrimaryTargetOverflowId: missedTarget.primaryTargetId,
       allowedRoles: new Set(["repair"]),
     });
 
@@ -199,9 +197,9 @@ type ScoredCandidate = {
 type SelectCandidateInput = {
   questionBank: DiagnosticQuestionBank;
   shownDiagnosticItemIds: Set<string>;
-  primaryCompetencyCounts: Map<string, number>;
+  primaryTargetCounts: Map<string, number>;
   repairSelectionCount: number;
-  repairCompetencyCounts: Map<string, number>;
+  repairTargetCounts: Map<string, number>;
   coveredCompetencyIds: Set<string>;
   attemptContext: AttemptSelectionContext;
   policy: InitialDiagnosticSelectionPolicy;
@@ -212,8 +210,8 @@ function selectHighestScoringCandidate(
   input: SelectCandidateInput & {
     phase: SelectionPhase;
     allowedRoles?: Set<DiagnosticQuestionRole>;
-    requiredPrimaryCompetencyId?: string;
-    allowedPrimaryCompetencyOverflowId?: string;
+    requiredPrimaryTargetId?: string;
+    allowedPrimaryTargetOverflowId?: string;
   },
 ): ScoredCandidate | null {
   const eligibleItems = input.questionBank.items
@@ -226,8 +224,8 @@ function selectHighestScoringCandidate(
     )
     .filter(
       (item) =>
-        !input.requiredPrimaryCompetencyId ||
-        primaryTargetId(item) === input.requiredPrimaryCompetencyId,
+        !input.requiredPrimaryTargetId ||
+        primaryTargetId(item) === input.requiredPrimaryTargetId,
     )
     .filter(
       (item) =>
@@ -237,19 +235,18 @@ function selectHighestScoringCandidate(
         ),
     )
     .filter((item) =>
-      canSelectPrimaryCompetencyCandidate({
+      canSelectPrimaryTargetCandidate({
         item,
-        primaryCompetencyCounts: input.primaryCompetencyCounts,
+        primaryTargetCounts: input.primaryTargetCounts,
         policy: input.policy,
-        allowedPrimaryCompetencyOverflowId:
-          input.allowedPrimaryCompetencyOverflowId,
+        allowedPrimaryTargetOverflowId: input.allowedPrimaryTargetOverflowId,
       }),
     )
     .filter((item) =>
       canSelectRepairCandidate({
         item,
         repairSelectionCount: input.repairSelectionCount,
-        repairCompetencyCounts: input.repairCompetencyCounts,
+        repairTargetCounts: input.repairTargetCounts,
         policy: input.policy,
         repairRoleCanBeSelected:
           !input.allowedRoles || input.allowedRoles.has("repair"),
@@ -274,7 +271,7 @@ function selectHighestScoringCandidate(
     .map((item) => {
       const score = scoreCandidate({
         item,
-        primaryCompetencyCounts: input.primaryCompetencyCounts,
+        primaryTargetCounts: input.primaryTargetCounts,
         coveredCompetencyIds: input.coveredCompetencyIds,
         attemptContext: input.attemptContext,
         goals: input.goals,
@@ -312,21 +309,21 @@ function canSelectExplorationLevelCandidate(input: {
   );
 }
 
-function canSelectPrimaryCompetencyCandidate(input: {
+function canSelectPrimaryTargetCandidate(input: {
   item: DiagnosticQuestionBankItem;
-  primaryCompetencyCounts: Map<string, number>;
+  primaryTargetCounts: Map<string, number>;
   policy: InitialDiagnosticSelectionPolicy;
-  allowedPrimaryCompetencyOverflowId?: string;
+  allowedPrimaryTargetOverflowId?: string;
 }): boolean {
   if (
-    input.allowedPrimaryCompetencyOverflowId &&
-    primaryTargetId(input.item) === input.allowedPrimaryCompetencyOverflowId
+    input.allowedPrimaryTargetOverflowId &&
+    primaryTargetId(input.item) === input.allowedPrimaryTargetOverflowId
   ) {
     return true;
   }
 
   return (
-    (input.primaryCompetencyCounts.get(primaryTargetId(input.item)) ?? 0) <
+    (input.primaryTargetCounts.get(primaryTargetId(input.item)) ?? 0) <
     input.policy.config.maxItemsPerCompetency
   );
 }
@@ -334,7 +331,7 @@ function canSelectPrimaryCompetencyCandidate(input: {
 function canSelectRepairCandidate(input: {
   item: DiagnosticQuestionBankItem;
   repairSelectionCount: number;
-  repairCompetencyCounts: Map<string, number>;
+  repairTargetCounts: Map<string, number>;
   policy: InitialDiagnosticSelectionPolicy;
   repairRoleCanBeSelected: boolean;
 }): boolean {
@@ -351,14 +348,14 @@ function canSelectRepairCandidate(input: {
   }
 
   return (
-    (input.repairCompetencyCounts.get(primaryTargetId(input.item)) ?? 0) <
+    (input.repairTargetCounts.get(primaryTargetId(input.item)) ?? 0) <
     input.policy.config.maxRepairItemsPerCompetency
   );
 }
 
 function scoreCandidate(input: {
   item: DiagnosticQuestionBankItem;
-  primaryCompetencyCounts: Map<string, number>;
+  primaryTargetCounts: Map<string, number>;
   coveredCompetencyIds: Set<string>;
   attemptContext: AttemptSelectionContext;
   goals: string[];
@@ -366,7 +363,7 @@ function scoreCandidate(input: {
   allowedRoles?: Set<DiagnosticQuestionRole>;
 }): CandidateScore {
   const repeatedPrimaryCount =
-    input.primaryCompetencyCounts.get(primaryTargetId(input.item)) ?? 0;
+    input.primaryTargetCounts.get(primaryTargetId(input.item)) ?? 0;
   const directNewCompetencyValue = repeatedPrimaryCount === 0 ? 100 : 0;
   const repeatedCompetencyPenalty = repeatedPrimaryCount * 40;
   const prerequisites = input.item.primaryCompetency?.prerequisites ?? [];
@@ -640,7 +637,7 @@ function scoreDifficultyFit(input: {
   return 0;
 }
 
-function countPrimaryCompetencyAttempts(input: {
+function countPrimaryTargetAttempts(input: {
   questionBank: DiagnosticQuestionBank;
   attemptItems: DiagnosticAttemptItem[];
 }): Map<string, number> {
@@ -868,15 +865,15 @@ function findFinalValidationRepairAttemptItem(input: {
   );
 }
 
-function findMissedCompetenciesByRepairPriority(
+function findMissedTargetsByRepairPriority(
   input: SelectCandidateInput,
-): Array<{ primaryCompetencyId: string; impactScore: number }> {
+): Array<{ primaryTargetId: string; impactScore: number }> {
   const itemsById = new Map(
     input.questionBank.items.map((item) => [item.id, item]),
   );
-  const missedCompetencies = new Map<
+  const missedTargets = new Map<
     string,
-    { primaryCompetencyId: string; impactScore: number }
+    { primaryTargetId: string; impactScore: number }
   >();
 
   for (const attemptItem of input.attemptContext.answeredItems) {
@@ -898,21 +895,21 @@ function findMissedCompetenciesByRepairPriority(
       goals: input.goals,
     });
     const targetId = primaryTargetId(item);
-    const current = missedCompetencies.get(targetId);
+    const current = missedTargets.get(targetId);
     if (!current || impactScore > current.impactScore) {
-      missedCompetencies.set(targetId, {
-        primaryCompetencyId: targetId,
+      missedTargets.set(targetId, {
+        primaryTargetId: targetId,
         impactScore,
       });
     }
   }
 
-  return [...missedCompetencies.values()].sort((left, right) => {
+  return [...missedTargets.values()].sort((left, right) => {
     if (left.impactScore !== right.impactScore) {
       return right.impactScore - left.impactScore;
     }
 
-    return left.primaryCompetencyId.localeCompare(right.primaryCompetencyId);
+    return left.primaryTargetId.localeCompare(right.primaryTargetId);
   });
 }
 
