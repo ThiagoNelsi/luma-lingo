@@ -110,11 +110,28 @@ describe("InitialDiagnosticRuntimeService", () => {
     expect(attempts.items).toHaveLength(1);
   });
 
-  it("scores the current response and completes automatically when no next item exists", async () => {
+  it("presents, scores, and completes a concept-targeted Q-matrix tracer", async () => {
     const now = new Date("2026-06-28T12:00:00.000Z");
     const attempts = new MemoryDiagnosticAttemptRepository();
+    const tracerItem: DiagnosticQuestionBankItem = {
+      ...buildQuestionBankItem(),
+      primaryCompetencyId: null,
+      primaryCompetencyKey: null,
+      primaryConceptId: "concept-1",
+      primaryConceptKey: "form.synthetic.subject_pronoun",
+      primaryCompetency: undefined,
+      targets: [],
+      evidenceMappings: [
+        {
+          conceptId: "concept-1",
+          conceptKey: "form.synthetic.subject_pronoun",
+          capability: "recognition",
+          strength: 100,
+        },
+      ],
+    };
     const questionBanks = new MemoryQuestionBankRepository(
-      buildQuestionBank([buildQuestionBankItem()]),
+      buildQuestionBank([tracerItem]),
     );
     const runtime = new InitialDiagnosticRuntimeService({
       attempts: new DiagnosticAttemptService(attempts, () => now),
@@ -158,6 +175,12 @@ describe("InitialDiagnosticRuntimeService", () => {
       confidence: 0.8,
       answeredAt: now,
     });
+    expect(tracerItem.evidenceMappings).toEqual([
+      expect.objectContaining({
+        conceptId: "concept-1",
+        capability: "recognition",
+      }),
+    ]);
   });
 
   it("returns the next item after an answer while keeping the attempt in progress", async () => {
@@ -512,6 +535,9 @@ function buildQuestionBankItem(
     key: input.key ?? "en.diag.a1.subject-pronouns.001",
     primaryCompetencyId,
     primaryCompetencyKey,
+    primaryConceptId: null,
+    primaryConceptKey: null,
+    mode: "reading",
     primaryCompetency: {
       id: primaryCompetencyId,
       key: primaryCompetencyKey,
@@ -566,5 +592,6 @@ function buildQuestionBankItem(
         details: { schemaVersion: 1 },
       },
     ],
+    evidenceMappings: [],
   };
 }

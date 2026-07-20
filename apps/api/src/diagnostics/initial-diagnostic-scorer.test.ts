@@ -234,6 +234,9 @@ function buildMultipleChoiceItem(): DiagnosticQuestionBankItem {
     key: "en.diag.a1.subject-pronouns.001",
     primaryCompetencyId: "competency-1",
     primaryCompetencyKey: "en.a1.subject-pronouns",
+    primaryConceptId: null,
+    primaryConceptKey: null,
+    mode: "reading",
     difficultyBand: "A1",
     responseFormat: "multiple_choice",
     status: "published",
@@ -283,6 +286,7 @@ function buildMultipleChoiceItem(): DiagnosticQuestionBankItem {
         details: { schemaVersion: 1 },
       },
     ],
+    evidenceMappings: [],
   };
 }
 
@@ -292,6 +296,9 @@ function buildFillBlankChoiceItem(): DiagnosticQuestionBankItem {
     key: "en.diag.a1.be-present.001",
     primaryCompetencyId: "competency-2",
     primaryCompetencyKey: "en.a1.be-present",
+    primaryConceptId: null,
+    primaryConceptKey: null,
+    mode: "reading",
     difficultyBand: "A1",
     responseFormat: "fill_blank_choice",
     status: "published",
@@ -343,6 +350,7 @@ function buildFillBlankChoiceItem(): DiagnosticQuestionBankItem {
         details: { schemaVersion: 1 },
       },
     ],
+    evidenceMappings: [],
   };
 }
 
@@ -352,6 +360,9 @@ function buildWordBankSequenceItem(): DiagnosticQuestionBankItem {
     key: "en.diag.a1.be-present.sequence.001",
     primaryCompetencyId: "competency-2",
     primaryCompetencyKey: "en.a1.be-present",
+    primaryConceptId: null,
+    primaryConceptKey: null,
+    mode: "writing",
     difficultyBand: "A1",
     responseFormat: "word_bank_sequence",
     status: "published",
@@ -424,5 +435,6 @@ function buildWordBankSequenceItem(): DiagnosticQuestionBankItem {
         details: { schemaVersion: 1 },
       },
     ],
+    evidenceMappings: [],
   };
 }

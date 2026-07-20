@@ -1,10 +1,4 @@
 -- The legacy question-target table distributed one score across competencies.
--- Diagnostic rows are disposable and were already retired during the catalog cutover.
-DELETE FROM "diagnostic_attempt_items";
-DELETE FROM "diagnostic_attempts";
-DELETE FROM "diagnostic_item_competency_targets";
-DELETE FROM "diagnostic_items";
-
 DROP TABLE "diagnostic_item_competency_targets";
 
 ALTER TABLE "diagnostic_items"

@@ -1,12 +1,11 @@
 import {
   authoredDiagnosticItemDetailsSchema,
+  capabilityValues,
   diagnosticQuestionModeSchema,
   diagnosticQuestionPromptSchema,
   diagnosticQuestionResponseFormatSchema,
   diagnosticQuestionScoringRuleSchema,
   diagnosticQuestionStatusSchema,
-  type DiagnosticQuestionPrompt,
-  type DiagnosticQuestionScoringRule,
 } from "@luma-lingo/shared";
 import { z } from "zod";
 
@@ -91,42 +90,15 @@ export const diagnosticQuestionBankItemSchema = z.object({
       z.object({
         conceptId: z.string(),
         conceptKey: z.string(),
-        capability: z.enum([
-          "recognition",
-          "controlled_production",
-          "contextualized_use",
-          "independent_use",
-        ]),
+        capability: z.enum(capabilityValues),
         strength: z.number().int().min(1).max(100),
       }),
     )
     .default([]),
 });
-export type DiagnosticQuestionBankItem = Omit<
-  z.infer<typeof diagnosticQuestionBankItemSchema>,
-  | "prompt"
-  | "scoringRule"
-  | "primaryConceptId"
-  | "primaryConceptKey"
-  | "mode"
-  | "evidenceMappings"
-> & {
-  prompt: DiagnosticQuestionPrompt;
-  scoringRule: DiagnosticQuestionScoringRule;
-  primaryConceptId?: string | null;
-  primaryConceptKey?: string | null;
-  mode?: z.infer<typeof diagnosticQuestionModeSchema>;
-  evidenceMappings?: Array<{
-    conceptId: string;
-    conceptKey: string;
-    capability:
-      | "recognition"
-      | "controlled_production"
-      | "contextualized_use"
-      | "independent_use";
-    strength: number;
-  }>;
-};
+export type DiagnosticQuestionBankItem = z.infer<
+  typeof diagnosticQuestionBankItemSchema
+>;
 
 export const diagnosticQuestionBankSchema = z.object({
   catalog: diagnosticQuestionBankCatalogSchema,

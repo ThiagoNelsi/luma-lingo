@@ -148,6 +148,50 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
       repository.findPublishedOnboardingQuestionBank("en"),
     ).resolves.toBeNull();
   });
+
+  it("maps a concept primary target without inventing a competency target", async () => {
+    const repository = new PrismaDiagnosticQuestionBankRepository({
+      competencyCatalog: {
+        findFirst: vi.fn(async () => ({
+          id: "catalog-1",
+          targetLanguage: "en",
+          version: "2026-06-28-draft",
+          status: "published",
+          publishedAt: new Date("2026-06-28T12:00:00.000Z"),
+          diagnosticItems: [
+            {
+              ...buildDiagnosticItemRow({
+                id: "item-concept-1",
+                key: "en.diag.a1.concept.001",
+                primaryCompetencyId: "unused-competency",
+                primaryCompetencyKey: "en.a1.unused",
+              }),
+              primaryCompetencyId: null,
+              primaryConceptId: "concept-1",
+              primaryCompetency: null,
+              primaryConcept: {
+                id: "concept-1",
+                key: "form.synthetic.subject_pronoun",
+              },
+            },
+          ],
+        })),
+      },
+    } as never);
+
+    await expect(
+      repository.findPublishedOnboardingQuestionBank("en"),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          primaryCompetencyId: null,
+          primaryCompetencyKey: null,
+          primaryConceptId: "concept-1",
+          primaryConceptKey: "form.synthetic.subject_pronoun",
+        },
+      ],
+    });
+  });
 });
 
 function buildDiagnosticItemRow(input: {

@@ -9,6 +9,60 @@ import { selectNextInitialDiagnosticItem } from "./initial-diagnostic-selector.j
 import { initialDiagnosticSelectionPolicy } from "./initial-diagnostic-policy.js";
 
 describe("selectNextInitialDiagnosticItem", () => {
+  it("uses a concept primary target when limiting repeated diagnostic targets", () => {
+    const answeredConceptItem: DiagnosticQuestionBankItem = {
+      ...buildQuestionBankItem({
+        id: "item-concept-answered",
+        key: "en.diag.a1.concept.answered.001",
+        primaryCompetencyId: "placeholder-competency",
+        primaryCompetencyKey: "en.a1.placeholder",
+        family: "grammar",
+        mode: "reading",
+      }),
+      primaryCompetencyId: null,
+      primaryCompetencyKey: null,
+      primaryConceptId: "concept-1",
+      primaryConceptKey: "form.synthetic.subject_pronoun",
+      primaryCompetency: undefined,
+      targets: [],
+    };
+    const repeatedConceptItem: DiagnosticQuestionBankItem = {
+      ...answeredConceptItem,
+      id: "item-concept-repeat",
+      key: "en.diag.a1.concept.repeat.001",
+    };
+    const competencyItem = buildQuestionBankItem({
+      id: "item-competency-new",
+      key: "en.diag.a1.competency.new.001",
+      primaryCompetencyId: "competency-2",
+      primaryCompetencyKey: "en.a1.new",
+      family: "grammar",
+      mode: "reading",
+    });
+
+    const selection = selectNextInitialDiagnosticItem({
+      questionBank: buildQuestionBank([
+        answeredConceptItem,
+        repeatedConceptItem,
+        competencyItem,
+      ]),
+      attemptItems: [
+        buildAttemptItem({
+          id: "attempt-item-1",
+          diagnosticItemId: answeredConceptItem.id,
+          position: 1,
+          score: 1,
+          confidence: 0.8,
+          answeredAt: new Date("2026-06-28T12:01:00.000Z"),
+        }),
+      ],
+      policy: initialDiagnosticSelectionPolicy,
+      goals: [],
+    });
+
+    expect(selection?.item.id).toBe(competencyItem.id);
+  });
+
   it("uses item key and then id as deterministic tie breakers", () => {
     const laterKeyCandidate = buildQuestionBankItem({
       id: "item-a",
@@ -2562,6 +2616,9 @@ function buildQuestionBankItem(input: {
     key: input.key,
     primaryCompetencyId: input.primaryCompetencyId,
     primaryCompetencyKey: input.primaryCompetencyKey,
+    primaryConceptId: null,
+    primaryConceptKey: null,
+    mode: "reading",
     primaryCompetency: {
       id: input.primaryCompetencyId,
       key: input.primaryCompetencyKey,
@@ -2616,6 +2673,7 @@ function buildQuestionBankItem(input: {
         details: { schemaVersion: 1 },
       },
     ],
+    evidenceMappings: [],
   };
 }
 

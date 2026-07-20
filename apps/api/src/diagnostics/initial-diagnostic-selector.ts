@@ -675,8 +675,8 @@ function findCoveredCompetencyIds(input: {
     const item = itemsById.get(attemptItem.diagnosticItemId);
     if (!item) continue;
 
-    for (const target of item.targets) {
-      coveredCompetencyIds.add(target.competencyId);
+    if (item.primaryCompetencyId) {
+      coveredCompetencyIds.add(item.primaryCompetencyId);
     }
   }
 

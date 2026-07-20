@@ -38,5 +38,7 @@ describe("diagnostic evidence database schema", () => {
     expect(migration).toContain(
       'CREATE TRIGGER "concept_evidence_append_only"',
     );
+    expect(migration).not.toContain('DELETE FROM "diagnostic_attempts"');
+    expect(migration).not.toContain('DELETE FROM "diagnostic_items"');
   });
 });
