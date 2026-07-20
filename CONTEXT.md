@@ -116,15 +116,43 @@ Onboarding route for a learner who already knows some of the target language. It
 
 ## Competency profile
 
-Per-target-language view of the learner's estimated ability across relevant competencies, together with the confidence of each estimate. It guides lesson focus and evolves as new evidence is collected.
+Per-target-language view of the learner's estimated knowledge across concepts and derived ability across relevant competencies, together with the confidence of each estimate. It guides lesson focus and evolves as new evidence is collected.
 
 ## Learner competency state
 
-Current estimate for one learner's ability and confidence in one catalog competency. It is a summary of evidence, not the evidence history itself.
+Current estimate for one learner's partial or integrated ability and confidence in one catalog competency. It may combine direct evidence with a `Competency mastery projection`, but it does not replace the component states relevant to a particular activity.
 
 ## Competency catalog
 
-Versioned set of measurable capabilities and their learning relationships for one target language. Core and goal-specific learning both reference this shared catalog.
+Versioned set of measurable capabilities and their learning relationships for one target language. Adaptive planning and the `Pedagogical policy` both reference this shared catalog.
+
+## Concept
+
+Reusable unit of linguistic knowledge that a competency may contain, assume, or use as support. A concept has no proficiency level and may itself be a learning or assessment target.
+
+## Component concept
+
+Concept that directly composes the observable performance described by a competency.
+
+## Assumed concept
+
+Concept whose declared `Capability` is expected before a learner attempts a competency or activity, without being part of the performance being measured.
+
+## Supporting concept
+
+Concept that is relevant to a competency or activity without composing its primary performance or acting as assumed knowledge.
+
+## Capability
+
+Degree of language control at which a learner can demonstrate a concept: recognition, controlled production, contextualized use, or independent use.
+
+## Learner concept state
+
+Current estimate of one learner's knowledge and confidence for one concept at one `Capability`. It distinguishes direct from inferred evidence and persists across compatible catalog versions.
+
+## Competency mastery projection
+
+Non-authoritative summary of partial mastery across a competency's component concept states. It preserves variation between components while providing a competency-level estimate when needed.
 
 ## Published competency catalog
 
@@ -138,13 +166,9 @@ Stable catalog-specific reference for one competency. It is used to connect cata
 
 Broad kind of capability represented by a competency, such as situational communication, grammar, vocabulary, comprehension, or production.
 
-## Competency mode
-
-Learning or evidence mode most closely associated with a competency when one mode is dominant, such as reading, writing, or listening.
-
 ## Competency tag
 
-Metadata label used to group or filter catalog competencies when the distinction is not already captured by level, family, mode, goal priority, or prerequisite relationship.
+Metadata label used to group or filter catalog competencies when the distinction is not already captured by level, family, goal weight, or a learning relationship.
 
 ## Competency prerequisite
 
@@ -162,9 +186,9 @@ Observation from a diagnostic, lesson, review, or activity response that informs
 
 Origin of a `Competency evidence` observation, such as an initial diagnostic, lesson activity, review, or manual correction.
 
-## Core competency
+## Concept evidence
 
-Foundational target-language capability relevant to every learner. A learner may demonstrate it through diagnostic or lesson evidence without receiving dedicated instruction.
+Observation from a diagnostic, lesson, review, or activity response that informs a `Learner concept state`. It records whether the observation is direct or inferred.
 
 ## Supporting competency
 
@@ -192,15 +216,27 @@ State that the learner has shown enough evidence to leave a `Module` and move to
 
 ## Module candidate score
 
-Internal ranking of possible next `Module` objectives for a learner. It compares eligible candidates using prerequisite readiness, goal priority, competency gaps, uncertainty, review needs, lesson emphasis fit, and recent learning focus.
+Internal ranking of possible next `Module` objectives for a learner. It compares eligible candidates using prerequisite readiness, goal weight, competency gaps, uncertainty, review needs, lesson emphasis fit, and recent learning focus.
 
-## Goal priority
+## Pedagogical policy
 
-Relative relevance assigned to a catalog competency for a particular `Goal`. A competency may have priority for multiple goals without being duplicated.
+Product-owned, revisable weights that influence adaptive content selection without defining a fixed `Learning plan`. It is separate from the relatively stable linguistic facts in a `Competency catalog`.
+
+## Goal weight
+
+Relative relevance assigned by the `Pedagogical policy` to a concept or competency for a particular `Goal`. It influences adaptive selection without predetermining lesson order.
+
+## Base priority
+
+Goal-independent importance assigned by the `Pedagogical policy` to a competency. It expresses foundational relevance as a graduated weight rather than a binary classification.
+
+## Foundation weight
+
+Relative suitability of a competency as an initial learning entry point. It helps select beginner foundations without defining a fixed sequence.
 
 ## Learning priorities
 
-Ordered competencies and vocabulary selected for a learner from profile evidence, core gaps, goals, and review needs. They define what the learning experience should address next.
+Ordered competencies and vocabulary selected for a learner from profile evidence, knowledge gaps, goals, and review needs. They define what the learning experience should address next.
 
 ## Learning plan
 
@@ -216,11 +252,11 @@ Learner-specific interests and contexts used to make examples, vocabulary, and a
 
 ## Diagnostic item
 
-Assessment prompt designed to collect evidence primarily about one competency at a known difficulty.
+Assessment prompt designed to collect evidence primarily about one competency or concept at a known difficulty.
 
 ## Diagnostic target
 
-Competency that a `Diagnostic item` can collect evidence for. Each diagnostic item has one primary diagnostic target and may also have supporting targets.
+Competency or concept that a `Diagnostic item` is intentionally designed to assess. Each diagnostic item has one primary diagnostic target and may also have supporting targets.
 
 ## Diagnostic target role
 
@@ -236,13 +272,21 @@ foundation, ceiling, repair, confidence, or goal_probe. See
 
 Relative contribution of a diagnostic item response to one `Diagnostic target`.
 
+## Evidence mapping
+
+Declared relationship from a question response to a concept and `Capability`, together with the strength of the resulting evidence.
+
+## Question mode
+
+Primary language channel that a diagnostic item or learning activity is intended to collect evidence about: reading, writing, listening, or speaking. It is distinct from the response format used to capture the learner's answer.
+
 ## Scoring rule
 
 Reviewed rule that converts a diagnostic response into score and evidence. It should be deterministic for the `Initial diagnostic`.
 
 ## Audited onboarding question bank
 
-Versioned collection of diagnostic items reviewed before learner use. Each item has a target language, primary competency, difficulty, response format, and scoring rule.
+Versioned collection of diagnostic items reviewed before learner use. Each item has a target language, primary `Diagnostic target`, difficulty, `Question mode`, response format, scoring rule, and `Evidence mapping`s.
 
 ## Diagnostic attempt
 
@@ -254,7 +298,7 @@ Reason a `Diagnostic attempt` exists, such as initial onboarding calibration, fu
 
 ## Diagnostic attempt item
 
-One `Diagnostic item` presented inside a `Diagnostic attempt`. It records the item's position in the attempt, the learner's structured response when answered, and the deterministic scoring result used to create competency evidence. In the MVP, whether an attempt item was answered is inferred from response data rather than stored as a separate item status.
+One `Diagnostic item` presented inside a `Diagnostic attempt`. It records the item's position in the attempt, the learner's structured response when answered, and the deterministic scoring result used to create concept or competency evidence. In the MVP, whether an attempt item was answered is inferred from response data rather than stored as a separate item status.
 
 ## Diagnostic selection policy
 

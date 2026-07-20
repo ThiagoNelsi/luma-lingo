@@ -1,5 +1,25 @@
 # Future Improvements
 
+## 2026-07-19
+
+### Versioned Curriculum Artifact Metadata And Checksums
+
+- **Deferred:** Add checksum verification for imported curriculum artifacts and
+  formal metadata tables for catalog, concept-registry, taxonomy, pedagogical-policy,
+  and diagnostic-question-bank versions. Record which immutable artifact versions
+  and import runs produced each published runtime dataset.
+- **Current scope boundary:** The current MVP runs locally against a disposable
+  development database and will rebuild the curriculum from locally versioned
+  artifacts after a tested backup. Checksums and a generalized metadata/version
+  model are not required to complete that local reset and import safely.
+- **Future value:** Explicit artifact provenance will make production imports
+  reproducible and auditable, prevent mismatched catalog and question-bank versions,
+  support rollback, and clarify which policy, taxonomy, registry, and scoring inputs
+  produced learner evidence.
+- **Revisit when:** Before publishing curriculum to a non-disposable environment,
+  supporting concurrent catalog or question-bank versions, automating imports, or
+  adding the planned B1/B2 catalog expansion.
+
 ## 2026-06-27
 
 ### Reuse Audited Diagnostic Items In Lessons
