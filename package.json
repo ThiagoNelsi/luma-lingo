@@ -15,7 +15,10 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "pnpm -r test",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate:competency-catalog-schemas": "tsx data/scripts/generate-competency-catalog-schemas.ts",
+    "check:competency-catalog-schemas": "tsx data/scripts/generate-competency-catalog-schemas.ts --check",
+    "validate:competency-catalog": "tsx data/scripts/validate-competency-catalog.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",
