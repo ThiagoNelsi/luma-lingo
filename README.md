@@ -78,6 +78,7 @@ with an in-memory authenticated learner.
 
 ## Key docs
 
+- [Documentação do sistema em português](docs/sistema-lumalingo.md)
 - [Glossary and shared terms](CONTEXT.md)
 - [Product brief and requirements](luma-lingo-prd.md)
 - [ADR 0001: Agent Roles and Lesson Flow](docs/adr/0001-agent-roles-and-lesson-flow.md)
