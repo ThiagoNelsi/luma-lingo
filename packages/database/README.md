@@ -14,10 +14,10 @@ This package owns the Prisma schema, migrations, and database client for LumaLin
   Study pace, and Onboarding starting point so onboarding resume and lesson
   generation can consume the same persisted preferences.
 - Learning tracks may point to a versioned competency catalog. Catalog records,
-  competencies, prerequisites, goal priorities, diagnostic items, competency
-  evidence, and sparse learner competency state live in Postgres. Language- and
-  version-specific curriculum details use JSONB fields and must be validated by
-  application code before use.
+  competencies, reusable concepts, competency-to-concept relationships,
+  diagnostic items, competency evidence, and sparse learner competency state
+  live in Postgres. Language- and version-specific curriculum details use JSONB
+  fields and must be validated by application code before use.
 
 `Learner.currentLearningTrackId` intentionally points to `LearningTrack`, while each `LearningTrack` also belongs to a `Learner`.
 
@@ -36,76 +36,41 @@ unknown, not that the competency is unmastered.
 See `../../docs/competency-database-schema.md` for the detailed competency
 schema guide, including relationship notes and JSONB examples.
 
-## Import competency catalogs
+## Publish the authorial catalog
 
-Use the local import script to load the ignored JSON catalog files from
-`data/catalogs/en/` into Postgres:
+The authorial files under `data/catalogs/en/authoral/` are private, ignored
+publication inputs. Validate and import them in dependency order: concepts
+first, then competencies and their concept relationships.
+
+Run a dry run before writing to the configured database:
 
 ```sh
+pnpm --filter @luma-lingo/database db:import:concepts -- --dry-run
 pnpm --filter @luma-lingo/database db:import:competencies -- --dry-run
-pnpm --filter @luma-lingo/database db:import:competencies -- --version en-mvp-1 --status published
 ```
 
-The script imports the grammar and non-grammar JSON files as one runtime
-`CompetencyCatalog`, upserts competencies, rebuilds prerequisite relationships
-for imported competencies, and rebuilds goal priorities for imported
-competencies. It does not delete competencies that are absent from the JSON
-files.
-
-Override source paths only when importing a different local draft:
+Publish the validated artifacts:
 
 ```sh
-pnpm --filter @luma-lingo/database db:import:competencies -- \
-  --grammar ../../data/catalogs/en/grammar-competencies.json \
-  --non-grammar ../../data/catalogs/en/non-grammar-competencies.json \
-  --version en-mvp-1
+pnpm --filter @luma-lingo/database db:import:concepts
+pnpm --filter @luma-lingo/database db:import:competencies
+pnpm --filter @luma-lingo/database db:verify:authorial-catalog
 ```
 
-The import runs inside one Prisma transaction with a 60-second timeout. If a
-slow local database needs more time, pass a higher timeout:
+The importers reject duplicate identities, unknown or inactive references,
+invalid relationship roles, invalid assumed capabilities, and content changes
+to an already published catalog version. They derive stable UUIDs from authorial
+identities, upsert rows in a transaction, and return aggregate counts only.
+Running the same import again is idempotent.
 
-```sh
-pnpm --filter @luma-lingo/database db:import:competencies -- \
-  --version en-mvp-1 \
-  --status published \
-  --transaction-timeout-ms 120000
-```
+Use `DATABASE_URL` for application and publication traffic. Set
+`DATABASE_MIGRATION_URL` to the provider's direct, unpooled connection for
+Prisma migrations.
 
 ## Import onboarding diagnostic questions
 
-Use the diagnostic question-bank import after importing the matching competency
-catalog version. The question bank declares its target catalog through
-`catalogVersion`, so import competencies with the same `--version` first:
-
-```sh
-pnpm --filter @luma-lingo/database db:import:competencies -- \
-  --version 2026-06-28-draft \
-  --status draft
-
-pnpm --filter @luma-lingo/database db:import:diagnostic-questions -- --dry-run
-pnpm --filter @luma-lingo/database db:import:diagnostic-questions
-```
-
-The default question-bank path is:
-
-```text
-../../data/catalogs/en/onboarding-diagnostic-question-bank-merged.json
-```
-
-Override it when importing another local draft:
-
-```sh
-pnpm --filter @luma-lingo/database db:import:diagnostic-questions -- \
-  --question-bank ../../data/catalogs/en/onboarding-diagnostic-question-bank-merged.json \
-  --transaction-timeout-ms 120000
-```
-
-The diagnostic question import validates the authored JSON against the shared
-Zod contract before writing. It then resolves every primary and supporting
-target against the imported `CompetencyCatalog`, upserts `DiagnosticItem` rows,
-rebuilds `DiagnosticItemCompetencyTarget` rows for the imported items, and
-stores question-bank import metadata on the catalog.
-
-`draft` diagnostic items are useful for local authoring and review. Runtime
-selection should read only `published` catalogs and `published` diagnostic
-items through the API repository contract.
+The legacy diagnostic bank doesn't share competency identities with the
+authorial catalog. Don't import or remap it into the published catalog. The API
+reports the diagnostic as unavailable until a new question bank with explicit
+evidence mappings is published. The existing diagnostic tables remain available
+for that replacement pipeline.

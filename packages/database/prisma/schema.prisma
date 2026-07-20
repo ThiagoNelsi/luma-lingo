@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_MIGRATION_URL")
 }
 
 enum OnboardingStatus {
@@ -156,60 +157,69 @@ model CompetencyCatalog {
 }
 
 model Competency {
-  id                     String                           @id @db.Uuid
-  catalogId              String                           @map("catalog_id") @db.Uuid
-  key                    String
-  title                  String
-  description            String?
-  family                 String
-  mode                   String?
-  difficultyBand         String?                          @map("difficulty_band")
-  isCore                 Boolean                          @default(false) @map("is_core")
-  details                Json                             @default("{}")
-  createdAt              DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  catalog                CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
-  prerequisites          CompetencyPrerequisite[]         @relation("CompetencyPrerequisites")
-  requiredBy             CompetencyPrerequisite[]         @relation("CompetencyRequiredBy")
-  goalPriorities         CompetencyGoalPriority[]
-  primaryDiagnosticItems DiagnosticItem[]                 @relation("PrimaryDiagnosticCompetency")
-  diagnosticItemTargets  DiagnosticItemCompetencyTarget[]
-  learnerStates          LearnerCompetencyState[]
-  evidence               CompetencyEvidence[]
+  id                       String                           @id @db.Uuid
+  catalogId                String                           @map("catalog_id") @db.Uuid
+  key                      String
+  title                    String
+  description              String?
+  family                   String
+  difficultyBand           String?                          @map("difficulty_band")
+  taxonomyId               String                           @map("taxonomy_id")
+  estimatedDifficultyScore Float?                           @map("estimated_difficulty_score")
+  status                   String                           @default("draft")
+  details                  Json                             @default("{}")
+  createdAt                DateTime                         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                  CompetencyCatalog                @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  conceptRelationships     CompetencyConcept[]
+  primaryDiagnosticItems   DiagnosticItem[]                 @relation("PrimaryDiagnosticCompetency")
+  diagnosticItemTargets    DiagnosticItemCompetencyTarget[]
+  learnerStates            LearnerCompetencyState[]
+  evidence                 CompetencyEvidence[]
 
   @@unique([catalogId, key])
   @@index([catalogId, family])
   @@index([catalogId, difficultyBand])
+  @@index([catalogId, taxonomyId])
+  @@index([catalogId, status])
   @@map("competencies")
 }
 
-model CompetencyPrerequisite {
-  competencyId   String     @map("competency_id") @db.Uuid
-  prerequisiteId String     @map("prerequisite_id") @db.Uuid
-  strength       Int?
-  details        Json       @default("{}")
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  competency     Competency @relation("CompetencyPrerequisites", fields: [competencyId], references: [id], onDelete: Cascade)
-  prerequisite   Competency @relation("CompetencyRequiredBy", fields: [prerequisiteId], references: [id], onDelete: Restrict)
+model Concept {
+  id                      String              @id @db.Uuid
+  targetLanguage          String              @map("target_language")
+  key                     String
+  label                   String
+  aliases                 String[]            @default([])
+  status                  String              @default("draft")
+  replacedByConceptId     String?             @map("replaced_by_concept_id") @db.Uuid
+  details                 Json                @default("{}")
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  replacedBy              Concept?            @relation("ConceptReplacement", fields: [replacedByConceptId], references: [id], onDelete: Restrict)
+  replacements            Concept[]           @relation("ConceptReplacement")
+  competencyRelationships CompetencyConcept[]
 
-  @@id([competencyId, prerequisiteId])
-  @@index([prerequisiteId])
-  @@map("competency_prerequisites")
+  @@unique([targetLanguage, key])
+  @@index([targetLanguage, status])
+  @@index([replacedByConceptId])
+  @@map("concepts")
 }
 
-model CompetencyGoalPriority {
-  id           String     @id @db.Uuid
-  competencyId String     @map("competency_id") @db.Uuid
-  goal         String
-  priority     Int
-  details      Json       @default("{}")
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  competency   Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+model CompetencyConcept {
+  competencyId       String     @map("competency_id") @db.Uuid
+  conceptId          String     @map("concept_id") @db.Uuid
+  role               String
+  requiredCapability String?    @map("required_capability")
+  details            Json       @default("{}")
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  competency         Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  concept            Concept    @relation(fields: [conceptId], references: [id], onDelete: Restrict)
 
-  @@unique([competencyId, goal])
-  @@index([goal, priority])
-  @@map("competency_goal_priorities")
+  @@id([competencyId, conceptId])
+  @@index([conceptId, role])
+  @@index([role, requiredCapability])
+  @@map("competency_concepts")
 }
 
 model DiagnosticItem {

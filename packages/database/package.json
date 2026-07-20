@@ -11,9 +11,11 @@
   },
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.json",
-    "check": "DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost:5432/luma_lingo} prisma validate && tsc --noEmit",
+    "check": "DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost:5432/luma_lingo} DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-postgresql://user:password@localhost:5432/luma_lingo} prisma validate && tsc --noEmit",
     "db:generate": "prisma generate",
-    "db:import:competencies": "dotenv -e ../../.env -- node scripts/import-competency-catalog.mjs",
+    "db:import:concepts": "dotenv -e ../../.env -- tsx scripts/import-concept-registry.ts",
+    "db:import:competencies": "dotenv -e ../../.env -- tsx scripts/import-competency-catalog.ts",
+    "db:verify:authorial-catalog": "dotenv -e ../../.env -- tsx scripts/verify-authorial-catalog.ts",
     "db:import:diagnostic-questions": "dotenv -e ../../.env -- tsx scripts/import-diagnostic-question-bank.ts",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
