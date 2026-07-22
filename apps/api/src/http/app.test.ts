@@ -14,6 +14,7 @@ import type { AppConfig } from "../config.js";
 import type { DiagnosticAttempt } from "../diagnostics/diagnostic-attempt.js";
 import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
+import type { InitialLearningPriority } from "../learning/initial-learning-priority.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRecord } from "../sessions/session-record.js";
@@ -40,7 +41,10 @@ const verifiedIdentity: AuthIdentity = {
   name: "Learner One",
 };
 
-function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
+function createMemoryDeps(
+  identity: AuthIdentity = verifiedIdentity,
+  initialLearningPriority: InitialLearningPriority | null = null,
+) {
   let session: SessionRecord | null = null;
   let completedDiagnosticAttempt: DiagnosticAttempt | null = null;
   const usersByIdentity = new Map<string, AuthProfile>();
@@ -357,6 +361,11 @@ function createMemoryDeps(identity: AuthIdentity = verifiedIdentity) {
     learners,
     onboardingCompletion,
     diagnosticAttempts,
+    initialLearningPriorities: {
+      async findInitialLearningPriority() {
+        return initialLearningPriority;
+      },
+    },
     users,
     sessions,
     initialDiagnostic: {
@@ -891,7 +900,23 @@ describe("auth routes", () => {
   });
 
   it("completes Beginner path onboarding and exposes completion through /me", async () => {
-    const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
+    const app = await createApp({
+      config: baseConfig,
+      ...createMemoryDeps(verifiedIdentity, {
+        competencyId: "competency-1",
+        competencyKey: "en.synthetic.foundation.pre_a1",
+        score: 205,
+        readiness: 1,
+        foundationWeight: 100,
+        basePriority: 40,
+        goalFit: 0,
+        knowledgeGap: 1,
+        uncertainty: 1,
+        reviewNeed: 0,
+        recentRepetition: 0,
+        selectionReason: "beginner_pre_a1_foundation",
+      }),
+    });
     const login = await app.inject({ method: "GET", url: "/auth/login" });
     const state =
       login.cookies.find(
@@ -932,6 +957,10 @@ describe("auth routes", () => {
     expect(completed.json()).toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
+      initialLearningPriority: {
+        competencyId: "competency-1",
+        competencyKey: "en.synthetic.foundation.pre_a1",
+      },
     });
 
     const me = await app.inject({
@@ -1036,6 +1065,7 @@ describe("auth routes", () => {
     expect(completed.json()).toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
+      initialLearningPriority: null,
     });
   });
 

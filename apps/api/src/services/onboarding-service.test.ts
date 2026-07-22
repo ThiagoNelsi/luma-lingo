@@ -13,6 +13,20 @@ describe("OnboardingService", () => {
       onboardingStatus: "completed" as const,
       onboardingStep: null,
     }));
+    const findInitialLearningPriority = vi.fn(async () => ({
+      competencyId: "competency-1",
+      competencyKey: "en.synthetic.foundation.pre_a1",
+      score: 205,
+      readiness: 1,
+      foundationWeight: 100,
+      basePriority: 40,
+      goalFit: 0,
+      knowledgeGap: 1,
+      uncertainty: 1,
+      reviewNeed: 0,
+      recentRepetition: 0,
+      selectionReason: "beginner_pre_a1_foundation" as const,
+    }));
     const service = new OnboardingService(
       learners,
       {
@@ -22,6 +36,7 @@ describe("OnboardingService", () => {
       {
         findCompletedAttempt: vi.fn(),
       } as unknown as DiagnosticAttemptRepository,
+      { findInitialLearningPriority },
     );
 
     await expect(
@@ -33,10 +48,28 @@ describe("OnboardingService", () => {
     ).resolves.toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
+      initialLearningPriority: {
+        competencyId: "competency-1",
+        competencyKey: "en.synthetic.foundation.pre_a1",
+        score: 205,
+        readiness: 1,
+        foundationWeight: 100,
+        basePriority: 40,
+        goalFit: 0,
+        knowledgeGap: 1,
+        uncertainty: 1,
+        reviewNeed: 0,
+        recentRepetition: 0,
+        selectionReason: "beginner_pre_a1_foundation",
+      },
     });
     expect(completeBeginnerOnboarding).toHaveBeenCalledWith({
       learningTrackId: "track-1",
       targetLanguage: "en",
+    });
+    expect(findInitialLearningPriority).toHaveBeenCalledWith({
+      learningTrackId: "track-1",
+      onboardingStartingPoint: "beginner",
     });
   });
 
@@ -99,6 +132,7 @@ describe("OnboardingService", () => {
     ).resolves.toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
+      initialLearningPriority: null,
     });
     expect(completeDiagnosticOnboarding).toHaveBeenCalledWith({
       learningTrackId: "track-1",

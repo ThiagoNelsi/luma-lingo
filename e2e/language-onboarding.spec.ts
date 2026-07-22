@@ -105,7 +105,17 @@ test("learner resumes onboarding and completes the diagnostic path", async ({
   await expect(
     page.getByRole("button", { name: "Synthetic option C" }),
   ).toBeVisible();
+  const completionResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiOrigin}/me/onboarding/complete` &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Synthetic option C" }).click();
+  await expect((await completionResponse).json()).resolves.toMatchObject({
+    initialLearningPriority: {
+      competencyId: "synthetic-competency-1",
+    },
+  });
   await expect(page).toHaveURL(/\/private$/);
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/private$/);
@@ -120,7 +130,17 @@ test("learner completes onboarding directly through the beginner path", async ({
 
   await page.goto("/onboarding/starting-point");
   await page.getByLabel("Começar do zero").check();
+  const completionResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiOrigin}/me/onboarding/complete` &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect((await completionResponse).json()).resolves.toMatchObject({
+    initialLearningPriority: {
+      competencyId: "synthetic-competency-1",
+    },
+  });
   await expect(page).toHaveURL(/\/private$/);
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/private$/);

@@ -14,6 +14,7 @@ describe("Onboarding completion client", () => {
         JSON.stringify({
           onboardingStatus: "completed",
           onboardingStep: null,
+          initialLearningPriority: null,
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       ),
@@ -24,6 +25,7 @@ describe("Onboarding completion client", () => {
       {
         onboardingStatus: "completed",
         onboardingStep: null,
+        initialLearningPriority: null,
       },
     );
     expect(fetchMock).toHaveBeenCalledWith(

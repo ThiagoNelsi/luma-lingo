@@ -12,6 +12,7 @@ import {
   type CompleteOnboardingInput,
 } from "../learners/onboarding-completion.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
+import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
 
 const initialDiagnosticPurpose = "onboarding_initial";
 
@@ -20,6 +21,7 @@ export class OnboardingService {
     private readonly learners: LearnerRepository,
     private readonly completion: OnboardingCompletionRepository,
     private readonly diagnosticAttempts: DiagnosticAttemptRepository,
+    private readonly initialLearningPriorities: InitialLearningPriorityRepository = noInitialLearningPriorityRepository,
   ) {}
 
   saveLanguageSelection(learnerId: string, selection: LanguageSelection) {
@@ -61,7 +63,7 @@ export class OnboardingService {
         throw new Error("published_competency_catalog_required");
       }
 
-      return completion;
+      return this.withInitialLearningPriority(completion, parsedInput);
     }
 
     const completedAttempt = await this.diagnosticAttempts.findCompletedAttempt(
@@ -73,9 +75,33 @@ export class OnboardingService {
       throw new Error("completed_initial_diagnostic_required");
     }
 
-    return this.completion.completeDiagnosticOnboarding({
+    const completion = await this.completion.completeDiagnosticOnboarding({
       learningTrackId: parsedInput.learningTrackId,
       competencyCatalogId: completedAttempt.catalogId,
     });
+
+    return this.withInitialLearningPriority(completion, parsedInput);
+  }
+
+  private async withInitialLearningPriority(
+    completion: Awaited<
+      ReturnType<OnboardingCompletionRepository["completeDiagnosticOnboarding"]>
+    >,
+    input: CompleteOnboardingInput,
+  ) {
+    return {
+      ...completion,
+      initialLearningPriority:
+        await this.initialLearningPriorities.findInitialLearningPriority({
+          learningTrackId: input.learningTrackId,
+          onboardingStartingPoint: input.onboardingStartingPoint!,
+        }),
+    };
   }
 }
+
+const noInitialLearningPriorityRepository: InitialLearningPriorityRepository = {
+  async findInitialLearningPriority() {
+    return null;
+  },
+};

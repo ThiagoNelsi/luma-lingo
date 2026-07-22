@@ -1,4 +1,5 @@
 import type { Goal, PedagogicalRankingConfig } from "@luma-lingo/shared";
+import { z } from "zod";
 
 import {
   evaluateActivityReadiness,
@@ -40,23 +41,27 @@ export type InitialLearningPriorityPolicy = {
   ranking?: PedagogicalRankingConfig;
 };
 
-export type InitialLearningPriority = {
-  competencyId: string;
-  competencyKey: string;
-  score: number;
-  readiness: number;
-  foundationWeight: number;
-  basePriority: number;
-  goalFit: number;
-  knowledgeGap: number;
-  uncertainty: number;
-  reviewNeed: number;
-  recentRepetition: number;
-  selectionReason:
-    | "beginner_pre_a1_foundation"
-    | "beginner_a1_fallback"
-    | "diagnostic_ranking";
-};
+export const initialLearningPrioritySchema = z.object({
+  competencyId: z.string(),
+  competencyKey: z.string(),
+  score: z.number(),
+  readiness: z.number().min(0).max(1),
+  foundationWeight: z.number().int().min(0).max(100),
+  basePriority: z.number().int().min(0).max(100),
+  goalFit: z.number().min(0).max(100),
+  knowledgeGap: z.number().min(0).max(1),
+  uncertainty: z.number().min(0).max(1),
+  reviewNeed: z.number().min(0).max(1),
+  recentRepetition: z.number().int().min(0).max(1),
+  selectionReason: z.enum([
+    "beginner_pre_a1_foundation",
+    "beginner_a1_fallback",
+    "diagnostic_ranking",
+  ]),
+});
+export type InitialLearningPriority = z.infer<
+  typeof initialLearningPrioritySchema
+>;
 
 type PriorityCompetency = {
   id: string;

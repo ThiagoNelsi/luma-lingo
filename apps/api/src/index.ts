@@ -13,6 +13,7 @@ import {
 import { ProfileIntroductionService } from "./profile/profile-introduction-service.js";
 import { PrismaDiagnosticAttemptRepository } from "./repositories/prisma-diagnostic-attempt-repository.js";
 import { PrismaDiagnosticQuestionBankRepository } from "./repositories/prisma-diagnostic-question-bank-repository.js";
+import { PrismaInitialLearningPriorityRepository } from "./repositories/prisma-initial-learning-priority-repository.js";
 import { PrismaProfileIntroductionRepository } from "./repositories/prisma-profile-introduction-repository.js";
 import { PrismaOnboardingCompletionRepository } from "./repositories/prisma-onboarding-completion-repository.js";
 import { PrismaSessionRepository } from "./repositories/prisma-session-repository.js";
@@ -45,6 +46,9 @@ const app = await createApp({
   learners: new PrismaLearnerRepository(prisma),
   onboardingCompletion: new PrismaOnboardingCompletionRepository(prisma),
   diagnosticAttempts: diagnosticAttemptRepository,
+  initialLearningPriorities: new PrismaInitialLearningPriorityRepository(
+    prisma,
+  ),
   users: new PrismaUserRepository(prisma),
   sessions: new PrismaSessionRepository(prisma),
   initialDiagnostic: new InitialDiagnosticRuntimeService({

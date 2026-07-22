@@ -5,6 +5,12 @@ import { normalizeApiOrigin } from "../config/api-origin.js";
 export const onboardingCompletionResultSchema = z.object({
   onboardingStatus: z.literal("completed"),
   onboardingStep: z.null(),
+  initialLearningPriority: z
+    .object({
+      competencyId: z.string(),
+      competencyKey: z.string(),
+    })
+    .nullable(),
 });
 export type OnboardingCompletionResult = z.infer<
   typeof onboardingCompletionResultSchema

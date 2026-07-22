@@ -11,11 +11,12 @@ import type { AppConfig } from "../../config.js";
 import { ageAndGoalsProgressSchema } from "../../learners/age-and-goals-progress.js";
 import { languageSelectionProgressSchema } from "../../learners/language-selection-progress.js";
 import { lessonPreferencesProgressSchema } from "../../learners/lesson-preferences-progress.js";
-import { onboardingCompletionSchema } from "../../learners/onboarding-completion.js";
 import { onboardingStartingPointProgressSchema } from "../../learners/onboarding-starting-point-progress.js";
 import { AuthService } from "../../services/auth-service.js";
 import { OnboardingService } from "../../services/onboarding-service.js";
 import { errorDtoSchema } from "../dtos/error-dto.js";
+import { onboardingCompletionDtoSchema } from "../dtos/onboarding-completion-dto.js";
+import { toOnboardingCompletionDto } from "../dtos/onboarding-completion-dto-mapper.js";
 import { isTrustedOrigin } from "../trusted-origin.js";
 
 export interface OnboardingRoutesDependencies {
@@ -164,7 +165,7 @@ export function registerOnboardingRoutes(
         tags: ["Learner"],
         summary: "Complete onboarding for the current Learning track",
         response: {
-          200: onboardingCompletionSchema,
+          200: onboardingCompletionDtoSchema,
           401: errorDtoSchema,
           403: errorDtoSchema,
           409: errorDtoSchema,
@@ -187,11 +188,15 @@ export function registerOnboardingRoutes(
       }
 
       try {
-        return await deps.onboarding.completeOnboarding({
+        const result = await deps.onboarding.completeOnboarding({
           learningTrackId: session.currentLearningTrack.id,
           targetLanguage: session.currentLearningTrack.targetLanguage,
           onboardingStartingPoint:
             session.currentLearningTrack.onboardingStartingPoint,
+        });
+        return toOnboardingCompletionDto({
+          completion: result,
+          initialLearningPriority: result.initialLearningPriority,
         });
       } catch (error) {
         if (error instanceof Error && isCompleteOnboardingConflict(error)) {

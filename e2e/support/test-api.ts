@@ -204,6 +204,30 @@ const onboardingCompletion: OnboardingCompletionRepository = {
   },
 };
 
+const initialLearningPriorities = {
+  async findInitialLearningPriority(input: {
+    onboardingStartingPoint: "beginner" | "diagnostic";
+  }) {
+    return {
+      competencyId: "synthetic-competency-1",
+      competencyKey: "en.synthetic.foundation.pre_a1",
+      score: 205,
+      readiness: 1,
+      foundationWeight: 100,
+      basePriority: 40,
+      goalFit: 0,
+      knowledgeGap: 1,
+      uncertainty: 1,
+      reviewNeed: 0,
+      recentRepetition: 0,
+      selectionReason:
+        input.onboardingStartingPoint === "beginner"
+          ? ("beginner_pre_a1_foundation" as const)
+          : ("diagnostic_ranking" as const),
+    };
+  },
+};
+
 const diagnosticAttempts: DiagnosticAttemptRepository = {
   async findInProgressAttempt() {
     return null;
@@ -457,6 +481,7 @@ const app = await createApp({
   learners,
   onboardingCompletion,
   diagnosticAttempts,
+  initialLearningPriorities,
   sessions: sessionRepository,
   users,
   profileIntroduction,
