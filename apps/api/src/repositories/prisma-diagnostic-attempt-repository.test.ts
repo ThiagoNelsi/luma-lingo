@@ -452,6 +452,11 @@ describe("PrismaDiagnosticAttemptRepository", () => {
             diagnosticItem: {
               include: {
                 conceptEvidenceMappings: true,
+                primaryCompetency: {
+                  include: {
+                    conceptRelationships: true,
+                  },
+                },
               },
             },
           },
@@ -550,6 +555,110 @@ describe("PrismaDiagnosticAttemptRepository", () => {
         mastery: 0.95,
         confidence: 0.8,
         directEvidenceCount: { increment: 1 },
+      }),
+    });
+  });
+
+  it("records weaker inferred evidence for assumed concepts after a strong direct response", async () => {
+    const completedAt = new Date("2026-06-27T12:12:00.000Z");
+    const answeredAt = new Date("2026-06-27T12:10:12.000Z");
+    const completedAttempt = {
+      id: "attempt-1",
+      learningTrackId: "track-1",
+      catalogId: "catalog-1",
+      purpose: "onboarding_initial",
+      status: "completed",
+      selectionPolicyVersion: "initial-diagnostic-selection-v1",
+      scoringPolicyVersion: "initial-diagnostic-scoring-v1",
+      startedAt: new Date("2026-06-27T12:00:00.000Z"),
+      completedAt,
+      abandonedAt: null,
+      summary: {},
+      details: {},
+      items: [
+        {
+          id: "attempt-item-1",
+          diagnosticItemId: "item-1",
+          score: 1,
+          confidence: 0.8,
+          answeredAt,
+          details: {
+            responseKind: "multiple_choice",
+          },
+          diagnosticItem: {
+            primaryCompetencyId: "competency-observed",
+            conceptEvidenceMappings: [],
+            primaryCompetency: {
+              conceptRelationships: [
+                {
+                  conceptId: "concept-assumed",
+                  role: "assumed",
+                  requiredCapability: "recognition",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    };
+    const tx = {
+      diagnosticAttempt: {
+        update: vi.fn(async () => completedAttempt),
+      },
+      competencyEvidence: {
+        createMany: vi.fn(async () => ({ count: 1 })),
+      },
+      learnerCompetencyState: {
+        upsert: vi.fn(async () => ({})),
+      },
+      conceptEvidence: {
+        createMany: vi.fn(async () => ({ count: 1 })),
+      },
+      learnerConceptState: {
+        upsert: vi.fn(async () => ({})),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const repository = new PrismaDiagnosticAttemptRepository(prisma as never);
+
+    await repository.completeAttempt({
+      attemptId: "attempt-1",
+      completedAt,
+      summary: {},
+    });
+
+    expect(tx.conceptEvidence.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          conceptId: "concept-assumed",
+          capability: "recognition",
+          evidenceKind: "inferred",
+          score: 0.8,
+          confidence: 0.6,
+          strength: 50,
+        }),
+      ],
+    });
+    expect(tx.learnerConceptState.upsert).toHaveBeenCalledWith({
+      where: {
+        learningTrackId_conceptId_capability: {
+          learningTrackId: "track-1",
+          conceptId: "concept-assumed",
+          capability: "recognition",
+        },
+      },
+      create: expect.objectContaining({
+        mastery: 0.8,
+        confidence: 0.6,
+        directEvidenceCount: 0,
+        inferredEvidenceCount: 1,
+      }),
+      update: expect.objectContaining({
+        inferredEvidenceCount: { increment: 1 },
       }),
     });
   });

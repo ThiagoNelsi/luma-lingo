@@ -1,4 +1,5 @@
 import { createId, type Prisma, type PrismaClient } from "@luma-lingo/database";
+import { capabilityValues } from "@luma-lingo/shared";
 
 import type {
   AnswerDiagnosticAttemptItemInput,
@@ -16,6 +17,10 @@ import {
   learnerCompetencyStateDetailsSchemaVersion,
 } from "../diagnostics/diagnostic-attempt.js";
 import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
+import {
+  inferAssumedConceptEvidence,
+  knowledgeInferencePolicyVersion,
+} from "../learning/knowledge-inference.js";
 
 type DiagnosticAttemptRow = {
   id: string;
@@ -62,6 +67,13 @@ type CompletedAttemptItemRow = {
       capability: string;
       strength: number;
     }>;
+    primaryCompetency: {
+      conceptRelationships: Array<{
+        conceptId: string;
+        role: string;
+        requiredCapability: string | null;
+      }>;
+    } | null;
   };
 };
 
@@ -290,6 +302,11 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
               diagnosticItem: {
                 include: {
                   conceptEvidenceMappings: true,
+                  primaryCompetency: {
+                    include: {
+                      conceptRelationships: true,
+                    },
+                  },
                 },
               },
             },
@@ -353,9 +370,43 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
       for (const evidence of conceptEvidenceRows) {
         const stateDetails = {
           schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
-          lastUpdateReason: evidence.sourceType,
+          lastUpdateReason:
+            evidence.evidenceKind === "direct"
+              ? evidence.sourceType
+              : knowledgeInferencePolicyVersion,
           scoringPolicyVersion: attempt.scoringPolicyVersion,
         };
+        if (evidence.evidenceKind === "inferred") {
+          await tx.learnerConceptState.upsert({
+            where: {
+              learningTrackId_conceptId_capability: {
+                learningTrackId: evidence.learningTrackId,
+                conceptId: evidence.conceptId,
+                capability: evidence.capability,
+              },
+            },
+            create: {
+              id: createId(),
+              learningTrackId: evidence.learningTrackId,
+              conceptId: evidence.conceptId,
+              capability: evidence.capability,
+              mastery: evidence.score,
+              confidence: evidence.confidence,
+              directEvidenceCount: 0,
+              inferredEvidenceCount: 1,
+              lastEvidenceAt: evidence.observedAt,
+              details: stateDetails,
+            },
+            update: {
+              inferredEvidenceCount: {
+                increment: 1,
+              },
+              lastEvidenceAt: evidence.observedAt,
+              details: stateDetails,
+            },
+          });
+          continue;
+        }
         await tx.learnerConceptState.upsert({
           where: {
             learningTrackId_conceptId_capability: {
@@ -420,8 +471,10 @@ function buildCompetencyEvidenceRows(attempt: CompletedAttemptRow) {
 }
 
 function buildConceptEvidenceRows(attempt: CompletedAttemptRow) {
-  return attempt.items.filter(isPublishableAttemptItem).flatMap((item) =>
-    (item.diagnosticItem.conceptEvidenceMappings ?? []).map((mapping) => ({
+  return attempt.items.filter(isPublishableAttemptItem).flatMap((item) => {
+    const directEvidenceRows = (
+      item.diagnosticItem.conceptEvidenceMappings ?? []
+    ).map((mapping) => ({
       id: createId(),
       learningTrackId: attempt.learningTrackId,
       conceptId: mapping.conceptId,
@@ -439,8 +492,60 @@ function buildConceptEvidenceRows(attempt: CompletedAttemptRow) {
         diagnosticItemId: item.diagnosticItemId,
         scoringPolicyVersion: attempt.scoringPolicyVersion,
       },
-    })),
-  );
+    }));
+    const assumedRequirements = (
+      item.diagnosticItem.primaryCompetency?.conceptRelationships ?? []
+    ).flatMap((relationship) => {
+      if (
+        relationship.role !== "assumed" ||
+        !isCapability(relationship.requiredCapability)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          conceptId: relationship.conceptId,
+          requiredCapability: relationship.requiredCapability,
+        },
+      ];
+    });
+    const itemDetails = toObject(item.details);
+    const inferredEvidenceRows = inferAssumedConceptEvidence({
+      directEvidence: {
+        conceptId: item.diagnosticItem.primaryCompetencyId ?? "integrated",
+        capability: "independent_use",
+        score: item.score,
+        confidence: item.confidence,
+        isExplicitUnknown: itemDetails.responseKind === "dont_know",
+        hasExactResponse:
+          itemDetails.responseKind !== "word_bank_sequence" ||
+          itemDetails.matchedAcceptedTokenSequence === true,
+      },
+      assumedRequirements,
+    }).map((evidence) => ({
+      id: createId(),
+      learningTrackId: attempt.learningTrackId,
+      conceptId: evidence.conceptId,
+      capability: evidence.capability,
+      evidenceKind: evidence.evidenceKind,
+      sourceType: "initial_diagnostic",
+      sourceId: item.id,
+      observedAt: item.answeredAt,
+      score: evidence.score,
+      confidence: evidence.confidence,
+      strength: 50,
+      details: {
+        schemaVersion: diagnosticEvidenceDetailsSchemaVersion,
+        attemptId: attempt.id,
+        diagnosticItemId: item.diagnosticItemId,
+        scoringPolicyVersion: attempt.scoringPolicyVersion,
+        inferencePolicyVersion: knowledgeInferencePolicyVersion,
+      },
+    }));
+
+    return [...directEvidenceRows, ...inferredEvidenceRows];
+  });
 }
 
 type PublishableAttemptItemRow = CompletedAttemptItemRow & {
@@ -455,4 +560,10 @@ function isPublishableAttemptItem(
   return (
     item.score !== null && item.confidence !== null && item.answeredAt !== null
   );
+}
+
+function isCapability(
+  value: string | null,
+): value is (typeof capabilityValues)[number] {
+  return capabilityValues.includes(value as (typeof capabilityValues)[number]);
 }
