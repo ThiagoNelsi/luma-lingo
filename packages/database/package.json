@@ -15,6 +15,7 @@
     "db:generate": "prisma generate",
     "db:import:concepts": "dotenv -e ../../.env -- tsx scripts/import-concept-registry.ts",
     "db:import:competencies": "dotenv -e ../../.env -- tsx scripts/import-competency-catalog.ts",
+    "db:import:policy": "dotenv -e ../../.env -- tsx scripts/import-pedagogical-policy.ts",
     "db:verify:authorial-catalog": "dotenv -e ../../.env -- tsx scripts/verify-authorial-catalog.ts",
     "db:import:diagnostic-questions": "dotenv -e ../../.env -- tsx scripts/import-diagnostic-question-bank.ts",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",

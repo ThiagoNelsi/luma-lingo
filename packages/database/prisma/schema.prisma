@@ -152,6 +152,7 @@ model CompetencyCatalog {
   competencies       Competency[]
   diagnosticItems    DiagnosticItem[]
   diagnosticAttempts DiagnosticAttempt[]
+  pedagogicalPolicies PedagogicalPolicy[]
 
   @@unique([targetLanguage, version])
   @@index([targetLanguage, status])
@@ -177,6 +178,8 @@ model Competency {
   primaryDiagnosticItems   DiagnosticItem[]         @relation("PrimaryDiagnosticCompetency")
   learnerStates            LearnerCompetencyState[]
   evidence                 CompetencyEvidence[]
+  pedagogicalWeights       PedagogicalCompetencyWeight[]
+  pedagogicalGoalWeights   PedagogicalCompetencyGoalWeight[]
 
   @@unique([catalogId, key])
   @@index([catalogId, family])
@@ -204,6 +207,7 @@ model Concept {
   diagnosticEvidenceMappings DiagnosticItemConceptEvidenceMapping[]
   learnerStates              LearnerConceptState[]
   evidence                   ConceptEvidence[]
+  pedagogicalGoalWeights    PedagogicalConceptGoalWeight[]
 
   @@unique([targetLanguage, key])
   @@index([targetLanguage, status])
@@ -225,6 +229,64 @@ model CompetencyConcept {
   @@index([conceptId, role])
   @@index([role, requiredCapability])
   @@map("competency_concepts")
+}
+
+model PedagogicalPolicy {
+  id                     String                              @id @db.Uuid
+  catalogId              String                              @map("catalog_id") @db.Uuid
+  sourcePolicyId         String                              @map("source_policy_id")
+  version                String
+  sourceChecksum         String                              @map("source_checksum")
+  metadata               Json                                @default("{}")
+  createdAt              DateTime                            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                CompetencyCatalog                   @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  competencyWeights      PedagogicalCompetencyWeight[]
+  competencyGoalWeights  PedagogicalCompetencyGoalWeight[]
+  conceptGoalWeights     PedagogicalConceptGoalWeight[]
+
+  @@unique([catalogId, version])
+  @@index([catalogId])
+  @@map("pedagogical_policies")
+}
+
+model PedagogicalCompetencyWeight {
+  policyId         String            @map("policy_id") @db.Uuid
+  competencyId     String            @map("competency_id") @db.Uuid
+  basePriority     Int?              @map("base_priority")
+  foundationWeight Int?              @map("foundation_weight")
+  policy           PedagogicalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  competency       Competency        @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+
+  @@id([policyId, competencyId])
+  @@index([competencyId])
+  @@map("pedagogical_competency_weights")
+}
+
+model PedagogicalCompetencyGoalWeight {
+  policyId     String            @map("policy_id") @db.Uuid
+  competencyId String            @map("competency_id") @db.Uuid
+  goal         String
+  weight       Int
+  policy       PedagogicalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  competency   Competency        @relation(fields: [competencyId], references: [id], onDelete: Restrict)
+
+  @@id([policyId, competencyId, goal])
+  @@index([competencyId, goal])
+  @@map("pedagogical_competency_goal_weights")
+}
+
+model PedagogicalConceptGoalWeight {
+  policyId  String            @map("policy_id") @db.Uuid
+  conceptId String            @map("concept_id") @db.Uuid
+  goal      String
+  weight    Int
+  policy    PedagogicalPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  concept   Concept           @relation(fields: [conceptId], references: [id], onDelete: Restrict)
+
+  @@id([policyId, conceptId, goal])
+  @@index([conceptId, goal])
+  @@map("pedagogical_concept_goal_weights")
 }
 
 model DiagnosticItem {
