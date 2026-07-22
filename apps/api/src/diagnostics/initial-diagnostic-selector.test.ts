@@ -153,6 +153,164 @@ describe("selectNextInitialDiagnosticItem", () => {
     expect(selection?.selectedForRole).toBe("foundation");
   });
 
+  it("prefers a question that directly observes more unknown component evidence", () => {
+    const isolatedItem = buildQuestionBankItem({
+      id: "item-isolated",
+      key: "en.diag.a1.aaa-isolated.001",
+      primaryCompetencyId: "competency-isolated",
+      primaryCompetencyKey: "en.a1.isolated",
+      family: "grammar",
+      mode: "reading",
+      evidenceMappings: [
+        {
+          conceptId: "concept-isolated",
+          conceptKey: "form.synthetic.isolated",
+          capability: "recognition",
+          strength: 100,
+        },
+      ],
+    });
+    const componentHubItem = buildQuestionBankItem({
+      id: "item-component-hub",
+      key: "en.diag.a1.zzz-component-hub.001",
+      primaryCompetencyId: "competency-component-hub",
+      primaryCompetencyKey: "en.a1.component-hub",
+      family: "grammar",
+      mode: "reading",
+      evidenceMappings: [
+        {
+          conceptId: "concept-form",
+          conceptKey: "form.synthetic.be_present",
+          capability: "recognition",
+          strength: 100,
+        },
+        {
+          conceptId: "concept-meaning",
+          conceptKey: "meaning.synthetic.be_present",
+          capability: "recognition",
+          strength: 100,
+        },
+        {
+          conceptId: "concept-use",
+          conceptKey: "function.synthetic.be_present",
+          capability: "controlled_production",
+          strength: 100,
+        },
+      ],
+    });
+
+    const selection = selectNextInitialDiagnosticItem({
+      questionBank: buildQuestionBank([isolatedItem, componentHubItem]),
+      attemptItems: [],
+      policy: initialDiagnosticSelectionPolicy,
+      goals: [],
+    });
+
+    expect(selection?.item.id).toBe(componentHubItem.id);
+  });
+
+  it("devalues direct concept evidence already observed at the same capability", () => {
+    const answeredItem = buildQuestionBankItem({
+      id: "item-answered",
+      key: "en.diag.a1.answered.001",
+      primaryCompetencyId: "competency-answered",
+      primaryCompetencyKey: "en.a1.answered",
+      family: "grammar",
+      mode: "reading",
+      evidenceMappings: [
+        {
+          conceptId: "concept-covered",
+          conceptKey: "form.synthetic.covered",
+          capability: "recognition",
+          strength: 100,
+        },
+      ],
+    });
+    const coveredCandidate = buildQuestionBankItem({
+      id: "item-covered",
+      key: "en.diag.a1.aaa-covered.001",
+      primaryCompetencyId: "competency-covered",
+      primaryCompetencyKey: "en.a1.covered",
+      family: "grammar",
+      mode: "reading",
+      evidenceMappings: answeredItem.evidenceMappings,
+    });
+    const novelCandidate = buildQuestionBankItem({
+      id: "item-novel",
+      key: "en.diag.a1.zzz-novel.001",
+      primaryCompetencyId: "competency-novel",
+      primaryCompetencyKey: "en.a1.novel",
+      family: "grammar",
+      mode: "reading",
+      evidenceMappings: [
+        {
+          conceptId: "concept-novel",
+          conceptKey: "form.synthetic.novel",
+          capability: "recognition",
+          strength: 100,
+        },
+      ],
+    });
+
+    const selection = selectNextInitialDiagnosticItem({
+      questionBank: buildQuestionBank([
+        answeredItem,
+        coveredCandidate,
+        novelCandidate,
+      ]),
+      attemptItems: buildAttemptItemsFor([answeredItem]),
+      policy: initialDiagnosticSelectionPolicy,
+      goals: [],
+    });
+
+    expect(selection?.item.id).toBe(novelCandidate.id);
+  });
+
+  it("gives a larger inferred-information bonus to higher assumed capabilities", () => {
+    const recognitionAssumptionItem = buildQuestionBankItem({
+      id: "item-recognition-assumption",
+      key: "en.diag.a1.aaa-recognition-assumption.001",
+      primaryCompetencyId: "competency-recognition-assumption",
+      primaryCompetencyKey: "en.a1.recognition-assumption",
+      family: "grammar",
+      mode: "reading",
+      assumedConcepts: [
+        {
+          conceptId: "concept-assumed-recognition",
+          conceptKey: "form.synthetic.assumed_recognition",
+          requiredCapability: "recognition",
+        },
+      ],
+    });
+    const independentUseAssumptionItem = buildQuestionBankItem({
+      id: "item-independent-use-assumption",
+      key: "en.diag.a1.zzz-independent-use-assumption.001",
+      primaryCompetencyId: "competency-independent-use-assumption",
+      primaryCompetencyKey: "en.a1.independent-use-assumption",
+      family: "grammar",
+      mode: "reading",
+      assumedConcepts: [
+        {
+          conceptId: "concept-assumed-independent-use",
+          conceptKey: "form.synthetic.assumed_independent_use",
+          requiredCapability: "independent_use",
+        },
+      ],
+    });
+
+    const selection = selectNextInitialDiagnosticItem({
+      questionBank: buildQuestionBank([
+        recognitionAssumptionItem,
+        independentUseAssumptionItem,
+      ]),
+      attemptItems: [],
+      policy: initialDiagnosticSelectionPolicy,
+      goals: [],
+    });
+
+    expect(selection?.item.id).toBe(independentUseAssumptionItem.id);
+  });
+
   it("does not advance from Pre-A1 before reaching the Pre-A1 success balance", () => {
     const answeredPreA1Item = buildQuestionBankItem({
       id: "item-pre-a1-answered",
@@ -398,7 +556,7 @@ describe("selectNextInitialDiagnosticItem", () => {
     expect(selection).toBeNull();
   });
 
-  it("prefers higher-band items with unknown prerequisite coverage over already-covered prerequisites", () => {
+  it("prefers higher-band items with unknown direct concept coverage", () => {
     const knownPrerequisiteItem = buildQuestionBankItem({
       id: "item-known-prerequisite",
       key: "en.diag.a1.known-prerequisite.001",
@@ -407,6 +565,14 @@ describe("selectNextInitialDiagnosticItem", () => {
       family: "grammar",
       mode: "reading",
       difficultyBand: "A1",
+      evidenceMappings: [
+        {
+          conceptId: "concept-covered",
+          conceptKey: "form.synthetic.covered",
+          capability: "recognition",
+          strength: 100,
+        },
+      ],
     });
     const a1ProgressItemA = buildQuestionBankItem({
       id: "item-a1-progress-a",
@@ -434,11 +600,12 @@ describe("selectNextInitialDiagnosticItem", () => {
       family: "grammar",
       mode: "reading",
       difficultyBand: "A2",
-      prerequisites: [
+      evidenceMappings: [
         {
-          competencyId: "competency-1",
-          competencyKey: "en.a1.known-prerequisite",
-          strength: 90,
+          conceptId: "concept-covered",
+          conceptKey: "form.synthetic.covered",
+          capability: "recognition",
+          strength: 100,
         },
       ],
     });
@@ -450,11 +617,12 @@ describe("selectNextInitialDiagnosticItem", () => {
       family: "grammar",
       mode: "reading",
       difficultyBand: "A2",
-      prerequisites: [
+      evidenceMappings: [
         {
-          competencyId: "competency-4",
-          competencyKey: "en.a1.unknown-prerequisite",
-          strength: 90,
+          conceptId: "concept-unknown",
+          conceptKey: "form.synthetic.unknown",
+          capability: "recognition",
+          strength: 100,
         },
       ],
     });
@@ -1547,16 +1715,18 @@ describe("selectNextInitialDiagnosticItem", () => {
       primaryCompetencyKey: "en.a1.high-impact",
       family: "grammar",
       mode: "reading",
-      prerequisites: [
+      evidenceMappings: [
         {
-          competencyId: "prerequisite-1",
-          competencyKey: "en.pre-a1.prerequisite-1",
-          strength: 90,
+          conceptId: "concept-high-impact-form",
+          conceptKey: "form.synthetic.high_impact",
+          capability: "recognition",
+          strength: 100,
         },
         {
-          competencyId: "prerequisite-2",
-          competencyKey: "en.pre-a1.prerequisite-2",
-          strength: 90,
+          conceptId: "concept-high-impact-function",
+          conceptKey: "function.synthetic.high_impact",
+          capability: "controlled_production",
+          strength: 100,
         },
       ],
     });
@@ -2610,6 +2780,25 @@ function buildQuestionBankItem(input: {
     strength: number | null;
   }>;
   goalPriorities?: Array<{ goal: string; priority: number }>;
+  assumedConcepts?: Array<{
+    conceptId: string;
+    conceptKey: string;
+    requiredCapability:
+      | "recognition"
+      | "controlled_production"
+      | "contextualized_use"
+      | "independent_use";
+  }>;
+  evidenceMappings?: Array<{
+    conceptId: string;
+    conceptKey: string;
+    capability:
+      | "recognition"
+      | "controlled_production"
+      | "contextualized_use"
+      | "independent_use";
+    strength: number;
+  }>;
 }): DiagnosticQuestionBankItem {
   return {
     id: input.id,
@@ -2628,6 +2817,7 @@ function buildQuestionBankItem(input: {
       isCore: true,
       prerequisites: input.prerequisites ?? [],
       goalPriorities: input.goalPriorities ?? [],
+      assumedConcepts: input.assumedConcepts ?? [],
     },
     difficultyBand: input.difficultyBand ?? "A1",
     responseFormat: "multiple_choice",
@@ -2673,7 +2863,7 @@ function buildQuestionBankItem(input: {
         details: { schemaVersion: 1 },
       },
     ],
-    evidenceMappings: [],
+    evidenceMappings: input.evidenceMappings ?? [],
   };
 }
 

@@ -53,6 +53,15 @@ export type DiagnosticQuestionBankGoalPriority = z.infer<
   typeof diagnosticQuestionBankGoalPrioritySchema
 >;
 
+export const diagnosticQuestionBankAssumedConceptSchema = z.object({
+  conceptId: z.string(),
+  conceptKey: z.string(),
+  requiredCapability: z.enum(capabilityValues),
+});
+export type DiagnosticQuestionBankAssumedConcept = z.infer<
+  typeof diagnosticQuestionBankAssumedConceptSchema
+>;
+
 export const diagnosticQuestionBankCompetencySchema = z.object({
   id: z.string(),
   key: z.string(),
@@ -62,6 +71,9 @@ export const diagnosticQuestionBankCompetencySchema = z.object({
   isCore: z.boolean(),
   prerequisites: z.array(diagnosticQuestionBankPrerequisiteSchema).default([]),
   goalPriorities: z.array(diagnosticQuestionBankGoalPrioritySchema).default([]),
+  assumedConcepts: z
+    .array(diagnosticQuestionBankAssumedConceptSchema)
+    .default([]),
 });
 export type DiagnosticQuestionBankCompetency = z.infer<
   typeof diagnosticQuestionBankCompetencySchema

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const initialDiagnosticSelectionPolicyVersion =
-  "initial-diagnostic-selection-v1";
+  "initial-diagnostic-selection-v2";
 export const initialDiagnosticScoringPolicyVersion =
   "initial-diagnostic-scoring-v1";
 
@@ -16,6 +16,15 @@ export const initialDiagnosticPolicyConfigSchema = z.object({
   strongCorrectMinScore: z.number().min(0).max(1),
   strongCorrectMinConfidence: z.number().min(0).max(1),
   requireExactWordBankSequenceForSpread: z.boolean(),
+  directConceptEvidenceWeight: z.number().positive(),
+  coveredConceptEvidenceMultiplier: z.number().min(0).max(1),
+  assumedConceptEvidenceMultiplier: z.number().min(0).max(1),
+  assumedCapabilityMultipliers: z.object({
+    recognition: z.number().positive(),
+    controlled_production: z.number().positive(),
+    contextualized_use: z.number().positive(),
+    independent_use: z.number().positive(),
+  }),
   levelAdvanceThresholds: z.object({
     "Pre-A1": z.number().int().positive(),
     A1: z.number().int().positive(),
@@ -39,6 +48,15 @@ export const defaultInitialDiagnosticPolicyConfig = {
   strongCorrectMinScore: 0.9,
   strongCorrectMinConfidence: 0.7,
   requireExactWordBankSequenceForSpread: true,
+  directConceptEvidenceWeight: 12,
+  coveredConceptEvidenceMultiplier: 0.2,
+  assumedConceptEvidenceMultiplier: 0.3,
+  assumedCapabilityMultipliers: {
+    recognition: 0.8,
+    controlled_production: 1,
+    contextualized_use: 1.1,
+    independent_use: 1.2,
+  },
   levelAdvanceThresholds: {
     "Pre-A1": 2,
     A1: 3,

@@ -1,5 +1,31 @@
 # Future Improvements
 
+## 2026-07-22
+
+### Weak Correlated-Component Priors During Onboarding
+
+- **Deferred:** Let strong direct evidence for one component concept create a
+  low-confidence prior for explicitly correlated sibling components. For
+  example, evidence for an affirmative present-simple form could weakly inform
+  the selection of probes for related negative and question forms. Correlations
+  should be directional and authorially declared rather than inferred from
+  shared competency membership alone.
+- **Current scope boundary:** Issue #33 infers weaker positive evidence only for
+  assumed concepts and preserves unknown component states during mastery and
+  readiness calculations. Automatically spreading evidence across components
+  would exceed that issue and could erase meaningful variation between sibling
+  forms that the concept model is intended to preserve.
+- **Future value:** A weak correlated prior could make a short onboarding
+  diagnostic more efficient by choosing better confirmation or repair probes,
+  avoiding unnecessarily basic questions, and improving initial ranking while
+  still treating unobserved components as unknown for readiness.
+- **Revisit when:** The catalog can express explicit directional correlation
+  metadata and deterministic simulations can calibrate conservative weights,
+  initially around `0.10` to `0.25`. Define separate provenance such as
+  `component_correlation`, keep confidence below the known-state threshold, and
+  verify that correlated priors never satisfy conjunctive activity requirements
+  without stronger evidence.
+
 ## 2026-07-20
 
 ### Support Competencies In Diagnostic Evidence Mappings

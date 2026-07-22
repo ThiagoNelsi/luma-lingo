@@ -50,7 +50,7 @@ describe("InitialDiagnosticRuntimeService", () => {
     expect(attempts.attempts[0]?.details).toEqual({
       schemaVersion: 1,
       selectionPolicy: {
-        version: "initial-diagnostic-selection-v1",
+        version: "initial-diagnostic-selection-v2",
         config: defaultInitialDiagnosticPolicyConfig,
       },
       scoringPolicy: {
@@ -547,6 +547,7 @@ function buildQuestionBankItem(
       isCore: true,
       prerequisites: [],
       goalPriorities: [{ goal: "travel", priority: 60 }],
+      assumedConcepts: [],
     },
     difficultyBand: "A1",
     responseFormat: "multiple_choice",

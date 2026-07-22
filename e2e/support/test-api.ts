@@ -40,6 +40,7 @@ const config: AppConfig = {
 
 let profile: AuthProfile | null = null;
 let completedDiagnosticAttempt: DiagnosticAttempt | null = null;
+let answeredDiagnosticItemCount = 0;
 const sessions = new Map<string, SessionRecord>();
 
 const authProvider: AuthProvider = {
@@ -232,6 +233,46 @@ const diagnosticAttempts: DiagnosticAttemptRepository = {
 
 const initialDiagnostic = {
   async startInitialDiagnostic() {
+    if (completedDiagnosticAttempt) {
+      return {
+        attempt: {
+          id: completedDiagnosticAttempt.id,
+          status: "completed" as const,
+          summary: completedDiagnosticAttempt.summary,
+        },
+        item: null,
+      };
+    }
+
+    if (answeredDiagnosticItemCount === 1) {
+      return {
+        attempt: {
+          id: "attempt-1",
+          status: "in_progress" as const,
+        },
+        item: {
+          attemptItemId: "attempt-item-2",
+          position: 2,
+          diagnosticItemId: "item-2",
+          key: "synthetic.diag.item-2",
+          responseFormat: "multiple_choice" as const,
+          prompt: {
+            schemaVersion: 1 as const,
+            kind: "multiple_choice" as const,
+            instructionLocalizations: {
+              pt: "Escolha a melhor resposta.",
+            },
+            contentLanguage: "en" as const,
+            stem: "Synthetic prompt two.",
+            options: [
+              { id: "option_c", text: "Synthetic option C" },
+              { id: "option_d", text: "Synthetic option D" },
+            ],
+          },
+        },
+      };
+    }
+
     return {
       attempt: {
         id: "attempt-1",
@@ -241,7 +282,7 @@ const initialDiagnostic = {
         attemptItemId: "attempt-item-1",
         position: 1,
         diagnosticItemId: "item-1",
-        key: "en.diag.pre-a1.subject-pronouns.001",
+        key: "synthetic.diag.item-1",
         responseFormat: "multiple_choice" as const,
         prompt: {
           schemaVersion: 1 as const,
@@ -250,16 +291,46 @@ const initialDiagnostic = {
             pt: "Escolha a melhor resposta.",
           },
           contentLanguage: "en" as const,
-          stem: "Maria is a teacher. ___ is from Brazil.",
+          stem: "Synthetic prompt one.",
           options: [
-            { id: "option_she", text: "She" },
-            { id: "option_he", text: "He" },
+            { id: "option_a", text: "Synthetic option A" },
+            { id: "option_b", text: "Synthetic option B" },
           ],
         },
       },
     };
   },
   async answerInitialDiagnosticItem(input: { learningTrackId: string }) {
+    answeredDiagnosticItemCount += 1;
+    if (answeredDiagnosticItemCount === 1) {
+      return {
+        attempt: {
+          id: "attempt-1",
+          status: "in_progress" as const,
+        },
+        item: {
+          attemptItemId: "attempt-item-2",
+          position: 2,
+          diagnosticItemId: "item-2",
+          key: "synthetic.diag.item-2",
+          responseFormat: "multiple_choice" as const,
+          prompt: {
+            schemaVersion: 1 as const,
+            kind: "multiple_choice" as const,
+            instructionLocalizations: {
+              pt: "Escolha a melhor resposta.",
+            },
+            contentLanguage: "en" as const,
+            stem: "Synthetic prompt two.",
+            options: [
+              { id: "option_c", text: "Synthetic option C" },
+              { id: "option_d", text: "Synthetic option D" },
+            ],
+          },
+        },
+      };
+    }
+
     completedDiagnosticAttempt = {
       id: "attempt-1",
       learningTrackId: input.learningTrackId,
@@ -397,6 +468,64 @@ app.get("/test-auth/authorize", async (request, reply) => {
   return reply.redirect(
     `${config.authCallbackUrl}?code=e2e-code&state=${encodeURIComponent(state)}`,
   );
+});
+
+app.post("/test-control/reset", async (_request, reply) => {
+  profile = null;
+  completedDiagnosticAttempt = null;
+  answeredDiagnosticItemCount = 0;
+  profileIntroductionStatus = "not_started";
+  sessions.clear();
+  return reply.code(204).send();
+});
+
+app.post("/test-control/seed", async (request, reply) => {
+  if (!profile) {
+    return reply.code(409).send({ error: "authenticated_profile_required" });
+  }
+
+  const { state } = request.body as { state?: string };
+  if (
+    state !== "starting-point" &&
+    state !== "profile-introduction" &&
+    state !== "profile-introduction-under-13"
+  ) {
+    return reply.code(400).send({ error: "unsupported_seed_state" });
+  }
+
+  const learningTrackId = profile.currentLearningTrack?.id ?? randomUUID();
+  const introductionStep =
+    state === "profile-introduction" ||
+    state === "profile-introduction-under-13";
+
+  profile = {
+    ...profile,
+    learner: {
+      ...profile.learner,
+      instructionLanguage: "pt",
+      ageRange:
+        state === "profile-introduction-under-13" ? "under_13" : "25_39",
+      currentLearningTrackId: learningTrackId,
+    },
+    currentLearningTrack: {
+      id: learningTrackId,
+      targetLanguage: "en",
+      level: null,
+      learningGoal: "travel",
+      goalCefrLevel: null,
+      additionalGoals: [],
+      lessonEmphases: introductionStep ? [] : ["reading"],
+      studyPace: null,
+      onboardingStartingPoint: null,
+      onboardingStatus: "in_progress",
+      onboardingStep: introductionStep ? "age_and_goals" : "lesson_preferences",
+    },
+  };
+  completedDiagnosticAttempt = null;
+  answeredDiagnosticItemCount = 0;
+  profileIntroductionStatus = introductionStep ? "not_started" : "completed";
+
+  return reply.code(204).send();
 });
 
 await app.listen({ host: "127.0.0.1", port: 3100 });

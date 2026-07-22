@@ -35,6 +35,14 @@ type DiagnosticQuestionBankItemRow = {
     key: string;
     family: string;
     difficultyBand: string | null;
+    conceptRelationships: Array<{
+      conceptId: string;
+      requiredCapability: string | null;
+      concept: {
+        id: string;
+        key: string;
+      };
+    }>;
   } | null;
   primaryConcept: {
     id: string;
@@ -92,6 +100,26 @@ export class PrismaDiagnosticQuestionBankRepository implements DiagnosticQuestio
                 key: true,
                 family: true,
                 difficultyBand: true,
+                conceptRelationships: {
+                  where: {
+                    role: "assumed",
+                  },
+                  orderBy: {
+                    concept: {
+                      key: "asc",
+                    },
+                  },
+                  select: {
+                    conceptId: true,
+                    requiredCapability: true,
+                    concept: {
+                      select: {
+                        id: true,
+                        key: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             primaryConcept: {
@@ -157,6 +185,18 @@ function toDiagnosticQuestionBankItem(row: DiagnosticQuestionBankItemRow) {
           isCore: false,
           prerequisites: [],
           goalPriorities: [],
+          assumedConcepts: row.primaryCompetency.conceptRelationships.flatMap(
+            (relationship) =>
+              relationship.requiredCapability
+                ? [
+                    {
+                      conceptId: relationship.conceptId,
+                      conceptKey: relationship.concept.key,
+                      requiredCapability: relationship.requiredCapability,
+                    },
+                  ]
+                : [],
+          ),
         }
       : undefined,
     difficultyBand: row.difficultyBand,

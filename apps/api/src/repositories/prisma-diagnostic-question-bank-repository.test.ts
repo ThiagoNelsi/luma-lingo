@@ -55,6 +55,13 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
             isCore: false,
             prerequisites: [],
             goalPriorities: [],
+            assumedConcepts: [
+              {
+                conceptId: "concept-assumed-1",
+                conceptKey: "form.synthetic.subject_pronoun",
+                requiredCapability: "recognition",
+              },
+            ],
           },
           evidenceMappings: [
             {
@@ -113,6 +120,26 @@ describe("PrismaDiagnosticQuestionBankRepository", () => {
                 key: true,
                 family: true,
                 difficultyBand: true,
+                conceptRelationships: {
+                  where: {
+                    role: "assumed",
+                  },
+                  orderBy: {
+                    concept: {
+                      key: "asc",
+                    },
+                  },
+                  select: {
+                    conceptId: true,
+                    requiredCapability: true,
+                    concept: {
+                      select: {
+                        id: true,
+                        key: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             primaryConcept: {
@@ -280,6 +307,19 @@ function buildDiagnosticItemRow(input: {
               {
                 goal: "travel",
                 priority: 70,
+              },
+            ]
+          : [],
+      conceptRelationships:
+        input.primaryCompetencyId === "competency-2"
+          ? [
+              {
+                conceptId: "concept-assumed-1",
+                requiredCapability: "recognition",
+                concept: {
+                  id: "concept-assumed-1",
+                  key: "form.synthetic.subject_pronoun",
+                },
               },
             ]
           : [],

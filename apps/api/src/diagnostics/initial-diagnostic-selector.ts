@@ -21,6 +21,7 @@ type SelectionPhase = "exploration" | "final_validation";
 type CandidateScore = {
   total: number;
   baseScore: number;
+  informationGainScore: number;
   levelFitScore: number;
   roleFitScore: number;
   difficultyFitScore: number;
@@ -62,7 +63,7 @@ export function selectNextInitialDiagnosticItem(input: {
       (item) => item.selectedForRole === "repair",
     ),
   });
-  const coveredCompetencyIds = findCoveredCompetencyIds({
+  const coveredConceptCapabilityKeys = findCoveredConceptCapabilityKeys({
     questionBank: input.questionBank,
     attemptItems: answeredItems,
   });
@@ -82,7 +83,7 @@ export function selectNextInitialDiagnosticItem(input: {
     primaryTargetCounts,
     repairSelectionCount,
     repairTargetCounts,
-    coveredCompetencyIds,
+    coveredConceptCapabilityKeys,
     attemptContext,
     policy: input.policy,
     goals: input.goals,
@@ -110,6 +111,7 @@ export function selectNextInitialDiagnosticItem(input: {
       selectedScore: selected.score.total,
       selectedScoreBreakdown: {
         baseScore: selected.score.baseScore,
+        informationGainScore: selected.score.informationGainScore,
         levelFitScore: selected.score.levelFitScore,
         roleFitScore: selected.score.roleFitScore,
         difficultyFitScore: selected.score.difficultyFitScore,
@@ -200,7 +202,7 @@ type SelectCandidateInput = {
   primaryTargetCounts: Map<string, number>;
   repairSelectionCount: number;
   repairTargetCounts: Map<string, number>;
-  coveredCompetencyIds: Set<string>;
+  coveredConceptCapabilityKeys: Set<string>;
   attemptContext: AttemptSelectionContext;
   policy: InitialDiagnosticSelectionPolicy;
   goals: string[];
@@ -272,8 +274,9 @@ function selectHighestScoringCandidate(
       const score = scoreCandidate({
         item,
         primaryTargetCounts: input.primaryTargetCounts,
-        coveredCompetencyIds: input.coveredCompetencyIds,
+        coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
         attemptContext: input.attemptContext,
+        policy: input.policy,
         goals: input.goals,
         phase: input.phase,
         allowedRoles: input.allowedRoles,
@@ -356,8 +359,9 @@ function canSelectRepairCandidate(input: {
 function scoreCandidate(input: {
   item: DiagnosticQuestionBankItem;
   primaryTargetCounts: Map<string, number>;
-  coveredCompetencyIds: Set<string>;
+  coveredConceptCapabilityKeys: Set<string>;
   attemptContext: AttemptSelectionContext;
+  policy: InitialDiagnosticSelectionPolicy;
   goals: string[];
   phase: SelectionPhase;
   allowedRoles?: Set<DiagnosticQuestionRole>;
@@ -366,15 +370,11 @@ function scoreCandidate(input: {
     input.primaryTargetCounts.get(primaryTargetId(input.item)) ?? 0;
   const directNewCompetencyValue = repeatedPrimaryCount === 0 ? 100 : 0;
   const repeatedCompetencyPenalty = repeatedPrimaryCount * 40;
-  const prerequisites = input.item.primaryCompetency?.prerequisites ?? [];
-  const unknownPrerequisiteCount = prerequisites.filter(
-    (prerequisite) =>
-      !input.coveredCompetencyIds.has(prerequisite.competencyId),
-  ).length;
-  const coveredPrerequisiteCount =
-    prerequisites.length - unknownPrerequisiteCount;
-  const inferredPrerequisiteCoverageValue = unknownPrerequisiteCount * 12;
-  const alreadyCoveredPrerequisiteOverlapPenalty = coveredPrerequisiteCount * 6;
+  const informationGainScore = scoreConceptInformationGain({
+    item: input.item,
+    coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
+    policy: input.policy,
+  });
   const familyModeDiversityBonus =
     (input.item.primaryCompetency?.family &&
     !input.attemptContext.observedFamilies.has(
@@ -411,8 +411,7 @@ function scoreCandidate(input: {
 
   const baseScore =
     directNewCompetencyValue +
-    inferredPrerequisiteCoverageValue -
-    alreadyCoveredPrerequisiteOverlapPenalty -
+    informationGainScore -
     repeatedCompetencyPenalty +
     familyModeDiversityBonus +
     goalPriorityBonus;
@@ -420,6 +419,7 @@ function scoreCandidate(input: {
   return {
     total: baseScore + levelFitScore + roleFit.score + difficultyFitScore,
     baseScore,
+    informationGainScore,
     levelFitScore,
     roleFitScore: roleFit.score,
     difficultyFitScore,
@@ -659,25 +659,86 @@ function countPrimaryTargetAttempts(input: {
   return counts;
 }
 
-function findCoveredCompetencyIds(input: {
+function findCoveredConceptCapabilityKeys(input: {
   questionBank: DiagnosticQuestionBank;
   attemptItems: DiagnosticAttemptItem[];
 }): Set<string> {
   const itemsById = new Map(
     input.questionBank.items.map((item) => [item.id, item]),
   );
-  const coveredCompetencyIds = new Set<string>();
+  const coveredConceptCapabilityKeys = new Set<string>();
 
   for (const attemptItem of input.attemptItems) {
     const item = itemsById.get(attemptItem.diagnosticItemId);
     if (!item) continue;
 
-    if (item.primaryCompetencyId) {
-      coveredCompetencyIds.add(item.primaryCompetencyId);
+    for (const mapping of item.evidenceMappings) {
+      coveredConceptCapabilityKeys.add(conceptCapabilityKey(mapping));
     }
   }
 
-  return coveredCompetencyIds;
+  return coveredConceptCapabilityKeys;
+}
+
+function scoreConceptInformationGain(input: {
+  item: DiagnosticQuestionBankItem;
+  coveredConceptCapabilityKeys: Set<string>;
+  policy: InitialDiagnosticSelectionPolicy;
+}): number {
+  const directEvidenceScore = input.item.evidenceMappings.reduce(
+    (total, mapping) =>
+      total +
+      input.policy.config.directConceptEvidenceWeight *
+        (mapping.strength / 100) *
+        coverageMultiplier({
+          conceptCapabilityKey: conceptCapabilityKey(mapping),
+          coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
+          policy: input.policy,
+        }),
+    0,
+  );
+  const assumedConceptScore = (
+    input.item.primaryCompetency?.assumedConcepts ?? []
+  ).reduce((total, assumedConcept) => {
+    const capabilityMultiplier =
+      input.policy.config.assumedCapabilityMultipliers[
+        assumedConcept.requiredCapability
+      ];
+
+    return (
+      total +
+      input.policy.config.directConceptEvidenceWeight *
+        input.policy.config.assumedConceptEvidenceMultiplier *
+        capabilityMultiplier *
+        coverageMultiplier({
+          conceptCapabilityKey: conceptCapabilityKey({
+            conceptId: assumedConcept.conceptId,
+            capability: assumedConcept.requiredCapability,
+          }),
+          coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
+          policy: input.policy,
+        })
+    );
+  }, 0);
+
+  return directEvidenceScore + assumedConceptScore;
+}
+
+function coverageMultiplier(input: {
+  conceptCapabilityKey: string;
+  coveredConceptCapabilityKeys: Set<string>;
+  policy: InitialDiagnosticSelectionPolicy;
+}): number {
+  return input.coveredConceptCapabilityKeys.has(input.conceptCapabilityKey)
+    ? input.policy.config.coveredConceptEvidenceMultiplier
+    : 1;
+}
+
+function conceptCapabilityKey(input: {
+  conceptId: string;
+  capability: string;
+}): string {
+  return `${input.conceptId}:${input.capability}`;
 }
 
 type AttemptSelectionContext = {
@@ -893,6 +954,8 @@ function findMissedTargetsByRepairPriority(
       item,
       targetLevel: input.attemptContext.targetLevel,
       goals: input.goals,
+      coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
+      policy: input.policy,
     });
     const targetId = primaryTargetId(item);
     const current = missedTargets.get(targetId);
@@ -917,9 +980,14 @@ function missedCompetencyImpactScore(input: {
   item: DiagnosticQuestionBankItem;
   targetLevel: DiagnosticLevel;
   goals: string[];
+  coveredConceptCapabilityKeys: Set<string>;
+  policy: InitialDiagnosticSelectionPolicy;
 }): number {
-  const prerequisiteScore =
-    (input.item.primaryCompetency?.prerequisites.length ?? 0) * 20;
+  const informationGainScore = scoreConceptInformationGain({
+    item: input.item,
+    coveredConceptCapabilityKeys: input.coveredConceptCapabilityKeys,
+    policy: input.policy,
+  });
   const coreScore = input.item.primaryCompetency?.isCore ? 10 : 0;
   const levelDistance = Math.abs(
     compareDifficultyBands(input.item.difficultyBand, input.targetLevel),
@@ -931,7 +999,7 @@ function missedCompetencyImpactScore(input: {
       goals: input.goals,
     }) * 0.1;
 
-  return prerequisiteScore + coreScore + levelScore + goalScore;
+  return informationGainScore + coreScore + levelScore + goalScore;
 }
 
 function toDiagnosticLevel(difficultyBand: string): DiagnosticLevel {
