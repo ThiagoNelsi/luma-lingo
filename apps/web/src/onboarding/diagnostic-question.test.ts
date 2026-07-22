@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createDontKnowDiagnosticResponse,
   getDiagnosticInstruction,
+  getWordBankResetKey,
+  shuffleWordBankTokens,
   splitFillBlankText,
 } from "./diagnostic-question.js";
 
@@ -62,5 +64,56 @@ describe("diagnostic question helpers", () => {
       schemaVersion: 1,
       kind: "dont_know",
     });
+  });
+
+  it("shuffles word-bank tokens without changing the authored token order", () => {
+    const tokens = [
+      { id: "token_i", text: "I" },
+      { id: "token_study", text: "study" },
+      { id: "token_engineering", text: "engineering" },
+    ];
+
+    expect(shuffleWordBankTokens(tokens, () => 0)).toEqual([
+      { id: "token_study", text: "study" },
+      { id: "token_engineering", text: "engineering" },
+      { id: "token_i", text: "I" },
+    ]);
+    expect(tokens).toEqual([
+      { id: "token_i", text: "I" },
+      { id: "token_study", text: "study" },
+      { id: "token_engineering", text: "engineering" },
+    ]);
+  });
+
+  it("does not leave a multi-token word bank in its authored order", () => {
+    const tokens = ["first", "second"];
+
+    expect(shuffleWordBankTokens(tokens, () => 0.99)).toEqual([
+      "second",
+      "first",
+    ]);
+  });
+
+  it("changes the word-bank reset key when a token label changes", () => {
+    const prompt = {
+      schemaVersion: 1 as const,
+      kind: "word_bank_sequence" as const,
+      instructionLocalizations: { en: "Arrange the words." },
+      contentLanguage: "en" as const,
+      tokens: [
+        { id: "token_i", text: "I" },
+        { id: "token_am", text: "am" },
+      ],
+    };
+
+    expect(getWordBankResetKey(prompt)).not.toBe(
+      getWordBankResetKey({
+        ...prompt,
+        tokens: [
+          { id: "token_i", text: "I" },
+          { id: "token_am", text: "are" },
+        ],
+      }),
+    );
   });
 });

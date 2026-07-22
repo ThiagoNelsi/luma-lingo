@@ -60,6 +60,33 @@ export function createDontKnowDiagnosticResponse(): DiagnosticQuestionResponse {
   };
 }
 
+export function shuffleWordBankTokens<T>(
+  tokens: readonly T[],
+  random: () => number = Math.random,
+): T[] {
+  const shuffledTokens = [...tokens];
+
+  for (let index = shuffledTokens.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffledTokens[index], shuffledTokens[swapIndex]] = [
+      shuffledTokens[swapIndex]!,
+      shuffledTokens[index]!,
+    ];
+  }
+
+  if (
+    shuffledTokens.length > 1 &&
+    shuffledTokens.every((token, index) => token === tokens[index])
+  ) {
+    [shuffledTokens[0], shuffledTokens[1]] = [
+      shuffledTokens[1]!,
+      shuffledTokens[0]!,
+    ];
+  }
+
+  return shuffledTokens;
+}
+
 export function DiagnosticQuestionPanel({
   disabled = false,
   instructionLanguage,
@@ -268,13 +295,18 @@ function WordBankSequenceQuestion({
     () => new Map(prompt.tokens.map((token) => [token.id, token])),
     [prompt.tokens],
   );
-  const availableTokens = prompt.tokens.filter(
+  const tokenOrderKey = getWordBankResetKey(prompt);
+  const displayedTokens = useMemo(
+    () => shuffleWordBankTokens(prompt.tokens),
+    [tokenOrderKey],
+  );
+  const availableTokens = displayedTokens.filter(
     (token) => !selectedTokenIds.includes(token.id),
   );
 
   useEffect(() => {
     setSelectedTokenIds(initialSelectedTokenIds);
-  }, [itemResetKey(prompt), selectedResponse]);
+  }, [selectedResponse, tokenOrderKey]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -368,8 +400,8 @@ function DontKnowButton({
   );
 }
 
-function itemResetKey(
+export function getWordBankResetKey(
   prompt: Extract<DiagnosticQuestionPrompt, { kind: "word_bank_sequence" }>,
 ): string {
-  return prompt.tokens.map((token) => token.id).join("|");
+  return prompt.tokens.map((token) => `${token.id}:${token.text}`).join("|");
 }
