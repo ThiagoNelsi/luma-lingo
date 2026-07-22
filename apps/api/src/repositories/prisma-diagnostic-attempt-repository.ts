@@ -14,13 +14,14 @@ import {
   diagnosticAttemptStatusSchema,
   diagnosticEvidenceDetailsSchemaVersion,
   diagnosticJsonObjectSchema,
-  learnerCompetencyStateDetailsSchemaVersion,
 } from "../diagnostics/diagnostic-attempt.js";
 import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
 import {
   inferAssumedConceptEvidence,
   knowledgeInferencePolicyVersion,
 } from "../learning/knowledge-inference.js";
+import { buildLearnerStateBatch } from "../learning/learner-state-batch.js";
+import { writeLearnerStateBatch } from "./prisma-learner-state-batch-writer.js";
 
 type DiagnosticAttemptRow = {
   id: string;
@@ -275,172 +276,79 @@ export class PrismaDiagnosticAttemptRepository implements DiagnosticAttemptRepos
   async completeAttempt(
     input: CompleteDiagnosticAttemptInput & { completedAt: Date },
   ): Promise<DiagnosticAttempt> {
-    const completedAttempt = await this.prisma.$transaction(async (tx) => {
-      const attempt = await tx.diagnosticAttempt.update({
-        where: {
-          id: input.attemptId,
-        },
-        data: {
-          status: "completed",
-          completedAt: input.completedAt,
-          summary: toInputJsonObject(input.summary),
-        },
-        include: {
-          items: {
-            where: {
-              answeredAt: {
-                not: null,
+    const completedAttempt = await this.prisma.$transaction(
+      async (tx) => {
+        const attempt = await tx.diagnosticAttempt.update({
+          where: {
+            id: input.attemptId,
+          },
+          data: {
+            status: "completed",
+            completedAt: input.completedAt,
+            summary: toInputJsonObject(input.summary),
+          },
+          include: {
+            items: {
+              orderBy: {
+                position: "asc",
               },
-              score: {
-                not: null,
+              where: {
+                answeredAt: {
+                  not: null,
+                },
+                score: {
+                  not: null,
+                },
+                confidence: {
+                  not: null,
+                },
               },
-              confidence: {
-                not: null,
-              },
-            },
-            include: {
-              diagnosticItem: {
-                include: {
-                  conceptEvidenceMappings: true,
-                  primaryCompetency: {
-                    include: {
-                      conceptRelationships: true,
+              include: {
+                diagnosticItem: {
+                  include: {
+                    conceptEvidenceMappings: true,
+                    primaryCompetency: {
+                      include: {
+                        conceptRelationships: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-      });
-      const competencyEvidenceRows = buildCompetencyEvidenceRows(
-        attempt as unknown as CompletedAttemptRow,
-      );
-      const conceptEvidenceRows = buildConceptEvidenceRows(
-        attempt as unknown as CompletedAttemptRow,
-      );
-
-      if (competencyEvidenceRows.length > 0) {
-        await tx.competencyEvidence.createMany({
-          data: competencyEvidenceRows,
         });
-      }
+        const competencyEvidenceRows = buildCompetencyEvidenceRows(
+          attempt as unknown as CompletedAttemptRow,
+        );
+        const conceptEvidenceRows = buildConceptEvidenceRows(
+          attempt as unknown as CompletedAttemptRow,
+        );
 
-      if (conceptEvidenceRows.length > 0) {
-        await tx.conceptEvidence.createMany({
-          data: conceptEvidenceRows,
-        });
-      }
-
-      for (const evidence of competencyEvidenceRows) {
-        const stateDetails = {
-          schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
-          lastUpdateReason: evidence.sourceType,
-          scoringPolicyVersion: attempt.scoringPolicyVersion,
-        };
-        await tx.learnerCompetencyState.upsert({
-          where: {
-            learningTrackId_competencyId: {
-              learningTrackId: evidence.learningTrackId,
-              competencyId: evidence.competencyId,
-            },
-          },
-          create: {
-            id: createId(),
-            learningTrackId: evidence.learningTrackId,
-            competencyId: evidence.competencyId,
-            abilityEstimate: evidence.score,
-            confidence: evidence.confidence,
-            evidenceCount: 1,
-            lastEvidenceAt: evidence.observedAt,
-            details: stateDetails,
-          },
-          update: {
-            abilityEstimate: evidence.score,
-            confidence: evidence.confidence,
-            evidenceCount: {
-              increment: 1,
-            },
-            lastEvidenceAt: evidence.observedAt,
-            details: stateDetails,
-          },
-        });
-      }
-
-      for (const evidence of conceptEvidenceRows) {
-        const stateDetails = {
-          schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
-          lastUpdateReason:
-            evidence.evidenceKind === "direct"
-              ? evidence.sourceType
-              : knowledgeInferencePolicyVersion,
-          scoringPolicyVersion: attempt.scoringPolicyVersion,
-        };
-        if (evidence.evidenceKind === "inferred") {
-          await tx.learnerConceptState.upsert({
-            where: {
-              learningTrackId_conceptId_capability: {
-                learningTrackId: evidence.learningTrackId,
-                conceptId: evidence.conceptId,
-                capability: evidence.capability,
-              },
-            },
-            create: {
-              id: createId(),
-              learningTrackId: evidence.learningTrackId,
-              conceptId: evidence.conceptId,
-              capability: evidence.capability,
-              mastery: evidence.score,
-              confidence: evidence.confidence,
-              directEvidenceCount: 0,
-              inferredEvidenceCount: 1,
-              lastEvidenceAt: evidence.observedAt,
-              details: stateDetails,
-            },
-            update: {
-              inferredEvidenceCount: {
-                increment: 1,
-              },
-              lastEvidenceAt: evidence.observedAt,
-              details: stateDetails,
-            },
+        if (competencyEvidenceRows.length > 0) {
+          await tx.competencyEvidence.createMany({
+            data: competencyEvidenceRows,
           });
-          continue;
         }
-        await tx.learnerConceptState.upsert({
-          where: {
-            learningTrackId_conceptId_capability: {
-              learningTrackId: evidence.learningTrackId,
-              conceptId: evidence.conceptId,
-              capability: evidence.capability,
-            },
-          },
-          create: {
-            id: createId(),
-            learningTrackId: evidence.learningTrackId,
-            conceptId: evidence.conceptId,
-            capability: evidence.capability,
-            mastery: evidence.score,
-            confidence: evidence.confidence,
-            directEvidenceCount: 1,
-            inferredEvidenceCount: 0,
-            lastEvidenceAt: evidence.observedAt,
-            details: stateDetails,
-          },
-          update: {
-            mastery: evidence.score,
-            confidence: evidence.confidence,
-            directEvidenceCount: {
-              increment: 1,
-            },
-            lastEvidenceAt: evidence.observedAt,
-            details: stateDetails,
-          },
-        });
-      }
 
-      return attempt;
-    });
+        if (conceptEvidenceRows.length > 0) {
+          await tx.conceptEvidence.createMany({
+            data: conceptEvidenceRows,
+          });
+        }
+
+        const learnerStateBatch = buildLearnerStateBatch({
+          scoringPolicyVersion: attempt.scoringPolicyVersion,
+          competencyEvidence: competencyEvidenceRows,
+          conceptEvidence: conceptEvidenceRows,
+        });
+
+        await writeLearnerStateBatch(tx, learnerStateBatch);
+
+        return attempt;
+      },
+      { timeout: 15_000 },
+    );
 
     return toDiagnosticAttempt(completedAttempt);
   }

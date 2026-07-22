@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc --noEmit",
+    "benchmark:diagnostic-completion": "tsx --env-file=../../.env scripts/benchmark-diagnostic-completion.ts",
+    "check": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run"

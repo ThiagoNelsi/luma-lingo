@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-07-22",
+  "scenario": {
+    "databaseEndpoint": "Neon pooled",
+    "runCountPerImplementation": 5,
+    "itemCount": 16,
+    "competencyEvidenceCount": 16,
+    "conceptEvidenceCount": 49,
+    "deterministicItemOrder": "diagnostic_item.key ASC",
+    "transactionTimeoutMs": 15000
+  },
+  "sequential": {
+    "wallDurationMs": [11347, 10330.16, 10404.38, 10552, 10332.77],
+    "databaseDurationMs": [11212, 10223, 10290, 10441, 10222],
+    "sqlStatementCount": [71, 71, 72, 71, 71],
+    "medianWallDurationMs": 10404.38,
+    "medianDatabaseDurationMs": 10290
+  },
+  "batch": {
+    "wallDurationMs": [2296.37, 2478.26, 2589.13, 1628.52, 1489.03],
+    "databaseDurationMs": [2267, 2457, 2569, 1610, 1466],
+    "sqlStatementCount": [8, 8, 8, 8, 8],
+    "medianWallDurationMs": 2296.37,
+    "medianDatabaseDurationMs": 2267
+  },
+  "comparison": {
+    "wallDurationReductionPercent": 77.93,
+    "databaseDurationReductionPercent": 77.97,
+    "medianSpeedup": 4.53,
+    "typicalSqlStatementReductionPercent": 88.73,
+    "typicalSqlStatementCountBefore": 71,
+    "sqlStatementCountAfter": 8
+  },
+  "validation": {
+    "competencyStateCount": 6,
+    "competencyStateEvidenceCount": 16,
+    "conceptStateCount": 34,
+    "conceptStateEvidenceCount": 49,
+    "appendOnlyEvidenceHistoryPreserved": true,
+    "inferenceOnlyConflictPreservedDirectMastery": true
+  }
+}

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  diagnosticEvidenceDetailsSchemaVersion,
-  learnerCompetencyStateDetailsSchemaVersion,
-} from "../diagnostics/diagnostic-attempt.js";
+import { diagnosticEvidenceDetailsSchemaVersion } from "../diagnostics/diagnostic-attempt.js";
 import { PrismaDiagnosticAttemptRepository } from "./prisma-diagnostic-attempt-repository.js";
 
 describe("PrismaDiagnosticAttemptRepository", () => {
@@ -406,6 +403,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
       learnerConceptState: {
         upsert: vi.fn(async () => ({})),
       },
+      $executeRaw: vi.fn(async () => 1),
     };
     const prisma = {
       $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
@@ -426,6 +424,9 @@ describe("PrismaDiagnosticAttemptRepository", () => {
       completedAt,
       summary,
     });
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: 15_000,
+    });
     expect(tx.diagnosticAttempt.update).toHaveBeenCalledWith({
       where: {
         id: "attempt-1",
@@ -437,6 +438,9 @@ describe("PrismaDiagnosticAttemptRepository", () => {
       },
       include: {
         items: {
+          orderBy: {
+            position: "asc",
+          },
           where: {
             answeredAt: {
               not: null,
@@ -501,62 +505,9 @@ describe("PrismaDiagnosticAttemptRepository", () => {
         }),
       ],
     });
-    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledTimes(1);
-    expect(tx.learnerCompetencyState.upsert).toHaveBeenCalledWith({
-      where: {
-        learningTrackId_competencyId: {
-          learningTrackId: "track-1",
-          competencyId: "competency-1",
-        },
-      },
-      create: {
-        id: expect.any(String),
-        learningTrackId: "track-1",
-        competencyId: "competency-1",
-        abilityEstimate: 0.95,
-        confidence: 0.8,
-        evidenceCount: 1,
-        lastEvidenceAt: answeredAt,
-        details: {
-          schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
-          lastUpdateReason: "initial_diagnostic",
-          scoringPolicyVersion: "initial-diagnostic-scoring-v1",
-        },
-      },
-      update: {
-        abilityEstimate: 0.95,
-        confidence: 0.8,
-        evidenceCount: {
-          increment: 1,
-        },
-        lastEvidenceAt: answeredAt,
-        details: {
-          schemaVersion: learnerCompetencyStateDetailsSchemaVersion,
-          lastUpdateReason: "initial_diagnostic",
-          scoringPolicyVersion: "initial-diagnostic-scoring-v1",
-        },
-      },
-    });
-    expect(tx.learnerConceptState.upsert).toHaveBeenCalledWith({
-      where: {
-        learningTrackId_conceptId_capability: {
-          learningTrackId: "track-1",
-          conceptId: "concept-1",
-          capability: "recognition",
-        },
-      },
-      create: expect.objectContaining({
-        mastery: 0.95,
-        confidence: 0.8,
-        directEvidenceCount: 1,
-        inferredEvidenceCount: 0,
-      }),
-      update: expect.objectContaining({
-        mastery: 0.95,
-        confidence: 0.8,
-        directEvidenceCount: { increment: 1 },
-      }),
-    });
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(tx.learnerCompetencyState.upsert).not.toHaveBeenCalled();
+    expect(tx.learnerConceptState.upsert).not.toHaveBeenCalled();
   });
 
   it("records weaker inferred evidence for assumed concepts after a strong direct response", async () => {
@@ -617,6 +568,7 @@ describe("PrismaDiagnosticAttemptRepository", () => {
       learnerConceptState: {
         upsert: vi.fn(async () => ({})),
       },
+      $executeRaw: vi.fn(async () => 1),
     };
     const prisma = {
       $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
@@ -643,24 +595,8 @@ describe("PrismaDiagnosticAttemptRepository", () => {
         }),
       ],
     });
-    expect(tx.learnerConceptState.upsert).toHaveBeenCalledWith({
-      where: {
-        learningTrackId_conceptId_capability: {
-          learningTrackId: "track-1",
-          conceptId: "concept-assumed",
-          capability: "recognition",
-        },
-      },
-      create: expect.objectContaining({
-        mastery: 0.8,
-        confidence: 0.6,
-        directEvidenceCount: 0,
-        inferredEvidenceCount: 1,
-      }),
-      update: expect.objectContaining({
-        inferredEvidenceCount: { increment: 1 },
-      }),
-    });
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(tx.learnerConceptState.upsert).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -854,6 +790,7 @@ function buildCompletionHarness(completedAttempt: Record<string, unknown>) {
     learnerCompetencyState: {
       upsert: vi.fn(async () => ({})),
     },
+    $executeRaw: vi.fn(async () => 1),
   };
   const prisma = {
     $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>

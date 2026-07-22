@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { v7 as uuidv7 } from "uuid";
 
-export { PrismaClient };
-export type { Prisma } from "@prisma/client";
+export { Prisma, PrismaClient };
 
 export function createId(): string {
   return uuidv7();
