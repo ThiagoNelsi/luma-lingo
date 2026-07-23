@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { MeResponse } from "./auth/me.js";
 import { createLogoutAction, createLoginRedirect } from "./auth/auth-routes.js";
 import { normalizeApiOrigin, readApiOrigin } from "./config/api-origin.js";
 import { getInitialDiagnosticRedirect } from "./pages/initial-diagnostic-onboarding-page.js";
+import { getProfileReviewRedirect } from "./pages/profile-review-onboarding-page.js";
 import {
   getNextOnboardingRoute,
   renderPrivateRouteText,
@@ -88,11 +90,56 @@ describe("web routes", () => {
           lessonEmphases: ["reading"],
           studyPace: "relaxed",
           onboardingStartingPoint: "beginner",
+          onboardingStatus: "in_progress",
+          onboardingStep: "starting_point",
+        },
+      }),
+    ).toBe("/onboarding/profile-review");
+    expect(
+      getNextOnboardingRoute({
+        user: { primaryEmail: "learner@example.com" },
+        learner: {
+          displayName: "Thiago",
+          instructionLanguage: "pt",
+          ageRange: "25_39",
+        },
+        currentLearningTrack: {
+          targetLanguage: "en",
+          learningGoal: "travel",
+          additionalGoals: [],
+          lessonEmphases: ["reading"],
+          studyPace: "relaxed",
+          onboardingStartingPoint: "beginner",
           onboardingStatus: "completed",
           onboardingStep: "starting_point",
         },
       }),
     ).toBe("/private");
+  });
+
+  it("shows the final profile review only after the shared onboarding prerequisites", () => {
+    const me: MeResponse = {
+      user: { primaryEmail: "learner@example.com" },
+      learner: {
+        displayName: "Thiago",
+        instructionLanguage: "pt" as const,
+        ageRange: "25_39" as const,
+      },
+      currentLearningTrack: {
+        targetLanguage: "en",
+        learningGoal: "travel" as const,
+        additionalGoals: [],
+        lessonEmphases: ["reading" as const],
+        studyPace: "relaxed" as const,
+        onboardingStartingPoint: "beginner" as const,
+        onboardingStatus: "in_progress",
+        onboardingStep: "starting_point",
+      },
+    };
+    expect(getProfileReviewRedirect(me, "manual_required")).toBeNull();
+    expect(getProfileReviewRedirect(me, "not_started")).toBe(
+      "/onboarding/introduction",
+    );
   });
 
   it("redirects the Initial diagnostic page when onboarding prerequisites are missing", () => {

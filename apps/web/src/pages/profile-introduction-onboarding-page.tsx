@@ -11,6 +11,11 @@ import {
   Surface,
 } from "../design-system/components/index.js";
 import {
+  clearProfileIntroductionRecording,
+  getProfileIntroductionRecording,
+  saveProfileIntroductionRecording,
+} from "../onboarding/profile-introduction-recording.js";
+import {
   submitProfileIntroduction,
   UnauthorizedProfileIntroductionError,
   useManualProfileIntroduction,
@@ -30,9 +35,14 @@ export function ProfileIntroductionOnboardingPage({
   apiOrigin,
 }: ProfileIntroductionOnboardingPageProps) {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState<RecordingPhase>("idle");
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [audio, setAudio] = useState<Blob | null>(null);
+  const savedRecording = getProfileIntroductionRecording();
+  const [phase, setPhase] = useState<RecordingPhase>(
+    savedRecording ? "ready" : "idle",
+  );
+  const [elapsedMs, setElapsedMs] = useState(savedRecording?.durationMs ?? 0);
+  const [audio, setAudio] = useState<Blob | null>(
+    savedRecording?.audio ?? null,
+  );
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [instructionLanguage, setInstructionLanguage] = useState("");
   const [manualOnly, setManualOnly] = useState(false);
@@ -135,6 +145,7 @@ export function ProfileIntroductionOnboardingPage({
         stream.getTracks().forEach((track) => track.stop());
         setElapsedMs(duration);
         setAudio(blob);
+        saveProfileIntroductionRecording({ audio: blob, durationMs: duration });
         setPhase("ready");
       };
       startedAtRef.current = Date.now();
@@ -154,6 +165,7 @@ export function ProfileIntroductionOnboardingPage({
   }
 
   function recordAgain() {
+    clearProfileIntroductionRecording();
     setAudio(null);
     setElapsedMs(0);
     setPhase("idle");
@@ -164,6 +176,7 @@ export function ProfileIntroductionOnboardingPage({
     setPhase("submitting");
     setError(null);
     try {
+      saveProfileIntroductionRecording({ audio, durationMs: elapsedMs });
       await submitProfileIntroduction(apiOrigin, audio, elapsedMs);
       navigate("/onboarding/preferences");
     } catch (caught) {
@@ -181,6 +194,7 @@ export function ProfileIntroductionOnboardingPage({
   async function chooseManualFallback() {
     try {
       await useManualProfileIntroduction(apiOrigin);
+      clearProfileIntroductionRecording();
       navigate("/onboarding/preferences");
     } catch {
       setError("Não foi possível continuar agora. Tente novamente.");

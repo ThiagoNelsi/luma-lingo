@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import type {
   AgeAndGoalsSelection,
+  ConfirmedProfile,
+  ExtractedProfile,
+  ProfileIntroductionStatus,
   LanguageSelection,
   LessonPreferencesSelection,
   OnboardingStartingPointSelection,
@@ -407,34 +410,34 @@ function completeCurrentLearningTrack(learningTrackId: string) {
   };
 }
 
-let profileIntroductionStatus = "not_started" as
-  | "not_started"
-  | "pending"
-  | "processing"
-  | "completed"
-  | "failed"
-  | "manual_required";
+let profileIntroductionStatus: ProfileIntroductionStatus = "not_started";
+let profileIntroductionProfile: ExtractedProfile | null = null;
+let profileIntroductionConfirmed = false;
 const profileIntroductions: ProfileIntroductionRepository = {
   async get() {
     return {
       status: profileIntroductionStatus,
+      confirmed: profileIntroductionConfirmed,
       attempts: 0,
       errorCode: null,
-      profile: null,
+      profile: profileIntroductionProfile,
     };
   },
   async markPending() {
     profileIntroductionStatus = "pending";
     return {
       status: profileIntroductionStatus,
+      confirmed: false,
       attempts: 0,
       errorCode: null,
       profile: null,
     };
   },
   async markProcessing() {},
-  async markCompleted() {
+  async markCompleted(_learnerId, extractedProfile) {
     profileIntroductionStatus = "completed";
+    profileIntroductionConfirmed = false;
+    profileIntroductionProfile = extractedProfile;
   },
   async markFailed() {
     profileIntroductionStatus = "failed";
@@ -443,10 +446,16 @@ const profileIntroductions: ProfileIntroductionRepository = {
     profileIntroductionStatus = "manual_required";
     return {
       status: profileIntroductionStatus,
+      confirmed: false,
       attempts: 0,
       errorCode: null,
       profile: null,
     };
+  },
+  async confirmProfile(_learnerId, confirmedProfile: ConfirmedProfile) {
+    profileIntroductionStatus = "completed";
+    profileIntroductionConfirmed = true;
+    profileIntroductionProfile = confirmedProfile;
   },
   async failInterrupted() {
     return 0;
@@ -500,6 +509,8 @@ app.post("/test-control/reset", async (_request, reply) => {
   completedDiagnosticAttempt = null;
   answeredDiagnosticItemCount = 0;
   profileIntroductionStatus = "not_started";
+  profileIntroductionProfile = null;
+  profileIntroductionConfirmed = false;
   sessions.clear();
   return reply.code(204).send();
 });
@@ -513,7 +524,10 @@ app.post("/test-control/seed", async (request, reply) => {
   if (
     state !== "starting-point" &&
     state !== "profile-introduction" &&
-    state !== "profile-introduction-under-13"
+    state !== "profile-introduction-under-13" &&
+    state !== "profile-review-pending" &&
+    state !== "profile-review-failed" &&
+    state !== "profile-review-diagnostic"
   ) {
     return reply.code(400).send({ error: "unsupported_seed_state" });
   }
@@ -522,6 +536,10 @@ app.post("/test-control/seed", async (request, reply) => {
   const introductionStep =
     state === "profile-introduction" ||
     state === "profile-introduction-under-13";
+  const profileReviewStep =
+    state === "profile-review-pending" ||
+    state === "profile-review-failed" ||
+    state === "profile-review-diagnostic";
 
   profile = {
     ...profile,
@@ -541,15 +559,43 @@ app.post("/test-control/seed", async (request, reply) => {
       additionalGoals: [],
       lessonEmphases: introductionStep ? [] : ["reading"],
       studyPace: null,
-      onboardingStartingPoint: null,
+      onboardingStartingPoint:
+        state === "profile-review-diagnostic"
+          ? "diagnostic"
+          : profileReviewStep
+            ? "beginner"
+            : null,
       onboardingStatus: "in_progress",
-      onboardingStep: introductionStep ? "age_and_goals" : "lesson_preferences",
+      onboardingStep: introductionStep ? "age_and_goals" : "starting_point",
     },
   };
   completedDiagnosticAttempt = null;
   answeredDiagnosticItemCount = 0;
-  profileIntroductionStatus = introductionStep ? "not_started" : "completed";
+  profileIntroductionStatus = introductionStep
+    ? "not_started"
+    : state === "profile-review-pending"
+      ? "pending"
+      : state === "profile-review-failed"
+        ? "failed"
+        : state === "profile-review-diagnostic"
+          ? "completed"
+          : "completed";
+  profileIntroductionProfile = null;
+  profileIntroductionConfirmed = false;
 
+  return reply.code(204).send();
+});
+
+app.post("/test-control/profile-introduction", async (request, reply) => {
+  const { status, profile: nextProfile } = request.body as {
+    status?: ProfileIntroductionStatus;
+    profile?: ExtractedProfile;
+  };
+  if (!status) return reply.code(400).send({ error: "status_required" });
+
+  profileIntroductionStatus = status;
+  profileIntroductionProfile = nextProfile ?? null;
+  profileIntroductionConfirmed = false;
   return reply.code(204).send();
 });
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  confirmProfileIntroduction,
   getProfileIntroduction,
   submitProfileIntroduction,
   UnauthorizedProfileIntroductionError,
@@ -11,6 +12,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const progress = {
   status: "pending",
+  confirmed: false,
   attempts: 0,
   errorCode: null,
   profile: null,
@@ -52,6 +54,50 @@ describe("profile introduction client", () => {
       2,
       "http://localhost:3000/me/profile-introduction/manual",
       { method: "POST", credentials: "include" },
+    );
+  });
+
+  it("persists the learner-confirmed profile", async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ...progress,
+            status: "completed",
+            profile: {
+              jobOrField: "Professora",
+              interests: ["cinema"],
+              dailyRoutine: [],
+              studyContext: null,
+              other: [],
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    await confirmProfileIntroduction("http://localhost:3000", {
+      jobOrField: "Professora",
+      interests: ["cinema"],
+      dailyRoutine: [],
+      studyContext: null,
+      other: [],
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:3000/me/profile-introduction/confirm",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          jobOrField: "Professora",
+          interests: ["cinema"],
+          dailyRoutine: [],
+          studyContext: null,
+          other: [],
+        }),
+      }),
     );
   });
 

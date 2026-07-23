@@ -188,12 +188,15 @@ export function registerOnboardingRoutes(
       }
 
       try {
-        const result = await deps.onboarding.completeOnboarding({
-          learningTrackId: session.currentLearningTrack.id,
-          targetLanguage: session.currentLearningTrack.targetLanguage,
-          onboardingStartingPoint:
-            session.currentLearningTrack.onboardingStartingPoint,
-        });
+        const result = await deps.onboarding.completeOnboarding(
+          {
+            learningTrackId: session.currentLearningTrack.id,
+            targetLanguage: session.currentLearningTrack.targetLanguage,
+            onboardingStartingPoint:
+              session.currentLearningTrack.onboardingStartingPoint,
+          },
+          session.learner.id,
+        );
         return toOnboardingCompletionDto({
           completion: result,
           initialLearningPriority: result.initialLearningPriority,
@@ -213,6 +216,7 @@ function isCompleteOnboardingConflict(error: Error): boolean {
   return (
     error.message === "onboarding_starting_point_required" ||
     error.message === "completed_initial_diagnostic_required" ||
-    error.message === "published_competency_catalog_required"
+    error.message === "published_competency_catalog_required" ||
+    error.message === "confirmed_user_profile_required"
   );
 }

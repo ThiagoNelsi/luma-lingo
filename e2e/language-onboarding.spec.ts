@@ -105,12 +105,16 @@ test("learner resumes onboarding and completes the diagnostic path", async ({
   await expect(
     page.getByRole("button", { name: "Synthetic option C" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Synthetic option C" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/profile-review$/);
+  await expect(page.getByLabel("Interesses")).toHaveValue("viagens");
+  await page.getByLabel("Área de trabalho ou atuação").fill("Professora");
   const completionResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiOrigin}/me/onboarding/complete` &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Synthetic option C" }).click();
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
   await expect((await completionResponse).json()).resolves.toMatchObject({
     initialLearningPriority: {
       competencyId: "synthetic-competency-1",
@@ -130,12 +134,16 @@ test("learner completes onboarding directly through the beginner path", async ({
 
   await page.goto("/onboarding/starting-point");
   await page.getByLabel("Começar do zero").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/profile-review$/);
+  await page.getByLabel("Área de trabalho ou atuação").fill("Estudante");
+  await page.getByLabel("Interesses").fill("viagens");
   const completionResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiOrigin}/me/onboarding/complete` &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
   await expect((await completionResponse).json()).resolves.toMatchObject({
     initialLearningPriority: {
       competencyId: "synthetic-competency-1",
@@ -143,6 +151,179 @@ test("learner completes onboarding directly through the beginner path", async ({
   });
   await expect(page).toHaveURL(/\/private$/);
   await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
+});
+
+test("learner can finish manually while the recorded introduction is still processing", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-pending");
+
+  await page.goto("/onboarding/profile-review");
+  await expect(
+    page.getByText(/analisando sua apresentação em segundo plano/),
+  ).toBeVisible();
+  await page.getByLabel("Área de trabalho ou atuação").fill("Designer");
+  await page.getByLabel("Interesses").fill("cinema");
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
+});
+
+test("pending extraction fills the final review without overwriting learner edits", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-pending");
+  await page.goto("/onboarding/profile-review");
+
+  await request.post(`${apiOrigin}/test-control/profile-introduction`, {
+    data: {
+      status: "completed",
+      profile: {
+        jobOrField: "Extraído",
+        interests: ["cinema"],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      },
+    },
+  });
+  await expect(page.getByLabel("Área de trabalho ou atuação")).toHaveValue(
+    "Extraído",
+  );
+  await expect(page.getByLabel("Interesses")).toHaveValue("cinema");
+
+  await seedAuthenticatedLearner(request, "profile-review-pending");
+  await page.goto("/onboarding/profile-review");
+  await page.getByLabel("Área de trabalho ou atuação").fill("Manual");
+  await request.post(`${apiOrigin}/test-control/profile-introduction`, {
+    data: {
+      status: "completed",
+      profile: {
+        jobOrField: "Extraído depois",
+        interests: ["viagens"],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      },
+    },
+  });
+  await expect(
+    page.getByText(/Recuperamos os detalhes da sua apresentação/),
+  ).toBeVisible();
+  await expect(page.getByLabel("Área de trabalho ou atuação")).toHaveValue(
+    "Manual",
+  );
+});
+
+test("learner cannot bypass an unfinished diagnostic through the final profile route", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-diagnostic");
+
+  await page.goto("/onboarding/profile-review");
+  await expect(page).toHaveURL(/\/onboarding\/initial-diagnostic$/);
+  await expect(
+    page.getByRole("button", { name: "Synthetic option A" }),
+  ).toBeVisible();
+});
+
+test("learner can complete the profile manually after extraction fails", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-failed");
+
+  await page.goto("/onboarding/profile-review");
+  await expect(
+    page.getByText(/Não foi possível analisar a gravação/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Gravar uma apresentação" }),
+  ).toBeVisible();
+  await page.getByLabel("Área de trabalho ou atuação").fill("Analista");
+  await page.getByLabel("Interesses").fill("música");
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
+});
+
+test("a failed extraction after refresh offers a new recording and manual completion", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-failed");
+  await page.goto("/onboarding/profile-review");
+  await page.reload();
+
+  await expect(
+    page.getByRole("button", { name: "Gravar uma apresentação" }),
+  ).toBeVisible();
+  await page.getByLabel("Área de trabalho ou atuação").fill("Analista");
+  await page.getByLabel("Interesses").fill("música");
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
+});
+
+test("learner keeps the profile details when confirmation or completion temporarily fails", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(request, "profile-review-failed");
+
+  let failConfirmation = true;
+  let failCompletion = true;
+  await page.route(
+    `${apiOrigin}/me/profile-introduction/confirm`,
+    async (route) => {
+      if (failConfirmation) {
+        failConfirmation = false;
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "profile_confirmation_failed" }),
+        });
+        return;
+      }
+      await route.continue();
+    },
+  );
+  await page.route(`${apiOrigin}/me/onboarding/complete`, async (route) => {
+    if (failCompletion) {
+      failCompletion = false;
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "onboarding_completion_failed" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/onboarding/profile-review");
+  await page.getByLabel("Área de trabalho ou atuação").fill("Analista");
+  await page.getByLabel("Interesses").fill("música");
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Não foi possível salvar seu perfil. Tente novamente.",
+  );
+  await expect(page.getByLabel("Área de trabalho ou atuação")).toHaveValue(
+    "Analista",
+  );
+
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Não foi possível salvar seu perfil. Tente novamente.",
+  );
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
   await expect(page).toHaveURL(/\/private$/);
 });
 
@@ -224,6 +405,16 @@ test("learner under 13 is sent through the manual introduction path", async ({
   ).not.toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/onboarding\/preferences$/);
+  await page.getByLabel("Ler").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await page.getByLabel("Começar do zero").check();
+  await page.getByRole("button", { name: "Salvar e continuar" }).click();
+  await expect(page).toHaveURL(/\/onboarding\/profile-review$/);
+  await page.getByLabel("Área de trabalho ou atuação").fill("Estudante");
+  await page.getByLabel("Interesses").fill("desenho");
+  await page.getByRole("button", { name: "Confirmar e começar" }).click();
+  await expect(page).toHaveURL(/\/private$/);
 });
 
 async function authenticate(page: Page) {
@@ -234,7 +425,12 @@ async function authenticate(page: Page) {
 async function seedAuthenticatedLearner(
   request: APIRequestContext,
   state:
-    "starting-point" | "profile-introduction" | "profile-introduction-under-13",
+    | "starting-point"
+    | "profile-introduction"
+    | "profile-introduction-under-13"
+    | "profile-review-pending"
+    | "profile-review-failed"
+    | "profile-review-diagnostic",
 ) {
   const response = await request.post(`${apiOrigin}/test-control/seed`, {
     data: { state },

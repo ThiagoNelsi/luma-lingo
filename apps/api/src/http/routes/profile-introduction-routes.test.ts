@@ -69,18 +69,39 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
     | "manual_required";
   const repository: ProfileIntroductionRepository = {
     async get() {
-      return { status, attempts: 0, errorCode: null, profile: null };
+      return {
+        status,
+        confirmed: false,
+        attempts: 0,
+        errorCode: null,
+        profile: null,
+      };
     },
     async markPending() {
       status = "pending";
-      return { status, attempts: 0, errorCode: null, profile: null };
+      return {
+        status,
+        confirmed: false,
+        attempts: 0,
+        errorCode: null,
+        profile: null,
+      };
     },
     async markProcessing() {},
     async markCompleted() {},
     async markFailed() {},
     async markManualRequired() {
       status = "manual_required";
-      return { status, attempts: 0, errorCode: null, profile: null };
+      return {
+        status,
+        confirmed: false,
+        attempts: 0,
+        errorCode: null,
+        profile: null,
+      };
+    },
+    async confirmProfile() {
+      status = "completed";
     },
     async failInterrupted() {
       return 0;
@@ -279,5 +300,67 @@ describe("profile introduction route handlers", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe("manual_required");
+  });
+
+  it("confirms a complete manual profile and rejects missing required details", async () => {
+    const app = await createHarness();
+    const valid = await app.inject({
+      method: "POST",
+      url: "/me/profile-introduction/confirm",
+      cookies: { luma_lingo_session: "token" },
+      headers: { origin: config.frontendOrigin },
+      payload: {
+        jobOrField: "Professora",
+        interests: ["cinema"],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      },
+    });
+    expect(valid.statusCode).toBe(200);
+    expect(valid.json().status).toBe("completed");
+
+    const invalid = await app.inject({
+      method: "POST",
+      url: "/me/profile-introduction/confirm",
+      cookies: { luma_lingo_session: "token" },
+      headers: { origin: config.frontendOrigin },
+      payload: {
+        jobOrField: "",
+        interests: [],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      },
+    });
+    expect(invalid.statusCode).toBe(400);
+  });
+
+  it("protects profile confirmation with origin and session checks", async () => {
+    const app = await createHarness();
+    const payload = {
+      jobOrField: "Professora",
+      interests: ["cinema"],
+      dailyRoutine: [],
+      studyContext: null,
+      other: [],
+    };
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/me/profile-introduction/confirm",
+      headers: { origin: config.frontendOrigin },
+      payload,
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const untrustedOrigin = await app.inject({
+      method: "POST",
+      url: "/me/profile-introduction/confirm",
+      cookies: { luma_lingo_session: "token" },
+      headers: { origin: "https://untrusted.example" },
+      payload,
+    });
+    expect(untrustedOrigin.statusCode).toBe(403);
   });
 });

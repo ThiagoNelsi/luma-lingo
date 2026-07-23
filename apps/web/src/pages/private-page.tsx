@@ -54,11 +54,7 @@ export function getNextOnboardingRoute(me: MeResponse): string {
   ) {
     return "/onboarding/initial-diagnostic";
   }
-  if (me.currentLearningTrack.onboardingStep === "starting_point") {
-    return "/onboarding/starting-point";
-  }
-
-  return "/onboarding/starting-point";
+  return "/onboarding/profile-review";
 }
 
 export function PrivatePage({ apiOrigin }: PrivatePageProps) {

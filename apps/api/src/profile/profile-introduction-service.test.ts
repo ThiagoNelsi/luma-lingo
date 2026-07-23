@@ -1,4 +1,4 @@
-import type { ExtractedProfile } from "@luma-lingo/shared";
+import type { ConfirmedProfile, ExtractedProfile } from "@luma-lingo/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileIntroductionRepository } from "./profile-introduction-repository.js";
@@ -15,24 +15,32 @@ function createHarness(options: { transcriptionFailures?: number } = {}) {
   let attempts = 0;
   let errorCode: string | null = null;
   let profile: ExtractedProfile | null = null;
+  let confirmedProfile: ConfirmedProfile | null = null;
   let failures = options.transcriptionFailures ?? 0;
   const tasks: Array<() => Promise<void>> = [];
   const repository: ProfileIntroductionRepository = {
     async get() {
-      return { status, attempts, errorCode, profile };
+      return {
+        status,
+        confirmed: confirmedProfile !== null,
+        attempts,
+        errorCode,
+        profile,
+      };
     },
     async markPending() {
       status = "pending";
       attempts = 0;
       errorCode = null;
       profile = null;
-      return { status, attempts, errorCode, profile };
+      return { status, confirmed: false, attempts, errorCode, profile };
     },
     async markProcessing(_id, value) {
       status = "processing";
       attempts = value;
     },
     async markCompleted(_id, value) {
+      if (confirmedProfile) return;
       status = "completed";
       profile = value;
       errorCode = null;
@@ -43,7 +51,18 @@ function createHarness(options: { transcriptionFailures?: number } = {}) {
     },
     async markManualRequired() {
       status = "manual_required";
-      return { status, attempts, errorCode, profile };
+      return {
+        status,
+        confirmed: confirmedProfile !== null,
+        attempts,
+        errorCode,
+        profile,
+      };
+    },
+    async confirmProfile(_id, value) {
+      status = "completed";
+      profile = value;
+      confirmedProfile = value;
     },
     async failInterrupted() {
       return 2;
@@ -84,7 +103,13 @@ function createHarness(options: { transcriptionFailures?: number } = {}) {
     service,
     tasks,
     repository,
-    getState: () => ({ status, attempts, errorCode, profile }),
+    getState: () => ({
+      status,
+      attempts,
+      errorCode,
+      profile,
+      confirmedProfile,
+    }),
   };
 }
 
@@ -150,6 +175,47 @@ describe("ProfileIntroductionService", () => {
       "manual_required",
     );
     expect(harness.tasks).toHaveLength(0);
+  });
+
+  it("persists a validated manual confirmation without allowing late extraction to replace it", async () => {
+    const harness = createHarness();
+    const confirmed = await harness.service.confirm("learner-1", {
+      jobOrField: "Professora",
+      interests: ["cinema"],
+      dailyRoutine: ["estuda à noite"],
+      studyContext: null,
+      other: [],
+    });
+
+    await harness.repository.markCompleted("learner-1", {
+      jobOrField: "Design",
+      interests: ["música"],
+      dailyRoutine: [],
+      studyContext: null,
+      other: [],
+    });
+
+    expect(confirmed).toMatchObject({
+      status: "completed",
+      profile: { jobOrField: "Professora", interests: ["cinema"] },
+    });
+    expect(harness.getState().profile).toMatchObject({
+      jobOrField: "Professora",
+    });
+  });
+
+  it("rejects profile confirmation without required details", async () => {
+    const harness = createHarness();
+
+    await expect(
+      harness.service.confirm("learner-1", {
+        jobOrField: "",
+        interests: [],
+        dailyRoutine: [],
+        studyContext: null,
+        other: [],
+      }),
+    ).rejects.toThrow();
   });
 
   it("exposes status and fails work interrupted by a restart", async () => {

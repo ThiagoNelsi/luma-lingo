@@ -1,4 +1,7 @@
-import { profileIntroductionProgressSchema } from "@luma-lingo/shared";
+import {
+  confirmedProfileSchema,
+  profileIntroductionProgressSchema,
+} from "@luma-lingo/shared";
 import type { FastifyInstance } from "fastify";
 
 import type { AppConfig } from "../../config.js";
@@ -38,6 +41,33 @@ export function registerProfileIntroductionRoutes(
     if (!session) return reply.code(401).send({ error: "unauthenticated" });
     return deps.profileIntroduction.get(session.learner.id);
   });
+
+  app.post(
+    "/me/profile-introduction/confirm",
+    {
+      schema: {
+        body: confirmedProfileSchema,
+        response: {
+          200: profileIntroductionProgressSchema,
+          400: errorDtoSchema,
+          401: errorDtoSchema,
+          403: errorDtoSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!isTrustedOrigin(request.headers.origin, deps.config))
+        return reply.code(403).send({ error: "invalid_request_origin" });
+      const session = await deps.auth.resolveSession(
+        request.cookies[deps.config.sessionCookieName],
+      );
+      if (!session) return reply.code(401).send({ error: "unauthenticated" });
+      return deps.profileIntroduction.confirm(
+        session.learner.id,
+        confirmedProfileSchema.parse(request.body),
+      );
+    },
+  );
 
   app.post(
     "/me/profile-introduction/manual",

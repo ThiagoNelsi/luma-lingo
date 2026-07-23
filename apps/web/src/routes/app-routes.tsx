@@ -11,6 +11,7 @@ import { NotFoundPage } from "../pages/not-found-page.js";
 import { OnboardingStartingPointPage } from "../pages/onboarding-starting-point-page.js";
 import { PrivatePage } from "../pages/private-page.js";
 import { ProfileIntroductionOnboardingPage } from "../pages/profile-introduction-onboarding-page.js";
+import { ProfileReviewOnboardingPage } from "../pages/profile-review-onboarding-page.js";
 import { PublicPage } from "../pages/public-page.js";
 import { StudyPaceOnboardingPage } from "../pages/study-pace-onboarding-page.js";
 
@@ -55,6 +56,10 @@ export function AppRoutes({ apiOrigin }: AppRoutesProps) {
       <Route
         path="/onboarding/initial-diagnostic"
         element={<InitialDiagnosticOnboardingPage apiOrigin={apiOrigin} />}
+      />
+      <Route
+        path="/onboarding/profile-review"
+        element={<ProfileReviewOnboardingPage apiOrigin={apiOrigin} />}
       />
       <Route
         path="/prototype/initial-diagnostic-ui"

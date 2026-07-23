@@ -1,4 +1,5 @@
 import type {
+  ConfirmedProfile,
   ExtractedProfile,
   ProfileIntroductionProgress,
 } from "@luma-lingo/shared";
@@ -8,6 +9,7 @@ import type { ProfileIntroductionRepository } from "../profile/profile-introduct
 
 interface PersistedProfileIntroduction {
   status: ProfileIntroductionProgress["status"];
+  confirmedAt: Date | null;
   attempts: number;
   errorCode: string | null;
   jobOrField: string | null;
@@ -23,12 +25,14 @@ export function toProfileIntroductionProgress(
   if (!value)
     return {
       status: "not_started",
+      confirmed: false,
       attempts: 0,
       errorCode: null,
       profile: null,
     };
   return {
     status: value.status,
+    confirmed: value.confirmedAt !== null,
     attempts: value.attempts,
     errorCode: value.errorCode,
     profile:
@@ -68,14 +72,15 @@ export class PrismaProfileIntroductionRepository implements ProfileIntroductionR
         dailyRoutine: [],
         studyContext: null,
         other: [],
+        confirmedAt: null,
       },
     });
     return toProfileIntroductionProgress(value);
   }
 
   async markProcessing(learnerId: string, attempts: number): Promise<void> {
-    await this.prisma.profileIntroduction.update({
-      where: { learnerId },
+    await this.prisma.profileIntroduction.updateMany({
+      where: { learnerId, confirmedAt: null },
       data: { status: "processing", attempts, errorCode: null },
     });
   }
@@ -84,15 +89,15 @@ export class PrismaProfileIntroductionRepository implements ProfileIntroductionR
     learnerId: string,
     profile: ExtractedProfile,
   ): Promise<void> {
-    await this.prisma.profileIntroduction.update({
-      where: { learnerId },
+    await this.prisma.profileIntroduction.updateMany({
+      where: { learnerId, confirmedAt: null },
       data: { status: "completed", errorCode: null, ...profile },
     });
   }
 
   async markFailed(learnerId: string, errorCode: string): Promise<void> {
-    await this.prisma.profileIntroduction.update({
-      where: { learnerId },
+    await this.prisma.profileIntroduction.updateMany({
+      where: { learnerId, confirmedAt: null },
       data: { status: "failed", errorCode },
     });
   }
@@ -106,9 +111,34 @@ export class PrismaProfileIntroductionRepository implements ProfileIntroductionR
     return toProfileIntroductionProgress(value);
   }
 
+  async confirmProfile(
+    learnerId: string,
+    profile: ConfirmedProfile,
+  ): Promise<void> {
+    await this.prisma.profileIntroduction.upsert({
+      where: { learnerId },
+      create: {
+        id: createId(),
+        learnerId,
+        status: "completed",
+        ...profile,
+        confirmedAt: new Date(),
+      },
+      update: {
+        status: "completed",
+        errorCode: null,
+        ...profile,
+        confirmedAt: new Date(),
+      },
+    });
+  }
+
   async failInterrupted(): Promise<number> {
     const result = await this.prisma.profileIntroduction.updateMany({
-      where: { status: { in: ["pending", "processing"] } },
+      where: {
+        status: { in: ["pending", "processing"] },
+        confirmedAt: null,
+      },
       data: { status: "failed", errorCode: "processing_interrupted" },
     });
     return result.count;

@@ -7,6 +7,7 @@ import {
 
 const row = {
   status: "completed" as const,
+  confirmedAt: null,
   attempts: 1,
   errorCode: null,
   jobOrField: "Design",
@@ -54,7 +55,7 @@ describe("PrismaProfileIntroductionRepository", () => {
     expect(profileIntroduction.upsert).toHaveBeenCalledTimes(2);
   });
 
-  it("persists processing, completion, and failure transitions", async () => {
+  it("does not let worker transitions replace a confirmed profile", async () => {
     const { repository, profileIntroduction } = createRepository();
     await repository.markProcessing("learner-1", 1);
     await repository.markCompleted("learner-1", {
@@ -65,11 +66,55 @@ describe("PrismaProfileIntroductionRepository", () => {
       other: [],
     });
     await repository.markFailed("learner-1", "failed");
-    expect(profileIntroduction.update).toHaveBeenCalledTimes(3);
+    expect(profileIntroduction.update).not.toHaveBeenCalled();
+    expect(profileIntroduction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { learnerId: "learner-1", confirmedAt: null },
+        data: expect.objectContaining({ status: "processing" }),
+      }),
+    );
+    expect(profileIntroduction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { learnerId: "learner-1", confirmedAt: null },
+        data: expect.objectContaining({ status: "completed" }),
+      }),
+    );
+    expect(profileIntroduction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { learnerId: "learner-1", confirmedAt: null },
+        data: expect.objectContaining({ status: "failed" }),
+      }),
+    );
+  });
+
+  it("persists a final confirmed profile", async () => {
+    const { repository, profileIntroduction } = createRepository();
+    await repository.confirmProfile("learner-1", {
+      jobOrField: "Professora",
+      interests: ["cinema"],
+      dailyRoutine: [],
+      studyContext: null,
+      other: [],
+    });
+
+    expect(profileIntroduction.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          status: "completed",
+          jobOrField: "Professora",
+          confirmedAt: expect.any(Date),
+        }),
+      }),
+    );
   });
 
   it("fails pending work after process restart", async () => {
-    const { repository } = createRepository();
+    const { repository, profileIntroduction } = createRepository();
     expect(await repository.failInterrupted()).toBe(2);
+    expect(profileIntroduction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ confirmedAt: null }),
+      }),
+    );
   });
 });

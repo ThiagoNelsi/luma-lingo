@@ -1,4 +1,8 @@
-import { profileIntroductionProgressSchema } from "@luma-lingo/shared";
+import {
+  confirmedProfileSchema,
+  profileIntroductionProgressSchema,
+  type ConfirmedProfile,
+} from "@luma-lingo/shared";
 
 import { normalizeApiOrigin } from "../config/api-origin.js";
 
@@ -47,6 +51,24 @@ export async function useManualProfileIntroduction(apiOrigin: string) {
     await fetch(
       `${normalizeApiOrigin(apiOrigin)}/me/profile-introduction/manual`,
       { method: "POST", credentials: "include" },
+    ),
+  );
+}
+
+export async function confirmProfileIntroduction(
+  apiOrigin: string,
+  profile: ConfirmedProfile,
+) {
+  const body = confirmedProfileSchema.parse(profile);
+  return parseProgress(
+    await fetch(
+      `${normalizeApiOrigin(apiOrigin)}/me/profile-introduction/confirm`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
     ),
   );
 }

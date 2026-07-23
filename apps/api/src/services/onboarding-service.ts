@@ -13,6 +13,7 @@ import {
 } from "../learners/onboarding-completion.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
+import type { ProfileIntroductionService } from "../profile/profile-introduction-service.js";
 
 const initialDiagnosticPurpose = "onboarding_initial";
 
@@ -22,6 +23,10 @@ export class OnboardingService {
     private readonly completion: OnboardingCompletionRepository,
     private readonly diagnosticAttempts: DiagnosticAttemptRepository,
     private readonly initialLearningPriorities: InitialLearningPriorityRepository = noInitialLearningPriorityRepository,
+    private readonly profileIntroduction?: Pick<
+      ProfileIntroductionService,
+      "get"
+    >,
   ) {}
 
   saveLanguageSelection(learnerId: string, selection: LanguageSelection) {
@@ -46,12 +51,14 @@ export class OnboardingService {
     return this.learners.saveOnboardingStartingPoint(learnerId, selection);
   }
 
-  async completeOnboarding(input: CompleteOnboardingInput) {
+  async completeOnboarding(input: CompleteOnboardingInput, learnerId: string) {
     const parsedInput = completeOnboardingInputSchema.parse(input);
 
     if (!parsedInput.onboardingStartingPoint) {
       throw new Error("onboarding_starting_point_required");
     }
+
+    await this.requireConfirmedProfile(learnerId);
 
     if (parsedInput.onboardingStartingPoint === "beginner") {
       const completion = await this.completion.completeBeginnerOnboarding({
@@ -97,6 +104,19 @@ export class OnboardingService {
           onboardingStartingPoint: input.onboardingStartingPoint!,
         }),
     };
+  }
+
+  private async requireConfirmedProfile(learnerId: string): Promise<void> {
+    if (!this.profileIntroduction) return;
+    const progress = await this.profileIntroduction.get(learnerId);
+    if (
+      progress.status !== "completed" ||
+      !progress.confirmed ||
+      !progress.profile?.jobOrField ||
+      progress.profile.interests.length === 0
+    ) {
+      throw new Error("confirmed_user_profile_required");
+    }
   }
 }
 

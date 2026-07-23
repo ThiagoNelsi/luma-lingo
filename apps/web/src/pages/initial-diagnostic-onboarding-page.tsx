@@ -23,10 +23,6 @@ import {
   UnauthorizedInitialDiagnosticError,
 } from "../onboarding/initial-diagnostic-client.js";
 import {
-  completeOnboarding,
-  UnauthorizedOnboardingCompletionError,
-} from "../onboarding/onboarding-completion-client.js";
-import {
   getProfileIntroduction,
   UnauthorizedProfileIntroductionError,
 } from "../onboarding/profile-introduction-client.js";
@@ -119,8 +115,7 @@ export function InitialDiagnosticOnboardingPage({
 
     async function handleRuntimeResult(result: InitialDiagnosticResult) {
       if (result.attempt.status === "completed" || !result.item) {
-        await completeOnboarding(apiOrigin);
-        navigate("/private", { replace: true });
+        navigate("/onboarding/profile-review", { replace: true });
         return;
       }
 
@@ -148,8 +143,7 @@ export function InitialDiagnosticOnboardingPage({
 
       if (result.attempt.status === "completed" || !result.item) {
         setStatusText("Finalizando sua configuração...");
-        await completeOnboarding(apiOrigin);
-        navigate("/private", { replace: true });
+        navigate("/onboarding/profile-review", { replace: true });
         return;
       }
 
@@ -290,7 +284,6 @@ function isUnauthorizedError(error: unknown): boolean {
   return (
     error instanceof UnauthorizedSessionError ||
     error instanceof UnauthorizedInitialDiagnosticError ||
-    error instanceof UnauthorizedOnboardingCompletionError ||
     error instanceof UnauthorizedProfileIntroductionError
   );
 }

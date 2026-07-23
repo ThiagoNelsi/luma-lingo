@@ -40,11 +40,14 @@ describe("OnboardingService", () => {
     );
 
     await expect(
-      service.completeOnboarding({
-        learningTrackId: "track-1",
-        targetLanguage: "en",
-        onboardingStartingPoint: "beginner",
-      }),
+      service.completeOnboarding(
+        {
+          learningTrackId: "track-1",
+          targetLanguage: "en",
+          onboardingStartingPoint: "beginner",
+        },
+        "learner-1",
+      ),
     ).resolves.toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
@@ -86,11 +89,14 @@ describe("OnboardingService", () => {
     );
 
     await expect(
-      service.completeOnboarding({
-        learningTrackId: "track-1",
-        targetLanguage: "en",
-        onboardingStartingPoint: "diagnostic",
-      }),
+      service.completeOnboarding(
+        {
+          learningTrackId: "track-1",
+          targetLanguage: "en",
+          onboardingStartingPoint: "diagnostic",
+        },
+        "learner-1",
+      ),
     ).rejects.toThrow("completed_initial_diagnostic_required");
   });
 
@@ -124,11 +130,14 @@ describe("OnboardingService", () => {
     );
 
     await expect(
-      service.completeOnboarding({
-        learningTrackId: "track-1",
-        targetLanguage: "en",
-        onboardingStartingPoint: "diagnostic",
-      }),
+      service.completeOnboarding(
+        {
+          learningTrackId: "track-1",
+          targetLanguage: "en",
+          onboardingStartingPoint: "diagnostic",
+        },
+        "learner-1",
+      ),
     ).resolves.toEqual({
       onboardingStatus: "completed",
       onboardingStep: null,
@@ -148,11 +157,56 @@ describe("OnboardingService", () => {
     );
 
     await expect(
-      service.completeOnboarding({
-        learningTrackId: "track-1",
-        targetLanguage: "en",
-        onboardingStartingPoint: null,
-      }),
+      service.completeOnboarding(
+        {
+          learningTrackId: "track-1",
+          targetLanguage: "en",
+          onboardingStartingPoint: null,
+        },
+        "learner-1",
+      ),
     ).rejects.toThrow("onboarding_starting_point_required");
+  });
+
+  it("requires a confirmed profile with the required details before completion", async () => {
+    const completeBeginnerOnboarding = vi.fn();
+    const service = new OnboardingService(
+      learners,
+      {
+        completeBeginnerOnboarding,
+        completeDiagnosticOnboarding: vi.fn(),
+      },
+      {} as DiagnosticAttemptRepository,
+      undefined,
+      {
+        async get() {
+          return {
+            status: "completed" as const,
+            confirmed: false,
+            attempts: 1,
+            errorCode: null,
+            profile: {
+              jobOrField: "Professora",
+              interests: ["cinema"],
+              dailyRoutine: [],
+              studyContext: null,
+              other: [],
+            },
+          };
+        },
+      },
+    );
+
+    await expect(
+      service.completeOnboarding(
+        {
+          learningTrackId: "track-1",
+          targetLanguage: "en",
+          onboardingStartingPoint: "beginner",
+        },
+        "learner-1",
+      ),
+    ).rejects.toThrow("confirmed_user_profile_required");
+    expect(completeBeginnerOnboarding).not.toHaveBeenCalled();
   });
 });

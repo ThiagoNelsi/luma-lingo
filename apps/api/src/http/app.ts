@@ -56,6 +56,7 @@ export async function createApp(deps: AppDependencies) {
     deps.onboardingCompletion,
     deps.diagnosticAttempts,
     deps.initialLearningPriorities,
+    deps.profileIntroduction,
   );
 
   await app.register(cookie);

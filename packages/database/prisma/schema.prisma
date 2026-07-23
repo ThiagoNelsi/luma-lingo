@@ -101,6 +101,7 @@ model ProfileIntroduction {
   dailyRoutine String[]                  @default([]) @map("daily_routine")
   studyContext String?                   @map("study_context")
   other        String[]                  @default([])
+  confirmedAt  DateTime?                 @map("confirmed_at") @db.Timestamptz(6)
   createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
   learner      Learner                   @relation(fields: [learnerId], references: [id], onDelete: Cascade)

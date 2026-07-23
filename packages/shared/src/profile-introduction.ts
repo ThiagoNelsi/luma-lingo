@@ -10,6 +10,13 @@ export const extractedProfileSchema = z.object({
 
 export type ExtractedProfile = z.infer<typeof extractedProfileSchema>;
 
+export const confirmedProfileSchema = extractedProfileSchema.extend({
+  jobOrField: z.string().trim().min(1).max(200),
+  interests: z.array(z.string().trim().min(1).max(200)).min(1).max(10),
+});
+
+export type ConfirmedProfile = z.infer<typeof confirmedProfileSchema>;
+
 export const profileIntroductionStatusSchema = z.enum([
   "not_started",
   "pending",
@@ -25,6 +32,7 @@ export type ProfileIntroductionStatus = z.infer<
 
 export const profileIntroductionProgressSchema = z.object({
   status: profileIntroductionStatusSchema,
+  confirmed: z.boolean(),
   attempts: z.number().int().nonnegative(),
   errorCode: z.string().nullable(),
   profile: extractedProfileSchema.nullable(),

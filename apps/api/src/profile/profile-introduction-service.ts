@@ -1,4 +1,8 @@
-import type { ProfileIntroductionProgress } from "@luma-lingo/shared";
+import {
+  confirmedProfileSchema,
+  type ConfirmedProfile,
+  type ProfileIntroductionProgress,
+} from "@luma-lingo/shared";
 
 import type { ProfileIntroductionRepository } from "./profile-introduction-repository.js";
 import type {
@@ -57,6 +61,15 @@ export class ProfileIntroductionService {
     learnerId: string,
   ): Promise<ProfileIntroductionProgress> {
     return this.deps.repository.markManualRequired(learnerId);
+  }
+
+  async confirm(
+    learnerId: string,
+    profile: ConfirmedProfile,
+  ): Promise<ProfileIntroductionProgress> {
+    const confirmedProfile = confirmedProfileSchema.parse(profile);
+    await this.deps.repository.confirmProfile(learnerId, confirmedProfile);
+    return this.deps.repository.get(learnerId);
   }
 
   async recoverInterrupted(): Promise<number> {
