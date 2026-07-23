@@ -135,7 +135,14 @@ export function registerProfileIntroductionRoutes(
             declaredBytes = Number(part.value);
         }
       } catch (error) {
-        console.error("Error processing multipart request", error);
+        request.log.warn(
+          {
+            err: error,
+            event: "profile_introduction.upload.rejected",
+            reason: "multipart_processing_failed",
+          },
+          "Profile introduction upload rejected",
+        );
         return reply.code(400).send({ error: "invalid_audio_upload" });
       }
 
@@ -155,14 +162,17 @@ export function registerProfileIntroductionRoutes(
         durationMs > maxDurationMs
       ) {
         audio?.fill(0);
-        console.log("Rejected audio upload", {
-          reason: "validation_failed",
-          mimeType,
-          declaredMimeType,
-          byteLength: audio?.length,
-          declaredBytes,
-          durationMs,
-        });
+        request.log.warn(
+          {
+            audioBytes: audio?.length,
+            declaredBytes,
+            durationMs,
+            event: "profile_introduction.upload.rejected",
+            mimeType: normalizedMimeType,
+            reason: "validation_failed",
+          },
+          "Profile introduction upload rejected",
+        );
         return reply.code(400).send({ error: "invalid_audio_upload" });
       }
       const progress = await deps.profileIntroduction.submit(

@@ -10,6 +10,7 @@ import type {
   DiagnosticQuestionBankItem,
 } from "./diagnostic-question-bank.js";
 import type { DiagnosticQuestionBankRepository } from "./diagnostic-question-bank-repository.js";
+import { createSilentLogger, type AppLogger } from "../observability/logger.js";
 import {
   initialDiagnosticScoringPolicy,
   initialDiagnosticScoringPolicyVersion,
@@ -44,12 +45,17 @@ export type InitialDiagnosticRuntimeResult = {
 };
 
 export class InitialDiagnosticRuntimeService {
+  private readonly logger: AppLogger;
+
   constructor(
     private readonly deps: {
       attempts: DiagnosticAttemptService;
+      logger?: AppLogger;
       questionBanks: DiagnosticQuestionBankRepository;
     },
-  ) {}
+  ) {
+    this.logger = deps.logger ?? createSilentLogger();
+  }
 
   async startInitialDiagnostic(input: {
     learningTrackId: string;
@@ -66,6 +72,14 @@ export class InitialDiagnosticRuntimeService {
         initialDiagnosticPurpose,
       );
       if (completedAttempt) {
+        this.logger.info(
+          {
+            attemptId: completedAttempt.id,
+            event: "initial_diagnostic.already_completed",
+            learningTrackId: input.learningTrackId,
+          },
+          "Initial diagnostic is already completed",
+        );
         return {
           attempt: toRuntimeAttempt(completedAttempt),
           item: null,
@@ -87,6 +101,15 @@ export class InitialDiagnosticRuntimeService {
     const attemptItems = await this.deps.attempts.findAttemptItems(attempt.id);
     const pendingItem = findPendingAttemptItem(attemptItems);
     if (pendingItem) {
+      this.logger.info(
+        {
+          attemptId: attempt.id,
+          event: "initial_diagnostic.resumed",
+          learningTrackId: input.learningTrackId,
+          position: pendingItem.position,
+        },
+        "Initial diagnostic resumed with pending item",
+      );
       return {
         attempt: toRuntimeAttempt(attempt),
         item: toRuntimeItem({ questionBank, attemptItem: pendingItem }),
@@ -100,6 +123,14 @@ export class InitialDiagnosticRuntimeService {
       goals: input.goals,
     });
     if (!selection) {
+      this.logger.info(
+        {
+          attemptId: attempt.id,
+          event: "initial_diagnostic.no_item_available",
+          learningTrackId: input.learningTrackId,
+        },
+        "No initial diagnostic item is available",
+      );
       return {
         attempt: toRuntimeAttempt(attempt),
         item: null,
@@ -111,6 +142,16 @@ export class InitialDiagnosticRuntimeService {
       attemptItems,
       selection,
     });
+
+    this.logger.info(
+      {
+        attemptId: attempt.id,
+        event: "initial_diagnostic.started",
+        learningTrackId: input.learningTrackId,
+        position: attemptItem.position,
+      },
+      "Initial diagnostic started",
+    );
 
     return {
       attempt: toRuntimeAttempt(attempt),
@@ -130,12 +171,28 @@ export class InitialDiagnosticRuntimeService {
       initialDiagnosticPurpose,
     );
     if (!attempt) {
+      this.logger.warn(
+        {
+          event: "initial_diagnostic.response.rejected",
+          learningTrackId: input.learningTrackId,
+          reason: "attempt_not_found",
+        },
+        "Initial diagnostic response rejected",
+      );
       throw new Error("initial_diagnostic_attempt_not_found");
     }
 
     const attemptItems = await this.deps.attempts.findAttemptItems(attempt.id);
     const pendingItem = findPendingAttemptItem(attemptItems);
     if (!pendingItem) {
+      this.logger.warn(
+        {
+          attemptId: attempt.id,
+          event: "initial_diagnostic.response.rejected",
+          reason: "pending_item_not_found",
+        },
+        "Initial diagnostic response rejected",
+      );
       throw new Error("initial_diagnostic_pending_item_not_found");
     }
 
@@ -178,6 +235,15 @@ export class InitialDiagnosticRuntimeService {
         }),
       });
 
+      this.logger.info(
+        {
+          attemptId: completedAttempt.id,
+          event: "initial_diagnostic.completed",
+          learningTrackId: input.learningTrackId,
+        },
+        "Initial diagnostic completed",
+      );
+
       return {
         attempt: toRuntimeAttempt(completedAttempt),
         item: null,
@@ -189,6 +255,15 @@ export class InitialDiagnosticRuntimeService {
       attemptItems: updatedAttemptItems,
       selection,
     });
+
+    this.logger.info(
+      {
+        attemptId: attempt.id,
+        event: "initial_diagnostic.response.accepted",
+        position: nextAttemptItem.position,
+      },
+      "Initial diagnostic response accepted",
+    );
 
     return {
       attempt: toRuntimeAttempt(attempt),
@@ -204,6 +279,13 @@ export class InitialDiagnosticRuntimeService {
         targetLanguage,
       );
     if (!questionBank) {
+      this.logger.error(
+        {
+          event: "initial_diagnostic.question_bank_missing",
+          targetLanguage,
+        },
+        "Published initial diagnostic question bank not found",
+      );
       throw new Error("initial_diagnostic_question_bank_not_found");
     }
 

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Writable } from "node:stream";
 
 import type {
   AgeAndGoalsSelection,
@@ -21,12 +22,14 @@ import type { SessionRecord } from "../sessions/session-record.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
 import type { AuthProfile } from "../services/auth-profile.js";
 import { createApp } from "./app.js";
+import { createAppLogger } from "../observability/logger.js";
 
 const baseConfig: AppConfig = {
   apiOrigin: "http://localhost:3000",
   authCallbackUrl: "http://localhost:3000/auth/callback",
   authLogoutUrl: "http://localhost:5173/login",
   frontendOrigin: "http://localhost:5173",
+  logLevel: "silent",
   nodeEnv: "test",
   sessionCookieName: "luma_lingo_session",
   sessionCookieSecure: false,
@@ -40,6 +43,18 @@ const verifiedIdentity: AuthIdentity = {
   emailVerified: true,
   name: "Learner One",
 };
+
+function createLogCapture() {
+  const entries: Array<Record<string, unknown>> = [];
+  const destination = new Writable({
+    write(chunk, _encoding, callback) {
+      entries.push(JSON.parse(String(chunk)) as Record<string, unknown>);
+      callback();
+    },
+  });
+
+  return { entries, logger: createAppLogger("trace", destination) };
+}
 
 function createMemoryDeps(
   identity: AuthIdentity = verifiedIdentity,
@@ -400,6 +415,38 @@ function createMemoryDeps(
 }
 
 describe("auth routes", () => {
+  it("logs every HTTP route completion with a structured level based on status", async () => {
+    const { entries, logger } = createLogCapture();
+    const app = await createApp({
+      config: baseConfig,
+      logger,
+      ...createMemoryDeps(),
+    });
+
+    await app.inject({ method: "GET", url: "/health" });
+    await app.inject({ method: "GET", url: "/me" });
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "http.request.completed",
+          level: 30,
+          reqId: expect.any(String),
+          route: "/health",
+          statusCode: 200,
+        }),
+        expect.objectContaining({
+          event: "http.request.completed",
+          level: 40,
+          reqId: expect.any(String),
+          route: "/me",
+          statusCode: 401,
+        }),
+      ]),
+    );
+    await app.close();
+  });
+
   it("allows the web app to preflight language-selection writes", async () => {
     const app = await createApp({ config: baseConfig, ...createMemoryDeps() });
 

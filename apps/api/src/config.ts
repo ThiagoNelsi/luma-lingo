@@ -3,11 +3,14 @@ import { dirname, join } from "node:path";
 
 import { config as loadDotenv } from "dotenv";
 
+import { parseLogLevel, type LogLevel } from "./observability/logger.js";
+
 export interface AppConfig {
   apiOrigin: string;
   authCallbackUrl: string;
   authLogoutUrl: string;
   frontendOrigin: string;
+  logLevel: LogLevel;
   nodeEnv: string;
   sessionCookieName: string;
   sessionCookieSecure: boolean;
@@ -45,6 +48,7 @@ export function readRuntimeConfig(
       authCallbackUrl: required(env, "AUTH_CALLBACK_URL"),
       authLogoutUrl: required(env, "AUTH_LOGOUT_URL"),
       frontendOrigin: required(env, "FRONTEND_ORIGIN"),
+      logLevel: parseLogLevel(env.LOG_LEVEL ?? "info"),
       nodeEnv: env.NODE_ENV ?? "development",
       sessionCookieName: env.SESSION_COOKIE_NAME ?? "luma_lingo_session",
       sessionCookieSecure: parseBoolean(env.SESSION_COOKIE_SECURE ?? "true"),

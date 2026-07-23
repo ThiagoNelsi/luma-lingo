@@ -13,6 +13,7 @@ import {
 } from "../learners/onboarding-completion.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
+import { createSilentLogger, type AppLogger } from "../observability/logger.js";
 import type { ProfileIntroductionService } from "../profile/profile-introduction-service.js";
 
 const initialDiagnosticPurpose = "onboarding_initial";
@@ -27,34 +28,72 @@ export class OnboardingService {
       ProfileIntroductionService,
       "get"
     >,
+    private readonly logger: AppLogger = createSilentLogger(),
   ) {}
 
-  saveLanguageSelection(learnerId: string, selection: LanguageSelection) {
-    return this.learners.saveLanguageSelection(learnerId, selection);
+  async saveLanguageSelection(learnerId: string, selection: LanguageSelection) {
+    const progress = await this.learners.saveLanguageSelection(
+      learnerId,
+      selection,
+    );
+    this.logger.info(
+      { event: "onboarding.languages.saved", learnerId },
+      "Onboarding languages saved",
+    );
+    return progress;
   }
 
-  saveAgeAndGoals(learnerId: string, selection: AgeAndGoalsSelection) {
-    return this.learners.saveAgeAndGoals(learnerId, selection);
+  async saveAgeAndGoals(learnerId: string, selection: AgeAndGoalsSelection) {
+    const progress = await this.learners.saveAgeAndGoals(learnerId, selection);
+    this.logger.info(
+      { event: "onboarding.age_and_goals.saved", learnerId },
+      "Onboarding age and goals saved",
+    );
+    return progress;
   }
 
-  saveLessonPreferences(
+  async saveLessonPreferences(
     learnerId: string,
     selection: LessonPreferencesSelection,
   ) {
-    return this.learners.saveLessonPreferences(learnerId, selection);
+    const progress = await this.learners.saveLessonPreferences(
+      learnerId,
+      selection,
+    );
+    this.logger.info(
+      { event: "onboarding.lesson_preferences.saved", learnerId },
+      "Onboarding lesson preferences saved",
+    );
+    return progress;
   }
 
-  saveOnboardingStartingPoint(
+  async saveOnboardingStartingPoint(
     learnerId: string,
     selection: OnboardingStartingPointSelection,
   ) {
-    return this.learners.saveOnboardingStartingPoint(learnerId, selection);
+    const progress = await this.learners.saveOnboardingStartingPoint(
+      learnerId,
+      selection,
+    );
+    this.logger.info(
+      { event: "onboarding.starting_point.saved", learnerId },
+      "Onboarding starting point saved",
+    );
+    return progress;
   }
 
   async completeOnboarding(input: CompleteOnboardingInput, learnerId: string) {
     const parsedInput = completeOnboardingInputSchema.parse(input);
 
     if (!parsedInput.onboardingStartingPoint) {
+      this.logger.warn(
+        {
+          event: "onboarding.completion.rejected",
+          learnerId,
+          reason: "onboarding_starting_point_required",
+        },
+        "Onboarding completion rejected",
+      );
       throw new Error("onboarding_starting_point_required");
     }
 
@@ -67,10 +106,32 @@ export class OnboardingService {
       });
 
       if (!completion) {
+        this.logger.warn(
+          {
+            event: "onboarding.completion.rejected",
+            learnerId,
+            learningTrackId: parsedInput.learningTrackId,
+            reason: "published_competency_catalog_required",
+          },
+          "Onboarding completion rejected",
+        );
         throw new Error("published_competency_catalog_required");
       }
 
-      return this.withInitialLearningPriority(completion, parsedInput);
+      const result = await this.withInitialLearningPriority(
+        completion,
+        parsedInput,
+      );
+      this.logger.info(
+        {
+          event: "onboarding.completed",
+          learnerId,
+          learningTrackId: parsedInput.learningTrackId,
+          startingPoint: "beginner",
+        },
+        "Onboarding completed",
+      );
+      return result;
     }
 
     const completedAttempt = await this.diagnosticAttempts.findCompletedAttempt(
@@ -79,6 +140,15 @@ export class OnboardingService {
     );
 
     if (!completedAttempt) {
+      this.logger.warn(
+        {
+          event: "onboarding.completion.rejected",
+          learnerId,
+          learningTrackId: parsedInput.learningTrackId,
+          reason: "completed_initial_diagnostic_required",
+        },
+        "Onboarding completion rejected",
+      );
       throw new Error("completed_initial_diagnostic_required");
     }
 
@@ -87,7 +157,20 @@ export class OnboardingService {
       competencyCatalogId: completedAttempt.catalogId,
     });
 
-    return this.withInitialLearningPriority(completion, parsedInput);
+    const result = await this.withInitialLearningPriority(
+      completion,
+      parsedInput,
+    );
+    this.logger.info(
+      {
+        event: "onboarding.completed",
+        learnerId,
+        learningTrackId: parsedInput.learningTrackId,
+        startingPoint: "diagnostic",
+      },
+      "Onboarding completed",
+    );
+    return result;
   }
 
   private async withInitialLearningPriority(
@@ -115,6 +198,14 @@ export class OnboardingService {
       !progress.profile?.jobOrField ||
       progress.profile.interests.length === 0
     ) {
+      this.logger.warn(
+        {
+          event: "onboarding.completion.rejected",
+          learnerId,
+          reason: "confirmed_user_profile_required",
+        },
+        "Onboarding completion rejected",
+      );
       throw new Error("confirmed_user_profile_required");
     }
   }

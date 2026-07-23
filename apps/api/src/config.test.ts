@@ -17,6 +17,7 @@ const envKeys = [
   "FRONTEND_ORIGIN",
   "GEMINI_API_KEY",
   "GEMINI_MODEL",
+  "LOG_LEVEL",
   "PORT",
   "SESSION_COOKIE_NAME",
   "SESSION_COOKIE_SECURE",
@@ -60,6 +61,7 @@ describe("runtime config", () => {
         "FRONTEND_ORIGIN=http://localhost:5173",
         "GEMINI_API_KEY=test-key",
         "GEMINI_MODEL=gemini-test",
+        "LOG_LEVEL=debug",
         "PORT=3000",
         "SESSION_COOKIE_NAME=luma_lingo_session",
         "SESSION_COOKIE_SECURE=false",
@@ -71,6 +73,7 @@ describe("runtime config", () => {
       loadRuntimeEnv(packageDirectory);
       expect(readRuntimeConfig().app.apiOrigin).toBe("http://localhost:3000");
       expect(readRuntimeConfig().gemini.model).toBe("gemini-test");
+      expect(readRuntimeConfig().app.logLevel).toBe("debug");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

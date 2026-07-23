@@ -5,6 +5,7 @@ import { loadRuntimeEnv, readRuntimeConfig } from "./config.js";
 import { DiagnosticAttemptService } from "./diagnostics/diagnostic-attempt-service.js";
 import { InitialDiagnosticRuntimeService } from "./diagnostics/initial-diagnostic-runtime-service.js";
 import { createApp } from "./http/app.js";
+import { createAppLogger } from "./observability/logger.js";
 import {
   createGeminiGenerate,
   GeminiProfileExtractionProvider,
@@ -23,6 +24,7 @@ import { PrismaUserRepository } from "./repositories/prisma-user-repository.js";
 loadRuntimeEnv();
 
 const runtime = readRuntimeConfig();
+const logger = createAppLogger(runtime.app.logLevel);
 const prisma = createDatabaseClient();
 const profileRepository = new PrismaProfileIntroductionRepository(prisma);
 const diagnosticAttemptRepository = new PrismaDiagnosticAttemptRepository(
@@ -30,11 +32,15 @@ const diagnosticAttemptRepository = new PrismaDiagnosticAttemptRepository(
 );
 const diagnosticQuestionBankRepository =
   new PrismaDiagnosticQuestionBankRepository(prisma);
-const geminiGenerate = createGeminiGenerate(runtime.gemini);
+const geminiGenerate = createGeminiGenerate(
+  runtime.gemini,
+  logger.child({ component: "gemini" }),
+);
 const profileIntroduction = new ProfileIntroductionService({
   repository: profileRepository,
   transcription: new GeminiTranscriptionProvider(geminiGenerate),
   extraction: new GeminiProfileExtractionProvider(geminiGenerate),
+  logger: logger.child({ component: "profile-introduction-service" }),
   schedule(task) {
     setImmediate(() => void task());
   },
@@ -42,7 +48,10 @@ const profileIntroduction = new ProfileIntroductionService({
 await profileIntroduction.recoverInterrupted();
 const app = await createApp({
   config: runtime.app,
-  authProvider: new CognitoAuthProvider(runtime.cognito),
+  authProvider: new CognitoAuthProvider(
+    runtime.cognito,
+    logger.child({ component: "cognito-auth-provider" }),
+  ),
   learners: new PrismaLearnerRepository(prisma),
   onboardingCompletion: new PrismaOnboardingCompletionRepository(prisma),
   diagnosticAttempts: diagnosticAttemptRepository,
@@ -52,10 +61,17 @@ const app = await createApp({
   users: new PrismaUserRepository(prisma),
   sessions: new PrismaSessionRepository(prisma),
   initialDiagnostic: new InitialDiagnosticRuntimeService({
-    attempts: new DiagnosticAttemptService(diagnosticAttemptRepository),
+    attempts: new DiagnosticAttemptService(
+      diagnosticAttemptRepository,
+      undefined,
+      logger.child({ component: "diagnostic-attempt-service" }),
+    ),
+    logger: logger.child({ component: "initial-diagnostic-runtime-service" }),
     questionBanks: diagnosticQuestionBankRepository,
   }),
+  logger,
   profileIntroduction,
 });
 
 await app.listen({ host: "0.0.0.0", port: runtime.port });
+logger.info({ event: "api.started", port: runtime.port }, "API started");

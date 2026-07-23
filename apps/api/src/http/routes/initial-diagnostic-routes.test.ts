@@ -16,6 +16,7 @@ const config: AppConfig = {
   authCallbackUrl: "http://localhost:3000/auth/callback",
   authLogoutUrl: "http://localhost:5173/login",
   frontendOrigin: "http://localhost:5173",
+  logLevel: "silent",
   nodeEnv: "test",
   sessionCookieName: "luma_lingo_session",
   sessionCookieSecure: false,

@@ -1,7 +1,7 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
-import Fastify from "fastify";
+import Fastify, { type FastifyBaseLogger } from "fastify";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -16,6 +16,11 @@ import type { OnboardingCompletionRepository } from "../learners/onboarding-comp
 import type { LearnerRepository } from "../learners/learner-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
 import type { SessionRepository } from "../sessions/session-repository.js";
+import {
+  createAppLogger,
+  createSilentLogger,
+  type AppLogger,
+} from "../observability/logger.js";
 import { ProfileIntroductionService } from "../profile/profile-introduction-service.js";
 import { AuthService } from "../services/auth-service.js";
 import { OnboardingService } from "../services/onboarding-service.js";
@@ -37,26 +42,72 @@ export interface AppDependencies {
   users: UserRepository;
   sessions: SessionRepository;
   initialDiagnostic?: InitialDiagnosticRuntimeService;
+  logger?: AppLogger;
   profileIntroduction?: ProfileIntroductionService;
 }
 
 export async function createApp(deps: AppDependencies) {
-  const app = Fastify({ logger: deps.config.nodeEnv !== "test" });
+  const logger =
+    deps.logger ??
+    (deps.config.nodeEnv === "test"
+      ? createSilentLogger()
+      : createAppLogger(deps.config.logLevel));
+  const app = Fastify({
+    disableRequestLogging: true,
+    loggerInstance: logger as unknown as FastifyBaseLogger,
+  });
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  app.addHook("onError", (request, reply, error, done) => {
+    request.log.error(
+      {
+        err: error,
+        event: "http.request.failed",
+        method: request.method,
+        route: request.routeOptions.url ?? request.url,
+        statusCode: reply.statusCode,
+      },
+      "HTTP request failed",
+    );
+    done();
+  });
+  app.addHook("onResponse", (request, reply, done) => {
+    const fields = {
+      event: "http.request.completed",
+      method: request.method,
+      route: request.routeOptions.url ?? request.url,
+      statusCode: reply.statusCode,
+      durationMs: Math.round(reply.elapsedTime),
+    };
+
+    if (reply.statusCode >= 500) {
+      request.log.error(fields, "HTTP request completed with server error");
+    } else if (reply.statusCode >= 400) {
+      request.log.warn(fields, "HTTP request completed with client error");
+    } else {
+      request.log.info(fields, "HTTP request completed");
+    }
+    done();
+  });
   app.addContentTypeParser(
     "application/x-www-form-urlencoded",
     { parseAs: "string" },
     async () => ({}),
   );
 
-  const auth = new AuthService(deps.users, deps.sessions, deps.config);
+  const auth = new AuthService(
+    deps.users,
+    deps.sessions,
+    deps.config,
+    logger.child({ component: "auth-service" }),
+  );
   const onboarding = new OnboardingService(
     deps.learners,
     deps.onboardingCompletion,
     deps.diagnosticAttempts,
     deps.initialLearningPriorities,
     deps.profileIntroduction,
+    logger.child({ component: "onboarding-service" }),
   );
 
   await app.register(cookie);
