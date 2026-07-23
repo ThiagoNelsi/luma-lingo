@@ -59,6 +59,13 @@ export class DiagnosticAttemptService {
     return this.repository.findInProgressAttempt(learningTrackId, purpose);
   }
 
+  findCompletedAttempt(
+    learningTrackId: string,
+    purpose: string,
+  ): Promise<DiagnosticAttempt | null> {
+    return this.repository.findCompletedAttempt(learningTrackId, purpose);
+  }
+
   async recordShownItem(
     input: RecordShownDiagnosticAttemptItemInput,
   ): Promise<DiagnosticAttemptItem> {

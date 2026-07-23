@@ -56,6 +56,22 @@ export class InitialDiagnosticRuntimeService {
     targetLanguage: string;
     goals: string[];
   }): Promise<InitialDiagnosticRuntimeResult> {
+    const inProgressAttempt = await this.deps.attempts.findInProgressAttempt(
+      input.learningTrackId,
+      initialDiagnosticPurpose,
+    );
+    if (!inProgressAttempt) {
+      const completedAttempt = await this.deps.attempts.findCompletedAttempt(
+        input.learningTrackId,
+        initialDiagnosticPurpose,
+      );
+      if (completedAttempt) {
+        return {
+          attempt: toRuntimeAttempt(completedAttempt),
+          item: null,
+        };
+      }
+    }
     const questionBank = await this.findQuestionBank(input.targetLanguage);
     const attempt = await this.deps.attempts.resumeOrCreateAttempt({
       learningTrackId: input.learningTrackId,

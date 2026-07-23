@@ -233,6 +233,33 @@ test("learner cannot bypass an unfinished diagnostic through the final profile r
   ).toBeVisible();
 });
 
+test("learner remains on profile review after a completed diagnostic", async ({
+  page,
+  request,
+}) => {
+  await authenticate(page);
+  await seedAuthenticatedLearner(
+    request,
+    "profile-review-diagnostic-completed",
+  );
+
+  const diagnosticStatus = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiOrigin}/me/initial-diagnostic/start` &&
+      response.request().method() === "POST",
+  );
+  await page.goto("/onboarding/profile-review");
+
+  await expect((await diagnosticStatus).json()).resolves.toMatchObject({
+    attempt: { status: "completed" },
+    item: null,
+  });
+  await expect(
+    page.getByRole("heading", { name: "Revise seu perfil" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/onboarding\/profile-review$/);
+});
+
 test("learner can complete the profile manually after extraction fails", async ({
   page,
   request,
@@ -430,7 +457,8 @@ async function seedAuthenticatedLearner(
     | "profile-introduction-under-13"
     | "profile-review-pending"
     | "profile-review-failed"
-    | "profile-review-diagnostic",
+    | "profile-review-diagnostic"
+    | "profile-review-diagnostic-completed",
 ) {
   const response = await request.post(`${apiOrigin}/test-control/seed`, {
     data: { state },

@@ -527,7 +527,8 @@ app.post("/test-control/seed", async (request, reply) => {
     state !== "profile-introduction-under-13" &&
     state !== "profile-review-pending" &&
     state !== "profile-review-failed" &&
-    state !== "profile-review-diagnostic"
+    state !== "profile-review-diagnostic" &&
+    state !== "profile-review-diagnostic-completed"
   ) {
     return reply.code(400).send({ error: "unsupported_seed_state" });
   }
@@ -539,7 +540,8 @@ app.post("/test-control/seed", async (request, reply) => {
   const profileReviewStep =
     state === "profile-review-pending" ||
     state === "profile-review-failed" ||
-    state === "profile-review-diagnostic";
+    state === "profile-review-diagnostic" ||
+    state === "profile-review-diagnostic-completed";
 
   profile = {
     ...profile,
@@ -560,7 +562,8 @@ app.post("/test-control/seed", async (request, reply) => {
       lessonEmphases: introductionStep ? [] : ["reading"],
       studyPace: null,
       onboardingStartingPoint:
-        state === "profile-review-diagnostic"
+        state === "profile-review-diagnostic" ||
+        state === "profile-review-diagnostic-completed"
           ? "diagnostic"
           : profileReviewStep
             ? "beginner"
@@ -569,7 +572,26 @@ app.post("/test-control/seed", async (request, reply) => {
       onboardingStep: introductionStep ? "age_and_goals" : "starting_point",
     },
   };
-  completedDiagnosticAttempt = null;
+  completedDiagnosticAttempt =
+    state === "profile-review-diagnostic-completed"
+      ? {
+          id: "attempt-1",
+          learningTrackId,
+          catalogId: "catalog-1",
+          purpose: "onboarding_initial",
+          status: "completed",
+          selectionPolicyVersion: "initial-diagnostic-selection-v1",
+          scoringPolicyVersion: "initial-diagnostic-scoring-v1",
+          startedAt: new Date(),
+          completedAt: new Date(),
+          abandonedAt: null,
+          summary: {
+            schemaVersion: 1,
+            answeredItemCount: 2,
+          },
+          details: {},
+        }
+      : null;
   answeredDiagnosticItemCount = 0;
   profileIntroductionStatus = introductionStep
     ? "not_started"
@@ -577,7 +599,8 @@ app.post("/test-control/seed", async (request, reply) => {
       ? "pending"
       : state === "profile-review-failed"
         ? "failed"
-        : state === "profile-review-diagnostic"
+        : state === "profile-review-diagnostic" ||
+            state === "profile-review-diagnostic-completed"
           ? "completed"
           : "completed";
   profileIntroductionProfile = null;

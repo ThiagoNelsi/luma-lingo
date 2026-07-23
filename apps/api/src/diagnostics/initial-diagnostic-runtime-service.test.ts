@@ -328,6 +328,45 @@ describe("InitialDiagnosticRuntimeService", () => {
       item: null,
     });
   });
+
+  it("returns the completed attempt when the profile review checks diagnostic status", async () => {
+    const now = new Date("2026-06-28T12:00:00.000Z");
+    const attempts = new MemoryDiagnosticAttemptRepository();
+    const runtime = new InitialDiagnosticRuntimeService({
+      attempts: new DiagnosticAttemptService(attempts, () => now),
+      questionBanks: new MemoryQuestionBankRepository(
+        buildQuestionBank([buildQuestionBankItem()]),
+      ),
+    });
+
+    await runtime.startInitialDiagnostic({
+      learningTrackId: "track-1",
+      targetLanguage: "en",
+      goals: ["travel"],
+    });
+    await runtime.answerInitialDiagnosticItem({
+      learningTrackId: "track-1",
+      targetLanguage: "en",
+      goals: ["travel"],
+      response: {
+        schemaVersion: 1,
+        kind: "multiple_choice",
+        selectedOptionIds: ["option_she"],
+      },
+    });
+
+    await expect(
+      runtime.startInitialDiagnostic({
+        learningTrackId: "track-1",
+        targetLanguage: "en",
+        goals: ["travel"],
+      }),
+    ).resolves.toMatchObject({
+      attempt: { id: "attempt-1", status: "completed" },
+      item: null,
+    });
+    expect(attempts.attempts).toHaveLength(1);
+  });
 });
 
 class MemoryQuestionBankRepository implements DiagnosticQuestionBankRepository {

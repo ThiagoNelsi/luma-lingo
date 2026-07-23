@@ -1,5 +1,31 @@
 # Future Improvements
 
+## 2026-07-23
+
+### Aggregate Confidence Across Direct Concept Evidence
+
+- **Deferred:** Replace the current “latest direct evidence wins” update for
+  `learner_concept_states.confidence` with a calibrated aggregation of
+  concordant direct evidence. The aggregation should account for each
+  evidence mapping's strength, conflicting results, and correlation between
+  probes from the same diagnostic attempt; it must not equate raw evidence
+  count with confidence. Include a safe plan to recompute or backfill existing
+  states from append-only `concept_evidence` records.
+- **Current scope boundary:** The July 23 investigation only diagnosed the
+  observed state `019f8b61-47b3-7479-bb21-de974cdabfa7`; it made no product or
+  persistence change. Choosing and calibrating an aggregation model requires
+  pedagogical policy work and regression coverage beyond that diagnosis.
+- **Future value:** Four correct direct observations currently leave that
+  state at 23.4% confidence because the final 30%-strength mapping overwrites
+  the prior 54.6%, 23.1%, and 22.8% mappings. Aggregation would make
+  confidence represent the accumulated certainty in the learner estimate,
+  while retaining restraint for repeated or weakly related observations.
+- **Revisit when:** Before learner-state confidence drives planning or is
+  exposed to learners. Define calibration simulations and expected behavior
+  for supporting/weak mappings, independent confirmation, contradictory
+  evidence, and same-attempt correlation; then add regression tests and a
+  backfill/reprojection procedure.
+
 ## 2026-07-22
 
 ### Weak Correlated-Component Priors During Onboarding
