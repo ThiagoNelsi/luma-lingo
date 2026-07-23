@@ -1,5 +1,10 @@
 import { extractedProfileSchema } from "@luma-lingo/shared";
 
+import {
+  createSilentLogger,
+  errorMetadata,
+  type AppLogger,
+} from "../observability/logger.js";
 import type {
   ProfileExtractionProvider,
   TranscriptionInput,
@@ -23,6 +28,16 @@ interface GeminiResponse {
 export type GeminiGenerate = (
   request: GeminiRequest,
 ) => Promise<GeminiResponse>;
+
+export class GeminiRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly retryAfterMilliseconds?: number,
+  ) {
+    super(`gemini_request_failed:${status}`);
+    this.name = "GeminiRequestError";
+  }
+}
 
 export class GeminiTranscriptionProvider implements TranscriptionProvider {
   constructor(private readonly generate: GeminiGenerate) {}
@@ -86,39 +101,85 @@ export class GeminiProfileExtractionProvider implements ProfileExtractionProvide
   }
 }
 
-export function createGeminiGenerate(config: {
-  apiKey: string;
-  model: string;
-  fetch?: typeof fetch;
-}): GeminiGenerate {
+export function createGeminiGenerate(
+  config: {
+    apiKey: string;
+    model: string;
+    fetch?: typeof fetch;
+  },
+  logger: AppLogger = createSilentLogger(),
+): GeminiGenerate {
   const fetchImpl = config.fetch ?? fetch;
   return async (request) => {
-    const response = await fetchImpl(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": config.apiKey,
+    const startedAt = performance.now();
+    try {
+      const response = await fetchImpl(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": config.apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: request.parts }],
+            generationConfig: request.responseJsonSchema
+              ? {
+                  responseMimeType: "application/json",
+                  responseJsonSchema: request.responseJsonSchema,
+                }
+              : undefined,
+          }),
         },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: request.parts }],
-          generationConfig: request.responseJsonSchema
-            ? {
-                responseMimeType: "application/json",
-                responseJsonSchema: request.responseJsonSchema,
-              }
-            : undefined,
-        }),
-      },
-    );
-    if (!response.ok)
-      throw new Error(`gemini_request_failed:${response.status}`);
-    const body = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("gemini_empty_response");
-    return { text };
+      );
+      if (!response.ok) {
+        throw new GeminiRequestError(
+          response.status,
+          parseRetryAfterMilliseconds(response.headers.get("retry-after")),
+        );
+      }
+      const body = (await response.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("gemini_empty_response");
+      logger.info(
+        {
+          durationMs: Math.round(performance.now() - startedAt),
+          event: "gemini.generate.completed",
+          model: config.model,
+        },
+        "Gemini generation completed",
+      );
+      return { text };
+    } catch (error) {
+      logger.error(
+        {
+          durationMs: Math.round(performance.now() - startedAt),
+          err: error,
+          event: "gemini.generate.failed",
+          model: config.model,
+          ...errorMetadata(error),
+        },
+        "Gemini generation failed",
+      );
+      throw error;
+    }
   };
+}
+
+export function parseRetryAfterMilliseconds(
+  value: string | null,
+  now: number = Date.now(),
+): number | undefined {
+  if (!value) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.ceil(seconds * 1_000);
+  }
+
+  const retryAt = Date.parse(value);
+  if (Number.isNaN(retryAt)) return undefined;
+  return Math.max(0, retryAt - now);
 }

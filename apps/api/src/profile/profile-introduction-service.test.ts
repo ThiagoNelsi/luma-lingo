@@ -2,9 +2,19 @@ import type { ConfirmedProfile, ExtractedProfile } from "@luma-lingo/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileIntroductionRepository } from "./profile-introduction-repository.js";
+import type { AppLogger } from "../observability/logger.js";
 import { ProfileIntroductionService } from "./profile-introduction-service.js";
 
-function createHarness(options: { transcriptionFailures?: number } = {}) {
+function createHarness(
+  options: {
+    logger?: AppLogger;
+    maxAttempts?: number;
+    random?: () => number;
+    retryAfterMilliseconds?: number;
+    transcriptionStatus?: number;
+    transcriptionFailures?: number;
+  } = {},
+) {
   let status:
     | "not_started"
     | "pending"
@@ -76,13 +86,17 @@ function createHarness(options: { transcriptionFailures?: number } = {}) {
     other: [],
   };
   const audio = Buffer.from("audio-data");
+  const sleep = vi.fn(async () => undefined);
   const service = new ProfileIntroductionService({
     repository,
     transcription: {
       async transcribe() {
         if (failures > 0) {
           failures -= 1;
-          throw new Error("temporary");
+          throw Object.assign(new Error("temporary"), {
+            retryAfterMilliseconds: options.retryAfterMilliseconds,
+            status: options.transcriptionStatus ?? 503,
+          });
         }
         return "Eu trabalho com design e gosto de cinema.";
       },
@@ -95,14 +109,17 @@ function createHarness(options: { transcriptionFailures?: number } = {}) {
     schedule(task) {
       tasks.push(task);
     },
-    sleep: vi.fn(async () => undefined),
-    maxAttempts: 3,
+    sleep,
+    maxAttempts: options.maxAttempts ?? 4,
+    logger: options.logger,
+    random: options.random,
   });
   return {
     audio,
     service,
     tasks,
     repository,
+    sleep,
     getState: () => ({
       status,
       attempts,
@@ -154,8 +171,58 @@ describe("ProfileIntroductionService", () => {
     expect([...harness.audio]).toEqual(new Array(harness.audio.length).fill(0));
   });
 
+  it("uses exponential backoff with jitter for transient provider failures", async () => {
+    const harness = createHarness({
+      maxAttempts: 4,
+      random: () => 0.5,
+      transcriptionFailures: 3,
+    });
+
+    await harness.service.submit("learner-1", "pt-BR", {
+      audio: harness.audio,
+      mimeType: "audio/webm",
+    });
+    await harness.tasks[0]?.();
+
+    expect(harness.sleep).toHaveBeenNthCalledWith(1, 1_500);
+    expect(harness.sleep).toHaveBeenNthCalledWith(2, 2_500);
+    expect(harness.sleep).toHaveBeenNthCalledWith(3, 4_500);
+  });
+
+  it("honors provider retry guidance when it exceeds calculated backoff", async () => {
+    const harness = createHarness({
+      random: () => 0,
+      retryAfterMilliseconds: 4_500,
+      transcriptionFailures: 1,
+    });
+
+    await harness.service.submit("learner-1", "pt-BR", {
+      audio: harness.audio,
+      mimeType: "audio/webm",
+    });
+    await harness.tasks[0]?.();
+
+    expect(harness.sleep).toHaveBeenCalledWith(4_500);
+  });
+
+  it("does not retry non-transient provider failures", async () => {
+    const harness = createHarness({
+      transcriptionFailures: 1,
+      transcriptionStatus: 400,
+    });
+
+    await harness.service.submit("learner-1", "pt-BR", {
+      audio: harness.audio,
+      mimeType: "audio/webm",
+    });
+    await harness.tasks[0]?.();
+
+    expect(harness.getState()).toMatchObject({ attempts: 1, status: "failed" });
+    expect(harness.sleep).not.toHaveBeenCalled();
+  });
+
   it("persists a bounded final failure and clears audio memory", async () => {
-    const harness = createHarness({ transcriptionFailures: 3 });
+    const harness = createHarness({ transcriptionFailures: 4 });
     await harness.service.submit("learner-1", "pt-BR", {
       audio: harness.audio,
       mimeType: "audio/webm",
@@ -163,10 +230,34 @@ describe("ProfileIntroductionService", () => {
     await harness.tasks[0]?.();
     expect(harness.getState()).toMatchObject({
       status: "failed",
-      attempts: 3,
-      errorCode: "profile_processing_failed",
+      attempts: 4,
+      errorCode: "profile_transcription_failed",
     });
     expect(harness.audio.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("logs the original error and stage when all processing attempts fail", async () => {
+    const logger = {
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    } as unknown as AppLogger;
+    const harness = createHarness({ logger, transcriptionFailures: 4 });
+
+    await harness.service.submit("learner-1", "pt-BR", {
+      audio: harness.audio,
+      mimeType: "audio/webm",
+    });
+    await harness.tasks[0]?.();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCode: "profile_transcription_failed",
+        event: "profile_introduction.failed",
+        learnerId: "learner-1",
+      }),
+      "Profile introduction failed after all attempts",
+    );
   });
 
   it("marks manual fallback without scheduling provider work", async () => {
