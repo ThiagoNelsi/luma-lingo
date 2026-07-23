@@ -1,56 +1,101 @@
 # LumaLingo
 
-LumaLingo is an AI-powered language learning product focused on personalized
-lessons, a lightweight onboarding flow, and a reliable feedback loop from one
-lesson to the next.
+> Um app mobile-first de aprendizagem de idiomas que começa pela vida real da
+> pessoa: objetivos, rotina, interesses e ponto de partida.
 
-This repository contains the web application, API, shared packages, database
-layer, infrastructure, and product documentation. The product glossary, PRD,
-and architecture decision records remain the source of truth for product and
-architecture decisions.
+LumaLingo é um MVP de edtech com IA. A proposta é substituir uma experiência
+genérica por uma jornada que coleta contexto de forma leve, estima o ponto de
+partida do aluno e cria a base para próximas aulas personalizadas.
 
-## What the product is
+O projeto foi pensado como um case de produto e engenharia: uma interface
+responsiva e acessível, regras pedagógicas explícitas, privacidade no fluxo de
+voz e uma arquitetura de monorepo pronta para evoluir.
 
-The intended experience is:
+## A experiência
 
-1. Collect a small learner profile.
-2. Estimate the learner's level with a friendly `Level check`.
-3. Generate a core lesson tailored to the learner's `Goal`, `User profile`,
-   `Lesson emphasis`, `Top mistakes`, `Review points`, and `Lesson length`.
-4. Review the learner's answers and produce a `Lesson report`.
-5. Use that report to shape the next lesson.
-6. Optionally add bonus content from public web sources when it makes sense.
+<p align="center">
+  <img src="docs/screenshots/mobile-home.png" alt="Tela inicial do LumaLingo em um viewport mobile, com convite para iniciar uma jornada de idiomas personalizada." width="280" />
+  <img src="docs/screenshots/mobile-audio-recording.png" alt="Etapa real do onboarding em layout mobile, durante a gravação de uma apresentação de áudio." width="280" />
+</p>
 
-The MVP stays focused on beginners and intermediate learners, with speaking
-excluded from the first version.
+As imagens mostram o layout em 390 × 844 px, com tema claro selecionado: a
+landing page pública e a etapa real de gravação de áudio do onboarding.
 
-## Current repo state
+### Do primeiro acesso à primeira prioridade de aprendizagem
 
-The repository is a pnpm TypeScript monorepo with:
+1. A pessoa escolhe o idioma que fala e o idioma que quer aprender.
+2. Define faixa etária, objetivo, preferências de estudo e ritmo.
+3. Apresenta seu contexto por uma gravação curta ou por campos manuais.
+4. Escolhe entre começar do zero ou fazer um diagnóstico inicial adaptado ao
+   ponto de partida.
+5. Revisa as informações e confirma o onboarding; o sistema persiste a
+   primeira prioridade de aprendizagem.
 
-- `apps/web` for the React, Vite, and Tailwind CSS frontend
-- `apps/api` for the Fastify backend
-- `packages/shared` for shared TypeScript contracts
-- `packages/database` for Prisma schema, migrations, and database access
-- `infra` for Terraform infrastructure
+O fluxo evita transformar a configuração em uma prova longa. Quem está
+começando pode pular o diagnóstico; quem já tem algum repertório recebe uma
+sequência curta de questões com rastreabilidade por competência.
 
-The current implementation includes the authentication and session foundation,
-public and authenticated web routes, and the initial responsive design system.
-The design system provides semantic light and dark theme tokens and reusable
-`Button`, `Surface`, and `Progress` components.
+## O que já existe
 
-Authenticated learners can complete the implemented onboarding steps for
-language selection, age and goals, and a short profile introduction. Eligible
-learners can record up to 90 seconds in their `Instruction language`, review or
-replace the local recording, and submit it for asynchronous transcription and
-structured profile extraction. Learners under 13 and learners who don't want
-to record use the manual-profile path. The API keeps submitted audio only in
-memory while Gemini processes it and persists only the processing state and
-extracted profile fields.
+| Área           | Entrega atual                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Experiência    | Landing page, design system responsivo, temas claro e escuro, e rotas públicas e autenticadas.                                    |
+| Onboarding     | Idiomas, dados de contexto, objetivos, preferências, ritmo, caminho iniciante ou diagnóstico, revisão e retomada do progresso.    |
+| Personalização | Apresentação de áudio de até 90 segundos, extração assíncrona de perfil e alternativa manual para quem não quer gravar.           |
+| Diagnóstico    | Banco de questões determinístico, registro de tentativas, pontuação e atualização inicial do estado de aprendizagem.              |
+| Plataforma     | Sessão própria da aplicação após Cognito, API documentada com OpenAPI, persistência PostgreSQL/Prisma e infraestrutura Terraform. |
+| Qualidade      | Testes unitários junto ao código e jornada crítica coberta com Playwright e uma API de teste em memória.                          |
 
-## Development
+## Diferenciais de produto e engenharia
 
-Install dependencies and start all development services:
+- **Personalização com propósito:** interesses, trabalho, rotina e objetivos
+  são dados de entrada para a experiência de aprendizagem, não apenas campos
+  de perfil.
+- **Privacidade desde o desenho:** o áudio da apresentação é processado em
+  memória e não é persistido. Pessoas menores de 13 anos seguem o caminho
+  manual, sem gravação.
+- **Modelo pedagógico explícito:** conceitos, competências, pré-requisitos e
+  evidências de aprendizagem são modelados separadamente. Isso permite
+  evoluir a adaptação sem transformar regras de ensino em prompts opacos.
+- **Arquitetura orientada a limites:** contratos compartilhados, schemas Zod,
+  DTOs HTTP, serviços de domínio e adaptadores de infraestrutura ficam em
+  camadas distintas.
+
+## Stack
+
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS e Lucide.
+- **Backend:** Fastify, TypeScript, Zod, cookies de sessão e OpenAPI.
+- **Dados:** PostgreSQL, Prisma e modelos versionados para o catálogo
+  pedagógico.
+- **Integrações:** Amazon Cognito para login, Gemini para a extração do perfil
+  a partir da apresentação, e adaptadores para isolar provedores.
+- **Operação e qualidade:** pnpm workspaces, Vitest, Playwright, Pino e
+  Terraform.
+
+## Arquitetura do repositório
+
+| Diretório                                | Responsabilidade                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| [`apps/web`](apps/web)                   | Aplicação React e a experiência mobile-first.                                |
+| [`apps/api`](apps/api)                   | API Fastify, autenticação, onboarding, diagnóstico e regras de aplicação.    |
+| [`packages/shared`](packages/shared)     | Contratos TypeScript e schemas reutilizados entre aplicações.                |
+| [`packages/database`](packages/database) | Schema Prisma, migrations, importadores e validações do catálogo pedagógico. |
+| [`infra`](infra)                         | Infraestrutura AWS declarada com Terraform.                                  |
+| [`docs`](docs)                           | Decisões arquiteturais, estratégia de diagnóstico e documentação de produto. |
+
+## Em evolução
+
+O núcleo de entrada, diagnóstico e estado inicial de aprendizagem está em
+desenvolvimento ativo. As próximas etapas de produto são gerar a primeira aula
+guiada a partir dessas evidências, avaliar as respostas e fechar o ciclo com
+um relatório que informa a próxima aula. Recursos de fala, gamificação e
+funcionalidades sociais permanecem fora do escopo do MVP.
+
+## Executar localmente
+
+Pré-requisitos: Node.js 22+, pnpm 10 e um PostgreSQL acessível. Para o fluxo
+de autenticação e extração de perfil, configure também Cognito e uma chave do
+Gemini.
 
 ```bash
 pnpm install
@@ -58,13 +103,10 @@ cp .env.example .env
 pnpm dev
 ```
 
-Set `GEMINI_API_KEY` in `.env` before starting the API. You can override the
-default `gemini-3.5-flash` model with `GEMINI_MODEL`. The current integration is
-for synthetic development recordings only. Before using real learner audio,
-move to a provider account with production-appropriate data controls or switch
-providers through the profile transcription and extraction adapters.
+Preencha as variáveis indicadas em [`.env.example`](.env.example), em especial
+as configurações do banco, Cognito e `GEMINI_API_KEY`.
 
-Run validation before committing changes:
+### Verificações
 
 ```bash
 pnpm check
@@ -73,17 +115,20 @@ pnpm test:e2e
 pnpm format
 ```
 
-The end-to-end suite uses Playwright and starts local web and API test servers
-with an in-memory authenticated learner.
+Os testes end-to-end iniciam uma API e uma interface locais com um aluno de
+teste em memória; não exigem banco de produção nem conta Cognito.
 
-## Key docs
+## Leitura complementar
 
-- [Documentação do sistema em português](docs/sistema-lumalingo.md)
-- [Glossary and shared terms](CONTEXT.md)
-- [Product brief and requirements](luma-lingo-prd.md)
-- [ADR 0001: Agent Roles and Lesson Flow](docs/adr/0001-agent-roles-and-lesson-flow.md)
-- [ADR 0002: Web MVP Stack and AWS Deployment](docs/adr/0002-web-mvp-stack-and-aws-deployment.md)
-- [ADR 0003: Cognito Managed Login](docs/adr/0003-use-cognito-managed-login-for-mvp-auth.md)
-- [ADR 0004: Cost-controlled development infrastructure](docs/adr/0004-cost-controlled-dev-infrastructure-and-provider-abstractions.md)
-- [ADR 0005: Recorded profile introduction processing](docs/adr/0005-process-recorded-profile-introductions-in-api-memory.md)
-- [Design system guidelines](docs/design-system/guidelines.md)
+- [Glossário de produto e domínio](CONTEXT.md)
+- [Visão de produto e requisitos](luma-lingo-prd.md)
+- [Ciclo de aprendizagem do aluno](docs/learner-learning-loop.md)
+- [Estratégia de validação do diagnóstico](docs/initial-diagnostic-validation-strategy.md)
+- [Decisões de arquitetura](docs/adr)
+- [Diretrizes do design system](docs/design-system/guidelines.md)
+
+---
+
+LumaLingo está sendo construído como um produto de aprendizagem prático,
+calmo e adaptável — com uma base técnica que torna as decisões de produto
+auditáveis.
