@@ -1,0 +1,8 @@
+-- RenameForeignKey
+ALTER TABLE "diagnostic_item_concept_evidence_mappings" RENAME CONSTRAINT "diagnostic_item_concept_evidence_mappings_diagnostic_item_id_fk" TO "diagnostic_item_concept_evidence_mappings_diagnostic_item__fkey";
+
+-- RenameIndex
+ALTER INDEX "diagnostic_item_concept_evidence_mappings_concept_id_capability" RENAME TO "diagnostic_item_concept_evidence_mappings_concept_id_capabi_idx";
+
+-- RenameIndex
+ALTER INDEX "learner_concept_states_learning_track_id_concept_id_capability_" RENAME TO "learner_concept_states_learning_track_id_concept_id_capabil_key";
