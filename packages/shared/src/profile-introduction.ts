@@ -3,8 +3,6 @@ import { z } from "zod";
 export const extractedProfileSchema = z.object({
   jobOrField: z.string().trim().max(200).nullable(),
   interests: z.array(z.string().trim().min(1).max(200)).max(10),
-  dailyRoutine: z.array(z.string().trim().min(1).max(300)).max(10),
-  studyContext: z.string().trim().max(300).nullable(),
   other: z.array(z.string().trim().min(1).max(300)).max(10),
 });
 

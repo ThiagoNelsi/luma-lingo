@@ -119,14 +119,34 @@ describe("Gemini profile providers", () => {
       text: JSON.stringify({
         jobOrField: null,
         interests: ["livros"],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       }),
     }));
     const provider = new GeminiProfileExtractionProvider(request);
     expect(await provider.extract("Gosto de livros.", "pt-BR")).toEqual(
       expect.objectContaining({ interests: ["livros"] }),
+    );
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responseJsonSchema: expect.objectContaining({
+          properties: {
+            jobOrField: expect.anything(),
+            interests: expect.anything(),
+            other: expect.anything(),
+          },
+          required: ["jobOrField", "interests", "other"],
+        }),
+      }),
+    );
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responseJsonSchema: expect.objectContaining({
+          properties: expect.not.objectContaining({
+            dailyRoutine: expect.anything(),
+            studyContext: expect.anything(),
+          }),
+        }),
+      }),
     );
   });
 });

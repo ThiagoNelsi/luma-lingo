@@ -11,13 +11,13 @@ describe("profile introduction contracts", () => {
     const result = extractedProfileSchema.parse({
       jobOrField: "Engenharia de software",
       interests: ["música"],
-      dailyRoutine: ["trabalha pela manhã"],
-      studyContext: "estuda no ônibus",
       other: [],
     });
 
     expect(result.interests).toEqual(["música"]);
     expect(Object.keys(result)).not.toContain("age");
+    expect(Object.keys(result)).not.toContain("dailyRoutine");
+    expect(Object.keys(result)).not.toContain("studyContext");
   });
 
   it("defines the persisted processing lifecycle", () => {
@@ -36,8 +36,6 @@ describe("profile introduction contracts", () => {
       confirmedProfileSchema.parse({
         jobOrField: "",
         interests: [],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       }),
     ).toThrow();
@@ -46,8 +44,6 @@ describe("profile introduction contracts", () => {
       confirmedProfileSchema.parse({
         jobOrField: "Engenharia de software",
         interests: ["música"],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       }),
     ).toMatchObject({ jobOrField: "Engenharia de software" });

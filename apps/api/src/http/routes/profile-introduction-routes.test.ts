@@ -120,8 +120,6 @@ function createHarness(ageRange: LearnerAgeRange = "25_39") {
         return {
           jobOrField: null,
           interests: [],
-          dailyRoutine: [],
-          studyContext: null,
           other: [],
         };
       },
@@ -313,8 +311,6 @@ describe("profile introduction route handlers", () => {
       payload: {
         jobOrField: "Professora",
         interests: ["cinema"],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       },
     });
@@ -329,8 +325,6 @@ describe("profile introduction route handlers", () => {
       payload: {
         jobOrField: "",
         interests: [],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       },
     });
@@ -342,8 +336,6 @@ describe("profile introduction route handlers", () => {
     const payload = {
       jobOrField: "Professora",
       interests: ["cinema"],
-      dailyRoutine: [],
-      studyContext: null,
       other: [],
     };
 

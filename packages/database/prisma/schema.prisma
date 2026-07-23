@@ -98,8 +98,6 @@ model ProfileIntroduction {
   errorCode    String?                   @map("error_code")
   jobOrField   String?                   @map("job_or_field")
   interests    String[]                  @default([])
-  dailyRoutine String[]                  @default([]) @map("daily_routine")
-  studyContext String?                   @map("study_context")
   other        String[]                  @default([])
   confirmedAt  DateTime?                 @map("confirmed_at") @db.Timestamptz(6)
   createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)

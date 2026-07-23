@@ -177,8 +177,8 @@ export function PrivatePage({ apiOrigin }: PrivatePageProps) {
           <div>
             <h3 className="mb-0">Uma dica para começar, {displayName}</h3>
             <p className={supportingCopyClasses}>
-              Seja sincero sobre sua rotina. Assim, as aulas cabem melhor no seu
-              dia.
+              Escolha suas preferências com sinceridade. Assim, as aulas cabem
+              melhor no seu dia.
             </p>
           </div>
         </Surface>

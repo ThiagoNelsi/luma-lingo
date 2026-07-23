@@ -12,8 +12,6 @@ const row = {
   errorCode: null,
   jobOrField: "Design",
   interests: ["cinema"],
-  dailyRoutine: [],
-  studyContext: null,
   other: [],
 };
 
@@ -61,8 +59,6 @@ describe("PrismaProfileIntroductionRepository", () => {
     await repository.markCompleted("learner-1", {
       jobOrField: null,
       interests: [],
-      dailyRoutine: [],
-      studyContext: null,
       other: [],
     });
     await repository.markFailed("learner-1", "failed");
@@ -92,8 +88,6 @@ describe("PrismaProfileIntroductionRepository", () => {
     await repository.confirmProfile("learner-1", {
       jobOrField: "Professora",
       interests: ["cinema"],
-      dailyRoutine: [],
-      studyContext: null,
       other: [],
     });
 

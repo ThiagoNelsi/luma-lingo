@@ -10,8 +10,6 @@ describe("profile review form", () => {
     const values = createProfileReviewValues({
       jobOrField: null,
       interests: ["cinema"],
-      dailyRoutine: ["estuda à noite"],
-      studyContext: null,
       other: [],
     });
 
@@ -49,14 +47,12 @@ describe("profile review form", () => {
     const result = validateProfileReviewForm({
       jobOrField: "Professora",
       interests: "cinema",
-      dailyRoutine: "",
-      studyContext: "x".repeat(301),
-      other: "",
+      other: "x".repeat(301),
     });
 
     expect(result).toMatchObject({
       ok: false,
-      errors: { studyContext: "Use até 300 caracteres." },
+      errors: { other: "Use até 10 itens de até 300 caracteres." },
     });
   });
 });

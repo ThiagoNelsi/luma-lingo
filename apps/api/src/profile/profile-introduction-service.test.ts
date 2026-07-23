@@ -81,8 +81,6 @@ function createHarness(
   const extracted: ExtractedProfile = {
     jobOrField: "Design",
     interests: ["cinema"],
-    dailyRoutine: [],
-    studyContext: null,
     other: [],
   };
   const audio = Buffer.from("audio-data");
@@ -273,16 +271,12 @@ describe("ProfileIntroductionService", () => {
     const confirmed = await harness.service.confirm("learner-1", {
       jobOrField: "Professora",
       interests: ["cinema"],
-      dailyRoutine: ["estuda à noite"],
-      studyContext: null,
       other: [],
     });
 
     await harness.repository.markCompleted("learner-1", {
       jobOrField: "Design",
       interests: ["música"],
-      dailyRoutine: [],
-      studyContext: null,
       other: [],
     });
 
@@ -302,8 +296,6 @@ describe("ProfileIntroductionService", () => {
       harness.service.confirm("learner-1", {
         jobOrField: "",
         interests: [],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
       }),
     ).rejects.toThrow();

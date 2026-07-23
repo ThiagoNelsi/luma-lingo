@@ -67,8 +67,6 @@ describe("profile introduction client", () => {
             profile: {
               jobOrField: "Professora",
               interests: ["cinema"],
-              dailyRoutine: [],
-              studyContext: null,
               other: [],
             },
           }),
@@ -80,8 +78,6 @@ describe("profile introduction client", () => {
     await confirmProfileIntroduction("http://localhost:3000", {
       jobOrField: "Professora",
       interests: ["cinema"],
-      dailyRoutine: [],
-      studyContext: null,
       other: [],
     });
 
@@ -93,8 +89,6 @@ describe("profile introduction client", () => {
         body: JSON.stringify({
           jobOrField: "Professora",
           interests: ["cinema"],
-          dailyRoutine: [],
-          studyContext: null,
           other: [],
         }),
       }),

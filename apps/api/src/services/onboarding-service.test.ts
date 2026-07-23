@@ -188,8 +188,6 @@ describe("OnboardingService", () => {
             profile: {
               jobOrField: "Professora",
               interests: ["cinema"],
-              dailyRoutine: [],
-              studyContext: null,
               other: [],
             },
           };

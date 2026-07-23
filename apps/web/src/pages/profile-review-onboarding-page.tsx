@@ -343,27 +343,6 @@ export function ProfileReviewOnboardingPage({
               <ProfileField
                 error={
                   attempted && !formResult.ok
-                    ? formResult.errors.dailyRoutine
-                    : undefined
-                }
-                hint="Conte um pouco da sua rotina; isso ajuda a tornar as aulas mais relevantes."
-                label="Rotina diária"
-                onChange={(value) => updateValue("dailyRoutine", value)}
-                value={values.dailyRoutine}
-              />
-              <ProfileField
-                error={
-                  attempted && !formResult.ok
-                    ? formResult.errors.studyContext
-                    : undefined
-                }
-                label="Contexto de estudo"
-                onChange={(value) => updateValue("studyContext", value)}
-                value={values.studyContext}
-              />
-              <ProfileField
-                error={
-                  attempted && !formResult.ok
                     ? formResult.errors.other
                     : undefined
                 }

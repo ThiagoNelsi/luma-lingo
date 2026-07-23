@@ -14,8 +14,6 @@ interface PersistedProfileIntroduction {
   errorCode: string | null;
   jobOrField: string | null;
   interests: string[];
-  dailyRoutine: string[];
-  studyContext: string | null;
   other: string[];
 }
 
@@ -40,8 +38,6 @@ export function toProfileIntroductionProgress(
         ? {
             jobOrField: value.jobOrField,
             interests: value.interests,
-            dailyRoutine: value.dailyRoutine,
-            studyContext: value.studyContext,
             other: value.other,
           }
         : null,
@@ -69,8 +65,6 @@ export class PrismaProfileIntroductionRepository implements ProfileIntroductionR
         errorCode: null,
         jobOrField: null,
         interests: [],
-        dailyRoutine: [],
-        studyContext: null,
         other: [],
         confirmedAt: null,
       },

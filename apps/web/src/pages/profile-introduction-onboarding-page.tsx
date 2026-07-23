@@ -254,20 +254,16 @@ export function ProfileIntroductionOnboardingPage({
               O que falar na apresentação?
             </p>
             <div className="flex flex-wrap gap-2">
-              {[
-                "Sua área de trabalho",
-                "Hobbies",
-                "Seus interesses",
-                "Sua rotina",
-                "Como costuma estudar",
-              ].map((prompt) => (
-                <span
-                  className="rounded-full border border-border bg-muted px-3 py-1.5 text-[var(--text-caption)]"
-                  key={prompt}
-                >
-                  {prompt}
-                </span>
-              ))}
+              {["Sua área de trabalho", "Hobbies", "Seus interesses"].map(
+                (prompt) => (
+                  <span
+                    className="rounded-full border border-border bg-muted px-3 py-1.5 text-[var(--text-caption)]"
+                    key={prompt}
+                  >
+                    {prompt}
+                  </span>
+                ),
+              )}
             </div>
           </div>
           <div className="flex flex-col items-center gap-4 py-3">

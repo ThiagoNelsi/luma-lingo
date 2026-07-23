@@ -64,18 +64,10 @@ export class GeminiTranscriptionProvider implements TranscriptionProvider {
 const profileJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "jobOrField",
-    "interests",
-    "dailyRoutine",
-    "studyContext",
-    "other",
-  ],
+  required: ["jobOrField", "interests", "other"],
   properties: {
     jobOrField: { type: ["string", "null"] },
     interests: { type: "array", items: { type: "string" }, maxItems: 10 },
-    dailyRoutine: { type: "array", items: { type: "string" }, maxItems: 10 },
-    studyContext: { type: ["string", "null"] },
     other: { type: "array", items: { type: "string" }, maxItems: 10 },
   },
 };
@@ -89,7 +81,7 @@ export class GeminiProfileExtractionProvider implements ProfileExtractionProvide
         {
           text: [
             `Extraia apenas fatos explicitamente ditos nesta transcrição em ${instructionLanguage}.`,
-            "Campos permitidos: trabalho/área, interesses, rotina diária, contexto de estudo e outros fatos úteis.",
+            "Campos permitidos: trabalho/área, interesses e outros fatos úteis.",
             "Nunca infira idade, objetivo, nível, ritmo, ênfase ou nome.",
             `Transcrição: ${transcript}`,
           ].join("\n"),
