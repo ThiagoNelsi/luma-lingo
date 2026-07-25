@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { lessonBlockContract, lessonBlockSchema } from "./lesson-content.js";
+import {
+  lessonBlockContract,
+  lessonBlockSchema,
+  lessonPlanSchema,
+} from "./lesson-content.js";
 
 describe("lesson block contract", () => {
+  it("requires an approximately ten-minute Lesson plan to have three to five cohesive blocks", () => {
+    expect(() =>
+      lessonPlanSchema.parse({
+        title: "Greetings",
+        objective: "Introduce yourself.",
+        blocks: [
+          { title: "Hello", objective: "Say hello." },
+          { title: "Name", objective: "Share your name." },
+        ],
+      }),
+    ).toThrow();
+  });
+
   it("keeps rendered activity variants closed and rejects an invalid answer index", () => {
     expect(() =>
       lessonBlockSchema.parse({

@@ -7,7 +7,7 @@ import { HomeService } from "../../lessons/home-service.js";
 import { AuthService } from "../../services/auth-service.js";
 import { errorDtoSchema } from "../dtos/error-dto.js";
 import { homeDtoSchema, toHomeDto } from "../dtos/home-dto.js";
-import { lessonDtoSchema } from "../dtos/lesson-dto.js";
+import { lessonDtoSchema, toLessonDto } from "../dtos/lesson-dto.js";
 
 export interface HomeRoutesDependencies {
   auth: AuthService;
@@ -72,7 +72,7 @@ export function registerHomeRoutes(
         request.params.lessonId,
       );
       if (!lesson) return reply.code(404).send({ error: "lesson_not_found" });
-      return lesson;
+      return toLessonDto(lesson);
     },
   );
 }

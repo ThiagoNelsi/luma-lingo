@@ -502,21 +502,24 @@ const app = await createApp({
     async getLesson(_learnerId, lessonId) {
       return {
         lessonId,
-        block: {
-          title: "Your first greeting",
-          objective: "Say hello and share your name.",
-          explanation: "Use Hello to greet someone.",
-          examples: [{ target: "Hello!", instruction: "Olá!" }],
-          activities: [
-            {
-              type: "multiple_choice" as const,
-              prompt: "Choose a greeting.",
-              options: ["Hello", "Thanks"],
-              correctOptionIndex: 0,
-              explanation: "Hello is a greeting.",
-            },
-          ],
-        },
+        blocks: [
+          {
+            title: "Your first greeting",
+            objective: "Say hello and share your name.",
+            explanation: "Use Hello to greet someone.",
+            examples: [{ target: "Hello!", instruction: "Olá!" }],
+            activities: [
+              {
+                type: "multiple_choice" as const,
+                prompt: "Choose a greeting.",
+                options: ["Hello", "Thanks"],
+                correctOptionIndex: 0,
+                explanation: "Hello is a greeting.",
+              },
+            ],
+          },
+        ],
+        nextBlockStatus: "preparing" as const,
       };
     },
   } as HomeService,

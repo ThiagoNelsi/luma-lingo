@@ -12,7 +12,7 @@ export const lessonPlanSchema = z.object({
         objective: textSchema,
       }),
     )
-    .min(1)
+    .min(3)
     .max(5),
 });
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
@@ -87,7 +87,7 @@ export const lessonPlanContract = {
       objective: { type: "string" },
       blocks: {
         type: "array",
-        minItems: 1,
+        minItems: 3,
         maxItems: 5,
         items: {
           type: "object",

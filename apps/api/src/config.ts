@@ -31,6 +31,7 @@ export interface RuntimeConfig {
   };
   openai: {
     apiKey: string;
+    lessonGenerationConcurrency: number;
     lessonForegroundBudgetMs: number;
     lessonBlockModel: string;
     lessonPlanModel: string;
@@ -72,6 +73,9 @@ export function readRuntimeConfig(
     },
     openai: {
       apiKey: required(env, "OPENAI_API_KEY"),
+      lessonGenerationConcurrency: parseInteger(
+        env.LESSON_GENERATION_CONCURRENCY ?? "4",
+      ),
       lessonForegroundBudgetMs: parseInteger(
         env.LESSON_FOREGROUND_BUDGET_MS ?? "5000",
       ),

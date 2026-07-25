@@ -22,6 +22,7 @@ interface OpenAiResponse {
       refusal?: string;
     }>;
   }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 export class OpenAiStructuredModelError extends Error {
@@ -264,6 +265,7 @@ function toRun(response: OpenAiResponse, model: string): StructuredModelRun {
       status: "failed",
       reference: response.id,
       errorCode: "openai_refusal",
+      usage: usageFrom(response),
     };
   }
   if (response.status === "completed") {
@@ -277,6 +279,7 @@ function toRun(response: OpenAiResponse, model: string): StructuredModelRun {
         status: "failed",
         reference: response.id,
         errorCode: "openai_empty_output",
+        usage: usageFrom(response),
       };
     }
     return {
@@ -285,6 +288,7 @@ function toRun(response: OpenAiResponse, model: string): StructuredModelRun {
       status: "completed",
       reference: response.id,
       output,
+      usage: usageFrom(response),
     };
   }
   if (response.status === "failed") {
@@ -294,6 +298,7 @@ function toRun(response: OpenAiResponse, model: string): StructuredModelRun {
       status: "failed",
       reference: response.id,
       errorCode: response.error?.code ?? "openai_response_failed",
+      usage: usageFrom(response),
     };
   }
   return {
@@ -301,7 +306,17 @@ function toRun(response: OpenAiResponse, model: string): StructuredModelRun {
     model: resolvedModel,
     status: "pending",
     reference: response.id,
+    usage: usageFrom(response),
   };
+}
+
+function usageFrom(
+  response: OpenAiResponse,
+): StructuredModelRun["usage"] | undefined {
+  const inputTokens = response.usage?.input_tokens;
+  const outputTokens = response.usage?.output_tokens;
+  if (inputTokens === undefined && outputTokens === undefined) return undefined;
+  return { inputTokens, outputTokens };
 }
 
 function reasoningEffortFor(workload: "lesson_plan" | "lesson_block") {

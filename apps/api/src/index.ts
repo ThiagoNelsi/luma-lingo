@@ -60,8 +60,10 @@ const lessonProduction = new LessonProductionService({
     logger.child({ component: "openai-structured-model" }),
   ),
   repository: lessonRepository,
+  concurrencyLimit: runtime.openai.lessonGenerationConcurrency,
   logger: logger.child({ component: "lesson-production-service" }),
 });
+await lessonProduction.recoverInterrupted();
 const profileIntroduction = new ProfileIntroductionService({
   repository: profileRepository,
   transcription: new GeminiTranscriptionProvider(geminiGenerate),

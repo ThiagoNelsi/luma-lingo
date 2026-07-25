@@ -35,15 +35,20 @@ export type HomeResponse = z.infer<typeof homeResponseSchema>;
 
 export const lessonResponseSchema = z.object({
   lessonId: z.uuid(),
-  block: z.object({
-    title: textSchema,
-    objective: textSchema,
-    explanation: textSchema,
-    examples: z.array(
-      z.object({ target: textSchema, instruction: textSchema }),
-    ),
-    activities: z.array(activitySchema),
-  }),
+  blocks: z
+    .array(
+      z.object({
+        title: textSchema,
+        objective: textSchema,
+        explanation: textSchema,
+        examples: z.array(
+          z.object({ target: textSchema, instruction: textSchema }),
+        ),
+        activities: z.array(activitySchema),
+      }),
+    )
+    .min(1),
+  nextBlockStatus: z.enum(["preparing", "failed", "complete"]),
 });
 export type LessonResponse = z.infer<typeof lessonResponseSchema>;
 

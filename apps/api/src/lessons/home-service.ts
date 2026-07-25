@@ -4,7 +4,6 @@ import {
   errorMetadata,
   type AppLogger,
 } from "../observability/logger.js";
-import type { LessonBlock } from "./lesson-content.js";
 import type { LessonProductionService } from "./lesson-production-service.js";
 import type { HomeLesson, LessonRepository } from "./lesson-repository.js";
 
@@ -17,7 +16,11 @@ export type HomeResult =
       block: NonNullable<HomeLesson["block"]>;
     };
 
-export type LessonResult = { lessonId: string; block: LessonBlock };
+export type LessonResult = {
+  lessonId: string;
+  blocks: NonNullable<HomeLesson["block"]>[];
+  nextBlockStatus: "preparing" | "failed" | "complete";
+};
 
 interface HomeInput {
   correlationId?: string;
@@ -196,8 +199,11 @@ export class HomeService {
     learnerId: string,
     lessonId: string,
   ): Promise<LessonResult | null> {
-    const block = await this.deps.lessons.findLessonBlock(learnerId, lessonId);
-    return block ? { lessonId, block } : null;
+    const progress = await this.deps.lessons.findLessonProgress(
+      learnerId,
+      lessonId,
+    );
+    return progress ? { lessonId, ...progress } : null;
   }
 }
 

@@ -9,11 +9,16 @@ export interface StructuredOutputContract<T> {
 
 export interface StructuredModelRun {
   adapter: string;
+  latencyMs?: number;
   model: string;
-  status: "completed" | "pending" | "failed";
+  status: "queued" | "completed" | "pending" | "failed";
   reference: string;
   output?: string;
   errorCode?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+  };
 }
 
 export interface StructuredModelRequest<T> {

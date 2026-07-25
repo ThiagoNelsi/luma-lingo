@@ -36,6 +36,15 @@ enum LessonStatus {
   @@map("lesson_status")
 }
 
+enum StructuredModelRunStatus {
+  queued
+  pending
+  completed
+  failed
+
+  @@map("structured_model_run_status")
+}
+
 model User {
   id              String         @id @db.Uuid
   primaryEmail    String         @map("primary_email")
@@ -516,7 +525,7 @@ model Lesson {
   module                    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   priorityCompetency        Competency    @relation("InitialLessonPriorityCompetency", fields: [priorityCompetencyId], references: [id], onDelete: Restrict)
   blocks                    LessonBlock[]
-  productionRuns            LessonProductionRun[]
+  structuredModelRuns       StructuredModelRun[]
 
   @@unique([learningTrackId, priorityCompetencyId])
   @@index([moduleId])
@@ -537,18 +546,26 @@ model LessonBlock {
   @@map("lesson_blocks")
 }
 
-model LessonProductionRun {
-  id              String   @id @db.Uuid
-  lessonId        String   @map("lesson_id") @db.Uuid
-  step            String
-  adapter         String
-  model           String
-  promptVersion   String   @map("prompt_version")
-  contractVersion String   @map("contract_version")
-  providerReference String? @map("provider_reference")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  lesson          Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+model StructuredModelRun {
+  id                 String                  @id @db.Uuid
+  lessonId           String                  @map("lesson_id") @db.Uuid
+  step               String
+  adapter            String
+  model              String
+  status             StructuredModelRunStatus @default(pending)
+  attempt            Int                     @default(1)
+  promptVersion      String                  @map("prompt_version")
+  contractVersion    String                  @map("contract_version")
+  providerReference  String?                 @map("provider_reference")
+  inputTokens        Int?                    @map("input_tokens")
+  outputTokens       Int?                    @map("output_tokens")
+  latencyMs          Int?                    @map("latency_ms")
+  errorCode          String?                 @map("error_code")
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lesson             Lesson                  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@unique([lessonId, step])
-  @@map("lesson_production_runs")
+  @@unique([lessonId, step, attempt])
+  @@index([status])
+  @@map("structured_model_runs")
 }

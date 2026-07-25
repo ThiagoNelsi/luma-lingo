@@ -78,10 +78,50 @@ describe("home routes", () => {
     expect(response.statusCode).toBe(401);
     expect(getHome).not.toHaveBeenCalled();
   });
+
+  it("exposes only the contiguous approved Lesson prefix", async () => {
+    const app = await buildApp({
+      getHome: vi.fn(),
+      getLesson: vi.fn(async () => ({
+        lessonId: "f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+        blocks: [
+          {
+            title: "Hello",
+            objective: "Greet someone.",
+            explanation: "Say Hello.",
+            examples: [{ target: "Hello!", instruction: "Olá!" }],
+            activities: [
+              {
+                type: "multiple_choice" as const,
+                prompt: "Choose a greeting.",
+                options: ["Hello", "Thanks"],
+                correctOptionIndex: 0,
+                explanation: "Hello is a greeting.",
+              },
+            ],
+          },
+        ],
+        nextBlockStatus: "preparing" as const,
+      })),
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/me/lessons/f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+      cookies: { luma_lingo_session: "session-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      blocks: [expect.objectContaining({ title: "Hello" })],
+      nextBlockStatus: "preparing",
+    });
+  });
 });
 
 async function buildApp(input: {
   getHome: ReturnType<typeof vi.fn>;
+  getLesson?: ReturnType<typeof vi.fn>;
   resolveSession?: ReturnType<typeof vi.fn>;
 }) {
   const app = Fastify();
@@ -101,7 +141,10 @@ async function buildApp(input: {
           currentLearningTrack: null,
         })),
     } as unknown as AuthService,
-    home: { getHome: input.getHome } as unknown as HomeService,
+    home: {
+      getHome: input.getHome,
+      getLesson: input.getLesson,
+    } as unknown as HomeService,
   });
   return app;
 }

@@ -23,6 +23,8 @@ export function HomePage({ apiOrigin }: HomePageProps) {
   const navigate = useNavigate();
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [lesson, setLesson] = useState<LessonResponse | null>(null);
+  const [visibleBlock, setVisibleBlock] = useState(0);
+  const [waitingForNext, setWaitingForNext] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -40,7 +42,10 @@ export function HomePage({ apiOrigin }: HomePageProps) {
         if (!active) return;
         setHome(result);
         if (result.status === "ready") {
-          setLesson(await fetchLesson(apiOrigin, result.lessonId));
+          const nextLesson = await fetchLesson(apiOrigin, result.lessonId);
+          if (!active) return;
+          setLesson(nextLesson);
+          setVisibleBlock(0);
         }
         setFailed(false);
         if (result.status === "preparing") {
@@ -65,12 +70,61 @@ export function HomePage({ apiOrigin }: HomePageProps) {
     };
   }, [apiOrigin, navigate]);
 
+  useEffect(() => {
+    if (!waitingForNext || !lesson) return;
+    const lessonId = lesson.lessonId;
+    let active = true;
+    let pollingTimer: number | undefined;
+
+    async function pollForNextBlock() {
+      try {
+        const updated = await fetchLesson(apiOrigin, lessonId);
+        if (!active) return;
+        setLesson(updated);
+        if (updated.blocks.length > visibleBlock) {
+          setWaitingForNext(false);
+          return;
+        }
+        if (updated.nextBlockStatus === "preparing") {
+          pollingTimer = window.setTimeout(
+            () => void pollForNextBlock(),
+            1_500,
+          );
+        }
+      } catch {
+        if (active) setWaitingForNext(false);
+      }
+    }
+
+    void pollForNextBlock();
+    return () => {
+      active = false;
+      if (pollingTimer) window.clearTimeout(pollingTimer);
+    };
+  }, [apiOrigin, lesson?.lessonId, visibleBlock, waitingForNext]);
+
+  const continueLesson = () => {
+    if (!lesson) return;
+    const nextPosition = visibleBlock + 1;
+    if (nextPosition < lesson.blocks.length) {
+      setVisibleBlock(nextPosition);
+      return;
+    }
+    if (lesson.nextBlockStatus === "preparing") setWaitingForNext(true);
+  };
+
   return (
     <main className="min-h-dvh px-[var(--screen-gutter)] pb-10 sm:pb-12">
       <div className="mx-auto flex w-full max-w-176 flex-col gap-[var(--content-gap)]">
         <PageHeader />
-        {renderHomeContent(home, lesson, failed, () =>
-          window.location.reload(),
+        {renderHomeContent(
+          home,
+          lesson,
+          visibleBlock,
+          waitingForNext,
+          failed,
+          continueLesson,
+          () => window.location.reload(),
         )}
         <form method="post" action={createLogoutAction(apiOrigin)}>
           <Button size="full" type="submit" variant="outline">
@@ -86,7 +140,10 @@ export function HomePage({ apiOrigin }: HomePageProps) {
 function renderHomeContent(
   home: HomeResponse | null,
   lesson: LessonResponse | null,
+  visibleBlock: number,
+  waitingForNext: boolean,
   failed: boolean,
+  continueLesson: () => void,
   retry: () => void,
 ) {
   if (failed || home?.status === "failed") {
@@ -120,22 +177,24 @@ function renderHomeContent(
       </Surface>
     );
   }
+  const block = lesson.blocks[visibleBlock];
+  if (!block) return null;
   return (
     <section className="flex flex-col gap-5">
       <div>
         <p className="mb-2 text-[var(--text-overline)] font-semibold tracking-[0.08em] text-muted-foreground uppercase">
           Primeira aula
         </p>
-        <h1 className="mb-2">{lesson.block.title}</h1>
-        <p className="mb-0 text-muted-foreground">{lesson.block.objective}</p>
+        <h1 className="mb-2">{block.title}</h1>
+        <p className="mb-0 text-muted-foreground">{block.objective}</p>
       </div>
       <Surface className="flex flex-col gap-4">
         <BookOpen aria-hidden="true" className="text-primary" size={22} />
         <p className="mb-0 leading-[var(--line-height-relaxed)]">
-          {lesson.block.explanation}
+          {block.explanation}
         </p>
         <div className="flex flex-col gap-2">
-          {lesson.block.examples.map((example) => (
+          {block.examples.map((example) => (
             <p
               className="mb-0 rounded-lg bg-secondary p-3"
               key={example.target}
@@ -150,7 +209,7 @@ function renderHomeContent(
       </Surface>
       <Surface className="flex flex-col gap-4" variant="tinted">
         <h2 className="mb-0">Pratique</h2>
-        {lesson.block.activities.map((activity, index) => (
+        {block.activities.map((activity, index) => (
           <div
             className="rounded-lg border border-border p-4"
             key={`${activity.type}-${index}`}
@@ -180,6 +239,30 @@ function renderHomeContent(
           </div>
         ))}
       </Surface>
+      {lesson.nextBlockStatus !== "complete" &&
+      visibleBlock === lesson.blocks.length - 1 ? (
+        <Surface className="flex flex-col gap-3" variant="secondary">
+          <p className="mb-0 text-muted-foreground">
+            {lesson.nextBlockStatus === "failed"
+              ? "O próximo bloco não pôde ser preparado. Os blocos concluídos continuam disponíveis."
+              : waitingForNext
+                ? "Preparando o próximo bloco…"
+                : "Quando terminar, continue para o próximo bloco."}
+          </p>
+          <Button
+            disabled={waitingForNext || lesson.nextBlockStatus === "failed"}
+            onClick={continueLesson}
+            size="full"
+          >
+            {waitingForNext ? "Preparando…" : "Continuar"}
+          </Button>
+        </Surface>
+      ) : null}
+      {visibleBlock < lesson.blocks.length - 1 ? (
+        <Button onClick={continueLesson} size="full">
+          Continuar
+        </Button>
+      ) : null}
     </section>
   );
 }

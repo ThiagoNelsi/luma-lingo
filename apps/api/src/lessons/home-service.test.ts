@@ -18,7 +18,7 @@ describe("HomeService", () => {
       async findHomeLesson() {
         return lesson;
       },
-      async findLessonBlock() {
+      async findLessonProgress() {
         return null;
       },
       async reserveFirstLesson() {
@@ -36,6 +36,18 @@ describe("HomeService", () => {
       },
       async publishFirstBlock() {
         throw new Error("unused");
+      },
+      async persistBlockRun() {
+        throw new Error("unused");
+      },
+      async claimQueuedBlockRun() {
+        return true;
+      },
+      async publishBlockRun() {
+        throw new Error("unused");
+      },
+      async findActiveBlockRuns() {
+        return [];
       },
       async failLesson() {
         throw new Error("unused");
@@ -101,7 +113,7 @@ describe("HomeService", () => {
       async findHomeLesson() {
         return { id: "lesson-1", status, block: null };
       },
-      async findLessonBlock() {
+      async findLessonProgress() {
         return null;
       },
       async reserveFirstLesson() {
@@ -123,6 +135,18 @@ describe("HomeService", () => {
       },
       async publishFirstBlock() {
         throw new Error("unused");
+      },
+      async persistBlockRun() {
+        throw new Error("unused");
+      },
+      async claimQueuedBlockRun() {
+        return true;
+      },
+      async publishBlockRun() {
+        throw new Error("unused");
+      },
+      async findActiveBlockRuns() {
+        return [];
       },
       async failLesson() {
         throw new Error("unused");
