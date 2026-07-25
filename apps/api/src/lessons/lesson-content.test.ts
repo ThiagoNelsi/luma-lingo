@@ -57,4 +57,12 @@ describe("lesson block contract", () => {
       { type: "string", enum: ["word_order"] },
     ]);
   });
+
+  it("keeps the provider contract's examples limit aligned with persisted content", () => {
+    const examples = lessonBlockContract.jsonSchema.properties.examples as {
+      maxItems?: number;
+    };
+
+    expect(examples.maxItems).toBe(5);
+  });
 });

@@ -16,7 +16,10 @@ import type { DiagnosticAttempt } from "../../apps/api/src/diagnostics/diagnosti
 import type { DiagnosticAttemptRepository } from "../../apps/api/src/diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../../apps/api/src/diagnostics/initial-diagnostic-runtime-service.js";
 import { createApp } from "../../apps/api/src/http/app.js";
-import type { HomeService } from "../../apps/api/src/lessons/home-service.js";
+import type {
+  HomeService,
+  LessonResult,
+} from "../../apps/api/src/lessons/home-service.js";
 import type { LearnerRepository } from "../../apps/api/src/learners/learner-repository.js";
 import type { OnboardingCompletionRepository } from "../../apps/api/src/learners/onboarding-completion-repository.js";
 import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
@@ -46,6 +49,60 @@ let profile: AuthProfile | null = null;
 let completedDiagnosticAttempt: DiagnosticAttempt | null = null;
 let answeredDiagnosticItemCount = 0;
 const sessions = new Map<string, SessionRecord>();
+const lessonId = "f7e1918b-78b8-47e3-b0d9-2d6597542c00";
+const lessonBlocks = [
+  {
+    title: "Your first greeting",
+    objective: "Say hello and share your name.",
+    explanation: "Use Hello to greet someone.",
+    examples: [{ target: "Hello!", instruction: "Olá!" }],
+    activities: [
+      {
+        type: "multiple_choice" as const,
+        prompt: "Choose a greeting.",
+        options: ["Hello", "Thanks"],
+        correctOptionIndex: 0,
+        explanation: "Hello is a greeting.",
+      },
+    ],
+  },
+  {
+    title: "Introduce yourself",
+    objective: "Share your name after greeting someone.",
+    explanation: "Use My name is followed by your name.",
+    examples: [{ target: "My name is Ana.", instruction: "Meu nome é Ana." }],
+    activities: [
+      {
+        type: "fill_blank" as const,
+        prompt: "Complete: My name ___ Ana.",
+        answer: "is",
+        explanation: "Use is after My name.",
+      },
+    ],
+  },
+  {
+    title: "Put the greeting together",
+    objective: "Greet someone and introduce yourself.",
+    explanation: "Combine Hello with My name is.",
+    examples: [
+      {
+        target: "Hello! My name is Ana.",
+        instruction: "Olá! Meu nome é Ana.",
+      },
+    ],
+    activities: [
+      {
+        type: "word_order" as const,
+        prompt: "Put the introduction in order.",
+        words: ["Hello!", "My", "name", "is", "Ana."],
+        answer: "Hello! My name is Ana.",
+        explanation: "The greeting comes before the introduction.",
+      },
+    ],
+  },
+] satisfies LessonResult["blocks"];
+let approvedLessonBlockPositions = new Set([0]);
+let laterLessonBlockFailed = false;
 
 const authProvider: AuthProvider = {
   getAuthorizationUrl({ state }) {
@@ -496,30 +553,25 @@ const app = await createApp({
     async getHome() {
       return {
         status: "ready" as const,
-        lessonId: "f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+        lessonId,
       };
     },
-    async getLesson(_learnerId, lessonId) {
+    async getLesson(_learnerId, requestedLessonId) {
+      const firstMissingPosition = lessonBlocks.findIndex(
+        (_block, position) => !approvedLessonBlockPositions.has(position),
+      );
+      const visibleBlockCount =
+        firstMissingPosition === -1
+          ? lessonBlocks.length
+          : firstMissingPosition;
       return {
-        lessonId,
-        blocks: [
-          {
-            title: "Your first greeting",
-            objective: "Say hello and share your name.",
-            explanation: "Use Hello to greet someone.",
-            examples: [{ target: "Hello!", instruction: "Olá!" }],
-            activities: [
-              {
-                type: "multiple_choice" as const,
-                prompt: "Choose a greeting.",
-                options: ["Hello", "Thanks"],
-                correctOptionIndex: 0,
-                explanation: "Hello is a greeting.",
-              },
-            ],
-          },
-        ],
-        nextBlockStatus: "preparing" as const,
+        lessonId: requestedLessonId,
+        blocks: lessonBlocks.slice(0, visibleBlockCount),
+        nextBlockStatus: laterLessonBlockFailed
+          ? ("failed" as const)
+          : visibleBlockCount === lessonBlocks.length
+            ? ("complete" as const)
+            : ("preparing" as const),
       };
     },
   } as HomeService,
@@ -543,6 +595,8 @@ app.post("/test-control/reset", async (_request, reply) => {
   profileIntroductionStatus = "not_started";
   profileIntroductionProfile = null;
   profileIntroductionConfirmed = false;
+  approvedLessonBlockPositions = new Set([0]);
+  laterLessonBlockFailed = false;
   sessions.clear();
   return reply.code(204).send();
 });
@@ -560,7 +614,8 @@ app.post("/test-control/seed", async (request, reply) => {
     state !== "profile-review-pending" &&
     state !== "profile-review-failed" &&
     state !== "profile-review-diagnostic" &&
-    state !== "profile-review-diagnostic-completed"
+    state !== "profile-review-diagnostic-completed" &&
+    state !== "lesson-ready"
   ) {
     return reply.code(400).send({ error: "unsupported_seed_state" });
   }
@@ -597,11 +652,16 @@ app.post("/test-control/seed", async (request, reply) => {
         state === "profile-review-diagnostic" ||
         state === "profile-review-diagnostic-completed"
           ? "diagnostic"
-          : profileReviewStep
+          : profileReviewStep || state === "lesson-ready"
             ? "beginner"
             : null,
-      onboardingStatus: "in_progress",
-      onboardingStep: introductionStep ? "age_and_goals" : "starting_point",
+      onboardingStatus: state === "lesson-ready" ? "completed" : "in_progress",
+      onboardingStep:
+        state === "lesson-ready"
+          ? null
+          : introductionStep
+            ? "age_and_goals"
+            : "starting_point",
     },
   };
   completedDiagnosticAttempt =
@@ -638,6 +698,28 @@ app.post("/test-control/seed", async (request, reply) => {
   profileIntroductionProfile = null;
   profileIntroductionConfirmed = false;
 
+  return reply.code(204).send();
+});
+
+app.post("/test-control/lesson", async (request, reply) => {
+  const { approvedBlockPositions, failed = false } = request.body as {
+    approvedBlockPositions?: number[];
+    failed?: boolean;
+  };
+  if (
+    !approvedBlockPositions ||
+    approvedBlockPositions.some(
+      (position) =>
+        !Number.isInteger(position) ||
+        position < 0 ||
+        position >= lessonBlocks.length,
+    )
+  ) {
+    return reply.code(400).send({ error: "invalid_lesson_generation_state" });
+  }
+
+  approvedLessonBlockPositions = new Set(approvedBlockPositions);
+  laterLessonBlockFailed = failed;
   return reply.code(204).send();
 });
 

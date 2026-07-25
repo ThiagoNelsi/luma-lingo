@@ -118,6 +118,7 @@ export const lessonBlockContract = {
       examples: {
         type: "array",
         minItems: 1,
+        maxItems: 5,
         items: {
           type: "object",
           additionalProperties: false,

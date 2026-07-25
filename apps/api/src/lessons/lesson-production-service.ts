@@ -76,7 +76,7 @@ export class LessonProductionService {
         contract: lessonBlockContract,
         workload: "lesson_block",
         instructions:
-          "Produce one cohesive text lesson block with explanation, examples, and activities. Return JSON only.",
+          "Produce one cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied objective exactly. Return JSON only.",
         input: blockPrompt(input.context, plan, firstPlanBlock.objective),
       });
       const block = parseCompletedRun(blockRun, lessonBlockSchema);
@@ -279,7 +279,7 @@ export class LessonProductionService {
       contract: lessonBlockContract,
       workload: "lesson_block",
       instructions:
-        "Produce one cohesive text lesson block with explanation, examples, and activities. Return JSON only.",
+        "Produce one cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied objective exactly. Return JSON only.",
       input: blockPrompt(input.context, input.plan, input.expectedObjective),
     });
     await this.persistProducedRun({ ...input, run });
@@ -444,7 +444,12 @@ function failedRun(
 }
 
 function errorCodeFor(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message.slice(0, 120) : fallback;
+  if (!(error instanceof Error)) return fallback;
+  if (/^[a-z][a-z0-9_]*(?::\d{3})?$/.test(error.message)) {
+    return error.message;
+  }
+  if (error.name === "ZodError") return "lesson_content_invalid";
+  return fallback;
 }
 
 async function mapWithConcurrency<T>(

@@ -1,4 +1,10 @@
-import { BookOpen, LoaderCircle, LogOut, RefreshCw } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  LoaderCircle,
+  LogOut,
+  RefreshCw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -81,7 +87,7 @@ export function HomePage({ apiOrigin }: HomePageProps) {
         const updated = await fetchLesson(apiOrigin, lessonId);
         if (!active) return;
         setLesson(updated);
-        if (updated.blocks.length > visibleBlock) {
+        if (updated.blocks.length > visibleBlock + 1) {
           setWaitingForNext(false);
           return;
         }
@@ -113,6 +119,10 @@ export function HomePage({ apiOrigin }: HomePageProps) {
     if (lesson.nextBlockStatus === "preparing") setWaitingForNext(true);
   };
 
+  const previousLesson = () => {
+    setVisibleBlock((current) => previousBlockIndex(current));
+  };
+
   return (
     <main className="min-h-dvh px-[var(--screen-gutter)] pb-10 sm:pb-12">
       <div className="mx-auto flex w-full max-w-176 flex-col gap-[var(--content-gap)]">
@@ -124,6 +134,7 @@ export function HomePage({ apiOrigin }: HomePageProps) {
           waitingForNext,
           failed,
           continueLesson,
+          previousLesson,
           () => window.location.reload(),
         )}
         <form method="post" action={createLogoutAction(apiOrigin)}>
@@ -144,6 +155,7 @@ function renderHomeContent(
   waitingForNext: boolean,
   failed: boolean,
   continueLesson: () => void,
+  previousLesson: () => void,
   retry: () => void,
 ) {
   if (failed || home?.status === "failed") {
@@ -239,6 +251,12 @@ function renderHomeContent(
           </div>
         ))}
       </Surface>
+      {visibleBlock > 0 ? (
+        <Button onClick={previousLesson} size="full" variant="outline">
+          <ChevronLeft aria-hidden="true" size={17} />
+          Voltar
+        </Button>
+      ) : null}
       {lesson.nextBlockStatus !== "complete" &&
       visibleBlock === lesson.blocks.length - 1 ? (
         <Surface className="flex flex-col gap-3" variant="secondary">
@@ -265,4 +283,8 @@ function renderHomeContent(
       ) : null}
     </section>
   );
+}
+
+export function previousBlockIndex(visibleBlock: number): number {
+  return Math.max(visibleBlock - 1, 0);
 }

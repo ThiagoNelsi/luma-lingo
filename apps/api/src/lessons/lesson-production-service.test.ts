@@ -267,6 +267,36 @@ describe("LessonProductionService", () => {
       "openai_request_failed",
     );
   });
+
+  it("fails malformed provider content with a stable safe code", async () => {
+    const failLesson = vi.fn(async () => undefined);
+    const service = new LessonProductionService({
+      repository: repositoryStub({ failLesson }),
+      model: {
+        async start(input) {
+          if (input.workload === "lesson_plan")
+            return completedRun(lessonPlan());
+          return completedRun({
+            ...blockFor(lessonPlan().blocks[0]?.objective ?? ""),
+            examples: Array.from({ length: 6 }, () => ({
+              target: "Hello!",
+              instruction: "Olá!",
+            })),
+          });
+        },
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await service.produceFirstBlock(firstLessonInput());
+
+    expect(failLesson).toHaveBeenCalledWith(
+      "lesson-1",
+      "lesson_content_invalid",
+    );
+  });
 });
 
 function repositoryStub(
