@@ -1,44 +1,76 @@
 import { z } from "zod";
 
 const textSchema = z.string().trim().min(1);
+const lessonEmphasisSchema = z.enum(["listening", "reading", "writing"]);
 
-export const lessonPlanSchema = z.object({
-  title: textSchema,
-  objective: textSchema,
-  blocks: z
-    .array(
-      z.object({
-        title: textSchema,
-        objective: textSchema,
-      }),
-    )
-    .min(3)
-    .max(5),
-});
+const lessonAlignmentSchema = z
+  .object({
+    instructionLanguage: textSchema,
+    targetLanguage: textSchema,
+    primaryGoal: textSchema,
+    priorityCompetencyKey: textSchema,
+    priorityCompetencyState: z
+      .object({
+        abilityEstimate: z.number().min(0).max(1).nullable(),
+        confidence: z.number().min(0).max(1),
+      })
+      .strict()
+      .nullable()
+      .optional(),
+    lessonEmphases: z.array(lessonEmphasisSchema).min(1).max(3),
+    profileTopics: z.array(textSchema).max(3),
+  })
+  .strict();
+
+export const lessonPlanSchema = z
+  .object({
+    title: textSchema,
+    objective: textSchema,
+    alignment: lessonAlignmentSchema.optional(),
+    blocks: z
+      .array(
+        z
+          .object({
+            title: textSchema,
+            objective: textSchema,
+            emphasis: lessonEmphasisSchema.optional(),
+          })
+          .strict(),
+      )
+      .min(3)
+      .max(5),
+  })
+  .strict();
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 
-const multipleChoiceActivitySchema = z.object({
-  type: z.literal("multiple_choice"),
-  prompt: textSchema,
-  options: z.array(textSchema).min(2).max(6),
-  correctOptionIndex: z.number().int().nonnegative(),
-  explanation: textSchema,
-});
+const multipleChoiceActivitySchema = z
+  .object({
+    type: z.literal("multiple_choice"),
+    prompt: textSchema,
+    options: z.array(textSchema).min(2).max(6),
+    correctOptionIndex: z.number().int().nonnegative(),
+    explanation: textSchema,
+  })
+  .strict();
 
-const fillBlankActivitySchema = z.object({
-  type: z.literal("fill_blank"),
-  prompt: textSchema,
-  answer: textSchema,
-  explanation: textSchema,
-});
+const fillBlankActivitySchema = z
+  .object({
+    type: z.literal("fill_blank"),
+    prompt: textSchema,
+    answer: textSchema,
+    explanation: textSchema,
+  })
+  .strict();
 
-const wordOrderActivitySchema = z.object({
-  type: z.literal("word_order"),
-  prompt: textSchema,
-  words: z.array(textSchema).min(2).max(12),
-  answer: textSchema,
-  explanation: textSchema,
-});
+const wordOrderActivitySchema = z
+  .object({
+    type: z.literal("word_order"),
+    prompt: textSchema,
+    words: z.array(textSchema).min(2).max(12),
+    answer: textSchema,
+    explanation: textSchema,
+  })
+  .strict();
 
 export const lessonActivitySchema = z.discriminatedUnion("type", [
   multipleChoiceActivitySchema,
@@ -53,11 +85,12 @@ export const lessonBlockSchema = z
     objective: textSchema,
     explanation: textSchema,
     examples: z
-      .array(z.object({ target: textSchema, instruction: textSchema }))
+      .array(z.object({ target: textSchema, instruction: textSchema }).strict())
       .min(1)
       .max(5),
     activities: z.array(lessonActivitySchema).min(1).max(5),
   })
+  .strict()
   .superRefine((block, context) => {
     for (const [index, activity] of block.activities.entries()) {
       if (
@@ -81,10 +114,59 @@ export const lessonPlanContract = {
   jsonSchema: {
     type: "object",
     additionalProperties: false,
-    required: ["title", "objective", "blocks"],
+    required: ["title", "objective", "alignment", "blocks"],
     properties: {
       title: { type: "string" },
       objective: { type: "string" },
+      alignment: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "instructionLanguage",
+          "targetLanguage",
+          "primaryGoal",
+          "priorityCompetencyKey",
+          "priorityCompetencyState",
+          "lessonEmphases",
+          "profileTopics",
+        ],
+        properties: {
+          instructionLanguage: { type: "string" },
+          targetLanguage: { type: "string" },
+          primaryGoal: { type: "string" },
+          priorityCompetencyKey: { type: "string" },
+          priorityCompetencyState: {
+            anyOf: [
+              {
+                type: "object",
+                additionalProperties: false,
+                required: ["abilityEstimate", "confidence"],
+                properties: {
+                  abilityEstimate: {
+                    anyOf: [{ type: "number" }, { type: "null" }],
+                  },
+                  confidence: { type: "number", minimum: 0, maximum: 1 },
+                },
+              },
+              { type: "null" },
+            ],
+          },
+          lessonEmphases: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: {
+              type: "string",
+              enum: ["listening", "reading", "writing"],
+            },
+          },
+          profileTopics: {
+            type: "array",
+            maxItems: 3,
+            items: { type: "string" },
+          },
+        },
+      },
       blocks: {
         type: "array",
         minItems: 3,
@@ -92,10 +174,14 @@ export const lessonPlanContract = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["title", "objective"],
+          required: ["title", "objective", "emphasis"],
           properties: {
             title: { type: "string" },
             objective: { type: "string" },
+            emphasis: {
+              type: "string",
+              enum: ["listening", "reading", "writing"],
+            },
           },
         },
       },

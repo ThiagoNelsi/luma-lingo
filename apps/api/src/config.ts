@@ -30,7 +30,7 @@ export interface RuntimeConfig {
     model: string;
   };
   openai: {
-    apiKey: string;
+    apiKey?: string;
     lessonGenerationConcurrency: number;
     lessonForegroundBudgetMs: number;
     lessonBlockModel: string;
@@ -72,7 +72,7 @@ export function readRuntimeConfig(
       model: env.GEMINI_MODEL ?? "gemini-3.5-flash",
     },
     openai: {
-      apiKey: required(env, "OPENAI_API_KEY"),
+      apiKey: env.OPENAI_API_KEY || undefined,
       lessonGenerationConcurrency: parseInteger(
         env.LESSON_GENERATION_CONCURRENCY ?? "4",
       ),

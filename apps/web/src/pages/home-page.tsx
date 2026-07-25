@@ -17,6 +17,7 @@ import {
   type HomeResponse,
   fetchLesson,
   type LessonResponse,
+  retryLessonGeneration,
   UnauthorizedHomeError,
 } from "../home/home-client.js";
 import { getNextOnboardingRoute } from "./private-page.js";
@@ -123,6 +124,22 @@ export function HomePage({ apiOrigin }: HomePageProps) {
     setVisibleBlock((current) => previousBlockIndex(current));
   };
 
+  const retryLesson = async () => {
+    const outcome = await resolveLessonRetry(apiOrigin, home, lesson);
+    if (outcome.status === "waiting") {
+      setFailed(false);
+      setLesson(outcome.lesson);
+      setWaitingForNext(true);
+    } else if (outcome.status === "reload") {
+      setFailed(false);
+      window.location.reload();
+    } else if (outcome.status === "unauthenticated") {
+      navigate("/login", { replace: true });
+    } else if (outcome.status === "failed") {
+      setFailed(true);
+    }
+  };
+
   return (
     <main className="min-h-dvh px-[var(--screen-gutter)] pb-10 sm:pb-12">
       <div className="mx-auto flex w-full max-w-176 flex-col gap-[var(--content-gap)]">
@@ -135,7 +152,7 @@ export function HomePage({ apiOrigin }: HomePageProps) {
           failed,
           continueLesson,
           previousLesson,
-          () => window.location.reload(),
+          () => void retryLesson(),
         )}
         <form method="post" action={createLogoutAction(apiOrigin)}>
           <Button size="full" type="submit" variant="outline">
@@ -163,7 +180,7 @@ function renderHomeContent(
       <Surface className="flex flex-col gap-4" variant="secondary">
         <h1 className="mb-0">Não foi possível preparar sua primeira aula</h1>
         <p className="mb-0 text-muted-foreground">
-          Atualize a página para tentar novamente.
+          Você pode tentar novamente sem descartar o que já ficou pronto.
         </p>
         <Button onClick={retry} variant="outline">
           <RefreshCw aria-hidden="true" size={17} />
@@ -267,13 +284,20 @@ function renderHomeContent(
                 ? "Preparando o próximo bloco…"
                 : "Quando terminar, continue para o próximo bloco."}
           </p>
-          <Button
-            disabled={waitingForNext || lesson.nextBlockStatus === "failed"}
-            onClick={continueLesson}
-            size="full"
-          >
-            {waitingForNext ? "Preparando…" : "Continuar"}
-          </Button>
+          {lesson.nextBlockStatus === "failed" ? (
+            <Button onClick={retry} size="full" variant="outline">
+              <RefreshCw aria-hidden="true" size={17} />
+              Tentar novamente
+            </Button>
+          ) : (
+            <Button
+              disabled={waitingForNext}
+              onClick={continueLesson}
+              size="full"
+            >
+              {waitingForNext ? "Preparando…" : "Continuar"}
+            </Button>
+          )}
         </Surface>
       ) : null}
       {visibleBlock < lesson.blocks.length - 1 ? (
@@ -287,4 +311,31 @@ function renderHomeContent(
 
 export function previousBlockIndex(visibleBlock: number): number {
   return Math.max(visibleBlock - 1, 0);
+}
+
+export async function resolveLessonRetry(
+  apiOrigin: string,
+  home: HomeResponse | null,
+  lesson: LessonResponse | null,
+  retry: typeof retryLessonGeneration = retryLessonGeneration,
+): Promise<
+  | { status: "failed" | "reload" | "unauthenticated" | "unavailable" }
+  | { status: "waiting"; lesson: LessonResponse }
+> {
+  const lessonId = lesson?.lessonId ?? home?.lessonId;
+  if (!lessonId) return { status: "unavailable" };
+  try {
+    await retry(apiOrigin, lessonId);
+    return lesson
+      ? {
+          status: "waiting",
+          lesson: { ...lesson, nextBlockStatus: "preparing" },
+        }
+      : { status: "reload" };
+  } catch (error) {
+    return {
+      status:
+        error instanceof UnauthorizedHomeError ? "unauthenticated" : "failed",
+    };
+  }
 }

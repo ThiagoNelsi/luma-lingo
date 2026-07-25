@@ -8,6 +8,7 @@ import { AuthService } from "../../services/auth-service.js";
 import { errorDtoSchema } from "../dtos/error-dto.js";
 import { homeDtoSchema, toHomeDto } from "../dtos/home-dto.js";
 import { lessonDtoSchema, toLessonDto } from "../dtos/lesson-dto.js";
+import { lessonRetryDtoSchema } from "../dtos/lesson-retry-dto.js";
 
 export interface HomeRoutesDependencies {
   auth: AuthService;
@@ -73,6 +74,39 @@ export function registerHomeRoutes(
       );
       if (!lesson) return reply.code(404).send({ error: "lesson_not_found" });
       return toLessonDto(lesson);
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().post(
+    "/me/lessons/:lessonId/retry",
+    {
+      schema: {
+        tags: ["Lesson"],
+        summary: "Retry only missing or failed generated Lesson work",
+        params: z.object({ lessonId: z.uuid() }),
+        response: {
+          202: lessonRetryDtoSchema,
+          401: errorDtoSchema,
+          409: errorDtoSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = await deps.auth.resolveSession(
+        request.cookies[deps.config.sessionCookieName],
+      );
+      if (!session) {
+        return reply.code(401).send({ error: "unauthenticated" });
+      }
+      const accepted = await deps.home.retryLesson(
+        session.learner.id,
+        request.params.lessonId,
+        request.id,
+      );
+      if (!accepted) {
+        return reply.code(409).send({ error: "lesson_retry_not_available" });
+      }
+      return reply.code(202).send({ accepted: true });
     },
   );
 }

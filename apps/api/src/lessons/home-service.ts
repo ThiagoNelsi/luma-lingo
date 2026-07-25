@@ -6,6 +6,7 @@ import {
 } from "../observability/logger.js";
 import type { LessonProductionService } from "./lesson-production-service.js";
 import type { HomeLesson, LessonRepository } from "./lesson-repository.js";
+import { lessonValidationContextSchema } from "./lesson-semantic-validator.js";
 
 export type HomeResult =
   | { status: "preparing"; lessonId: string }
@@ -43,7 +44,10 @@ export class HomeService {
     private readonly deps: {
       lessons: LessonRepository;
       priorities: InitialLearningPriorityRepository;
-      production: Pick<LessonProductionService, "produceFirstBlock">;
+      production: Pick<
+        LessonProductionService,
+        "produceFirstBlock" | "retryFailedWork"
+      >;
       foregroundBudgetMs: number;
       logger?: AppLogger;
     },
@@ -84,39 +88,9 @@ export class HomeService {
 
   private async resolveHome(input: HomeInput): Promise<HomeResult> {
     const existing = await this.deps.lessons.findHomeLesson(input.learnerId);
-    if (existing && existing.status !== "failed") return toHomeResult(existing);
+    if (existing) return toHomeResult(existing);
 
     const context = requireReadyContext(input);
-    if (existing) {
-      const retried = await this.deps.lessons.retryFailedFirstLesson(
-        input.learnerId,
-      );
-      if (!retried) {
-        const current = await this.deps.lessons.findHomeLesson(input.learnerId);
-        return current
-          ? toHomeResult(current)
-          : { status: "failed", lessonId: existing.id };
-      }
-      this.logger.warn(
-        {
-          attempt: 2,
-          event: "first_lesson.generation_retrying",
-          learnerId: input.learnerId,
-          learningTrackId: context.learningTrack.id,
-          lessonId: retried.lesson.id,
-          requestId: input.correlationId,
-        },
-        "First Lesson generation retrying",
-      );
-      return this.startProduction(
-        retried,
-        context,
-        input.learnerId,
-        input.correlationId,
-        2,
-      );
-    }
-
     const priority = await this.deps.priorities.findInitialLearningPriority({
       learningTrackId: context.learningTrack.id,
       onboardingStartingPoint: context.learningTrack.onboardingStartingPoint,
@@ -173,13 +147,13 @@ export class HomeService {
         moduleId: reserved.production.moduleId,
         priorityCompetencyId: reserved.production.priorityCompetencyId,
       },
-      context: {
+      context: lessonValidationContextSchema.parse({
         instructionLanguage: context.instructionLanguage,
         targetLanguage: context.learningTrack.targetLanguage,
         primaryGoal: context.learningTrack.learningGoal,
         lessonEmphases: context.learningTrack.lessonEmphases,
         priorityCompetencyKey: reserved.priorityCompetencyKey,
-      },
+      }),
       correlationId,
       attempt,
     });
@@ -204,6 +178,30 @@ export class HomeService {
       lessonId,
     );
     return progress ? { lessonId, ...progress } : null;
+  }
+
+  async retryLesson(
+    learnerId: string,
+    lessonId: string,
+    correlationId?: string,
+  ): Promise<boolean> {
+    const accepted = await this.deps.production.retryFailedWork(
+      learnerId,
+      lessonId,
+      correlationId,
+    );
+    if (accepted) {
+      this.logger.warn(
+        {
+          event: "lesson_generation.manual_retry_requested",
+          learnerId,
+          lessonId,
+          requestId: correlationId,
+        },
+        "Lesson generation manual retry requested",
+      );
+    }
+    return accepted;
   }
 }
 

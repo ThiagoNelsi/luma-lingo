@@ -31,10 +31,10 @@ describe("HomeService", () => {
         lesson = { id: "lesson-1", status: "preparing", block: null };
         return { lesson, created: true, production };
       },
-      async retryFailedFirstLesson() {
-        return null;
-      },
       async publishFirstBlock() {
+        throw new Error("unused");
+      },
+      async persistPlanRun() {
         throw new Error("unused");
       },
       async persistBlockRun() {
@@ -47,6 +47,9 @@ describe("HomeService", () => {
         throw new Error("unused");
       },
       async findActiveBlockRuns() {
+        return [];
+      },
+      async findActivePlanRuns() {
         return [];
       },
       async failLesson() {
@@ -75,7 +78,10 @@ describe("HomeService", () => {
       async produceFirstBlock() {
         productionCalls += 1;
       },
-    } as Pick<LessonProductionService, "produceFirstBlock">;
+      async retryFailedWork() {
+        throw new Error("unused");
+      },
+    } as Pick<LessonProductionService, "produceFirstBlock" | "retryFailedWork">;
     const service = new HomeService({
       lessons: repository,
       priorities,
@@ -105,7 +111,7 @@ describe("HomeService", () => {
     expect(productionCalls).toBe(1);
   });
 
-  it("restarts a failed first lesson only once under concurrent Home requests", async () => {
+  it("keeps failed Home reads side-effect free and retries only after an explicit request", async () => {
     let productionCalls = 0;
     let status: "preparing" | "ready" | "failed" = "failed";
     const warn = vi.fn();
@@ -119,21 +125,10 @@ describe("HomeService", () => {
       async reserveFirstLesson() {
         throw new Error("unused");
       },
-      async retryFailedFirstLesson() {
-        if (status !== "failed") return null;
-        status = "preparing";
-        return {
-          lesson: { id: "lesson-1", status: "preparing", block: null },
-          created: true,
-          production: {
-            moduleId: "module-1",
-            learningTrackId: "track-1",
-            priorityCompetencyId: "competency-1",
-          },
-          priorityCompetencyKey: "introduce-yourself",
-        };
-      },
       async publishFirstBlock() {
+        throw new Error("unused");
+      },
+      async persistPlanRun() {
         throw new Error("unused");
       },
       async persistBlockRun() {
@@ -146,6 +141,9 @@ describe("HomeService", () => {
         throw new Error("unused");
       },
       async findActiveBlockRuns() {
+        return [];
+      },
+      async findActivePlanRuns() {
         return [];
       },
       async failLesson() {
@@ -163,6 +161,10 @@ describe("HomeService", () => {
         async produceFirstBlock() {
           productionCalls += 1;
         },
+        async retryFailedWork() {
+          productionCalls += 1;
+          return true;
+        },
       },
       foregroundBudgetMs: 0,
       logger: {
@@ -174,23 +176,21 @@ describe("HomeService", () => {
     });
 
     await expect(
-      Promise.all([
-        service.getHome({ ...homeInput(), correlationId: "request-1" }),
-        service.getHome({ ...homeInput(), correlationId: "request-2" }),
-      ]),
-    ).resolves.toEqual([
-      { status: "preparing", lessonId: "lesson-1" },
-      { status: "preparing", lessonId: "lesson-1" },
-    ]);
+      service.getHome({ ...homeInput(), correlationId: "request-1" }),
+    ).resolves.toEqual({ status: "failed", lessonId: "lesson-1" });
+    expect(productionCalls).toBe(0);
+
+    await expect(
+      service.retryLesson("learner-1", "lesson-1", "request-2"),
+    ).resolves.toBe(true);
     expect(productionCalls).toBe(1);
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
-        attempt: 2,
-        event: "first_lesson.generation_retrying",
+        event: "lesson_generation.manual_retry_requested",
         lessonId: "lesson-1",
-        requestId: expect.stringMatching(/^request-/),
+        requestId: "request-2",
       }),
-      "First Lesson generation retrying",
+      "Lesson generation manual retry requested",
     );
   });
 });

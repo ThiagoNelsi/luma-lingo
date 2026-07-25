@@ -91,6 +91,7 @@ const app = await createApp({
     foregroundBudgetMs: runtime.openai.lessonForegroundBudgetMs,
     logger: logger.child({ component: "home-service" }),
   }),
+  lessonGenerationReadiness: () => lessonProduction.readiness(),
   users: new PrismaUserRepository(prisma),
   sessions: new PrismaSessionRepository(prisma),
   initialDiagnostic: new InitialDiagnosticRuntimeService({

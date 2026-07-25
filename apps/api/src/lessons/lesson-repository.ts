@@ -1,5 +1,18 @@
-import type { StructuredModelRun } from "../models/structured-model.js";
-import type { LessonBlock, LessonPlan } from "./lesson-content.js";
+import { z } from "zod";
+
+import {
+  structuredModelRunSchema,
+  type StructuredModelRun,
+} from "../models/structured-model.js";
+import {
+  lessonPlanSchema,
+  type LessonBlock,
+  type LessonPlan,
+} from "./lesson-content.js";
+import {
+  lessonValidationContextSchema,
+  type LessonValidationContext,
+} from "./lesson-semantic-validator.js";
 
 export interface HomeLesson {
   id: string;
@@ -22,10 +35,6 @@ export interface ReservedHomeLesson {
   };
 }
 
-export interface RetriedHomeLesson extends ReservedHomeLesson {
-  priorityCompetencyKey: string;
-}
-
 export interface FirstLessonReservation {
   learnerId: string;
   learningTrackId: string;
@@ -33,25 +42,68 @@ export interface FirstLessonReservation {
   priorityCompetencyKey: string;
 }
 
-export interface PersistedRun {
-  attempt: number;
-  blockPosition: number;
-  lessonId: string;
-  run: StructuredModelRun;
-}
+export const persistedRunSchema = z
+  .object({
+    attempt: z.number().int().positive(),
+    blockPosition: z.number().int().nonnegative(),
+    lessonId: z.string().min(1),
+    run: structuredModelRunSchema,
+  })
+  .strict();
+export type PersistedRun = z.infer<typeof persistedRunSchema>;
 
-export interface ActiveLessonBlockRun extends PersistedRun {
-  context: {
-    instructionLanguage: string;
-    targetLanguage: string;
-    primaryGoal: string;
-    lessonEmphases: string[];
-    priorityCompetencyKey: string;
-  };
-  plan: LessonPlan;
-}
+export const activeLessonBlockRunSchema = persistedRunSchema
+  .extend({
+    context: lessonValidationContextSchema,
+    plan: lessonPlanSchema,
+  })
+  .strict();
+export type ActiveLessonBlockRun = z.infer<typeof activeLessonBlockRunSchema>;
+
+export const reservedLessonProductionSchema = z
+  .object({
+    id: z.string().min(1),
+    learningTrackId: z.string().min(1),
+    moduleId: z.string().min(1),
+    priorityCompetencyId: z.string().min(1),
+  })
+  .strict();
+export type ReservedLessonProduction = z.infer<
+  typeof reservedLessonProductionSchema
+>;
+
+export const activeLessonPlanRunSchema = z
+  .object({
+    attempt: z.number().int().positive(),
+    context: lessonValidationContextSchema,
+    lesson: reservedLessonProductionSchema,
+    run: structuredModelRunSchema,
+  })
+  .strict();
+export type ActiveLessonPlanRun = z.infer<typeof activeLessonPlanRunSchema>;
+
+export const retryableLessonWorkSchema = z
+  .object({
+    lesson: reservedLessonProductionSchema,
+    context: lessonValidationContextSchema,
+    plan: lessonPlanSchema.nullable(),
+    planAttempt: z.number().int().positive(),
+    blocks: z.array(
+      z
+        .object({
+          attempt: z.number().int().positive(),
+          blockPosition: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type RetryableLessonWork = z.infer<typeof retryableLessonWorkSchema>;
 
 export interface LessonRepository {
+  findLessonValidationContext?(
+    lessonId: string,
+  ): Promise<LessonValidationContext | null>;
   findHomeLesson(learnerId: string): Promise<HomeLesson | null>;
   findLessonProgress(
     learnerId: string,
@@ -60,20 +112,30 @@ export interface LessonRepository {
   reserveFirstLesson(
     input: FirstLessonReservation,
   ): Promise<ReservedHomeLesson>;
-  retryFailedFirstLesson(learnerId: string): Promise<RetriedHomeLesson | null>;
+  prepareLessonRetry?(
+    learnerId: string,
+    lessonId: string,
+  ): Promise<RetryableLessonWork | null>;
+  persistPlanRun(input: {
+    attempt: number;
+    lessonId: string;
+    plan?: LessonPlan;
+    run: StructuredModelRun;
+  }): Promise<void>;
   publishFirstBlock(input: {
     attempt: number;
     lessonId: string;
     plan: LessonPlan;
     block: LessonBlock;
     runs: {
-      plan: StructuredModelRun;
-      block: StructuredModelRun;
+      plan: { attempt: number; run: StructuredModelRun };
+      block: { attempt: number; run: StructuredModelRun };
     };
   }): Promise<void>;
   claimQueuedBlockRun(input: Omit<PersistedRun, "run">): Promise<boolean>;
   persistBlockRun(input: PersistedRun): Promise<void>;
   publishBlockRun(input: PersistedRun & { block: LessonBlock }): Promise<void>;
+  findActivePlanRuns(): Promise<ActiveLessonPlanRun[]>;
   findActiveBlockRuns(): Promise<ActiveLessonBlockRun[]>;
   failLesson(lessonId: string, errorCode: string): Promise<void>;
 }

@@ -12,6 +12,41 @@ test.beforeEach(async ({ request }) => {
   expect(response).toBeOK();
 });
 
+test("Lesson generation can be degraded without taking down unrelated API capabilities", async ({
+  page,
+  request,
+}) => {
+  const health = await request.get(`${apiOrigin}/health`);
+  expect(health).toBeOK();
+  await expect(health.json()).resolves.toMatchObject({
+    ok: true,
+    readiness: {
+      lessonGeneration: {
+        status: "degraded",
+        reason: "missing_credentials",
+      },
+    },
+  });
+
+  await page.goto("/login");
+  await expect(page).toHaveURL(/\/onboarding\/languages$/);
+});
+
+test("unsafe generated Lesson content is rejected twice without being published", async ({
+  request,
+}) => {
+  const response = await request.post(
+    `${apiOrigin}/test-control/rejected-lesson-generation`,
+  );
+
+  expect(response.ok()).toBe(true);
+  await expect(response.json()).resolves.toEqual({
+    failureCode: "lesson_semantic_rejected",
+    published: false,
+    retryCount: 1,
+  });
+});
+
 test("learner waits for and reveals incrementally generated blocks in plan order", async ({
   page,
   request,
@@ -99,7 +134,9 @@ test("learner keeps approved blocks accessible after a later block fails", async
       "O próximo bloco não pôde ser preparado. Os blocos concluídos continuam disponíveis.",
     ),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continuar" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Tentar novamente" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Voltar" }).click();
   await expect(
@@ -108,6 +145,12 @@ test("learner keeps approved blocks accessible after a later block fails", async
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
     page.getByRole("heading", { name: "Introduce yourself" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Tentar novamente" }).click();
+  await waitForLessonPoll(page);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Put the greeting together" }),
   ).toBeVisible();
 });
 

@@ -9,14 +9,19 @@ import {
 } from "../lessons/lesson-content.js";
 import type {
   ActiveLessonBlockRun,
+  ActiveLessonPlanRun,
   FirstLessonReservation,
   HomeLesson,
   LessonProgress,
   LessonRepository,
   PersistedRun,
-  RetriedHomeLesson,
   ReservedHomeLesson,
+  RetryableLessonWork,
 } from "../lessons/lesson-repository.js";
+import {
+  lessonValidationContextSchema,
+  type LessonValidationContext,
+} from "../lessons/lesson-semantic-validator.js";
 import {
   createSilentLogger,
   errorMetadata,
@@ -31,6 +36,61 @@ export class PrismaLessonRepository implements LessonRepository {
     private readonly prisma: PrismaClient,
     private readonly logger: AppLogger = createSilentLogger(),
   ) {}
+
+  async findLessonValidationContext(
+    lessonId: string,
+  ): Promise<LessonValidationContext | null> {
+    return this.observe(
+      "lesson.find_validation_context",
+      { lessonId },
+      async () => {
+        const lesson = await this.prisma.lesson.findUnique({
+          where: { id: lessonId },
+          include: {
+            priorityCompetency: { select: { key: true } },
+            learningTrack: {
+              include: {
+                competencyStates: {
+                  include: { competency: { select: { key: true } } },
+                },
+                learner: { include: { profileIntroduction: true } },
+              },
+            },
+          },
+        });
+        if (!lesson) return null;
+        const track = lesson.learningTrack;
+        const profile = track.learner.profileIntroduction;
+        if (
+          !track.learner.instructionLanguage ||
+          !track.learningGoal ||
+          track.lessonEmphases.length === 0
+        ) {
+          return null;
+        }
+        return lessonValidationContextSchema.parse({
+          instructionLanguage: track.learner.instructionLanguage,
+          targetLanguage: track.targetLanguage,
+          primaryGoal: track.learningGoal,
+          lessonEmphases: track.lessonEmphases,
+          priorityCompetencyKey: lesson.priorityCompetency.key,
+          learnerAgeRange: track.learner.ageRange,
+          profileTopics: profile
+            ? [
+                ...(profile.jobOrField ? [profile.jobOrField] : []),
+                ...profile.interests,
+                ...profile.other,
+              ]
+            : [],
+          competencyProfile: track.competencyStates.map((state) => ({
+            competencyKey: state.competency.key,
+            abilityEstimate: state.abilityEstimate,
+            confidence: state.confidence,
+          })),
+        });
+      },
+    );
+  }
 
   async findHomeLesson(learnerId: string): Promise<HomeLesson | null> {
     return this.observe("lesson.find_home", { learnerId }, async () => {
@@ -156,29 +216,101 @@ export class PrismaLessonRepository implements LessonRepository {
     );
   }
 
-  async retryFailedFirstLesson(
+  async prepareLessonRetry(
     learnerId: string,
-  ): Promise<RetriedHomeLesson | null> {
-    return this.observe(
-      "lesson.retry_failed_first",
-      { learnerId },
-      async () => {
-        const failedLesson = await this.prisma.lesson.findFirst({
-          where: { status: "failed", learningTrack: { learnerId } },
-          orderBy: { createdAt: "asc" },
-          include: { priorityCompetency: { select: { key: true } } },
+    lessonId: string,
+  ): Promise<RetryableLessonWork | null> {
+    const context = await this.findLessonValidationContext(lessonId);
+    if (!context) return null;
+    return this.observe("lesson.prepare_retry", { learnerId, lessonId }, () =>
+      this.prisma.$transaction(async (tx) => {
+        const lesson = await tx.lesson.findFirst({
+          where: { id: lessonId, learningTrack: { learnerId } },
+          include: {
+            blocks: { select: { position: true } },
+            structuredModelRuns: {
+              select: { attempt: true, status: true, step: true },
+            },
+          },
         });
-        if (!failedLesson) return null;
-        const resumed = await this.prisma.lesson.updateMany({
-          where: { id: failedLesson.id, status: "failed" },
-          data: { status: "preparing", failureCode: null },
+        if (!lesson) return null;
+        const plan = lesson.plan
+          ? lessonPlanSchema.safeParse(lesson.plan)
+          : null;
+        const planAttempt =
+          Math.max(
+            0,
+            ...lesson.structuredModelRuns
+              .filter((run) => run.step === planStep)
+              .map((run) => run.attempt),
+          ) + 1;
+        if (!plan?.success) {
+          if (lesson.status !== "failed") return null;
+          const claimed = await tx.lesson.updateMany({
+            where: { id: lessonId, status: "failed" },
+            data: { failureCode: null, status: "preparing" },
+          });
+          if (claimed.count === 0) return null;
+          return {
+            lesson: {
+              id: lesson.id,
+              learningTrackId: lesson.learningTrackId,
+              moduleId: lesson.moduleId,
+              priorityCompetencyId: lesson.priorityCompetencyId,
+            },
+            context,
+            plan: null,
+            planAttempt,
+            blocks: [],
+          };
+        }
+
+        const approved = new Set(lesson.blocks.map((block) => block.position));
+        const blocks = plan.data.blocks.flatMap((_, blockPosition) => {
+          if (approved.has(blockPosition)) return [];
+          const latest = latestRunForStep(
+            lesson.structuredModelRuns,
+            blockStep(blockPosition),
+          );
+          if (latest && latest.status !== "failed") return [];
+          return [
+            {
+              attempt: (latest?.attempt ?? 0) + 1,
+              blockPosition,
+            },
+          ];
         });
-        if (resumed.count === 0) return null;
+        if (blocks.length === 0) return null;
+        await Promise.all(
+          blocks.map((block) =>
+            upsertRun(
+              tx,
+              lessonId,
+              blockStep(block.blockPosition),
+              block.attempt,
+              queuedRun(),
+            ),
+          ),
+        );
+        if (blocks.some((block) => block.blockPosition === 0)) {
+          await tx.lesson.update({
+            where: { id: lessonId },
+            data: { failureCode: null, status: "preparing" },
+          });
+        }
         return {
-          ...toReservedHomeLesson(failedLesson, true),
-          priorityCompetencyKey: failedLesson.priorityCompetency.key,
+          lesson: {
+            id: lesson.id,
+            learningTrackId: lesson.learningTrackId,
+            moduleId: lesson.moduleId,
+            priorityCompetencyId: lesson.priorityCompetencyId,
+          },
+          context,
+          plan: plan.data,
+          planAttempt,
+          blocks,
         };
-      },
+      }),
     );
   }
 
@@ -187,7 +319,10 @@ export class PrismaLessonRepository implements LessonRepository {
     lessonId: string;
     plan: LessonPlan;
     block: LessonBlock;
-    runs: { plan: StructuredModelRun; block: StructuredModelRun };
+    runs: {
+      plan: { attempt: number; run: StructuredModelRun };
+      block: { attempt: number; run: StructuredModelRun };
+    };
   }): Promise<void> {
     await this.observe(
       "lesson.publish_first_block",
@@ -199,22 +334,13 @@ export class PrismaLessonRepository implements LessonRepository {
             data: {
               status: "ready",
               failureCode: null,
-              plan: input.plan,
-              planAdapter: input.runs.plan.adapter,
-              planModel: input.runs.plan.model,
-              planPromptVersion: "v1",
-              planContractVersion: "v1",
-              blockAdapter: input.runs.block.adapter,
-              blockModel: input.runs.block.model,
+              blockAdapter: input.runs.block.run.adapter,
+              blockModel: input.runs.block.run.model,
               blockPromptVersion: "v1",
               blockContractVersion: "v1",
             },
           });
           if (published.count === 0) return;
-          await tx.lesson.update({
-            where: { id: input.lessonId },
-            data: { module: { update: { title: input.plan.title } } },
-          });
           await Promise.all([
             tx.lessonBlock.upsert({
               where: {
@@ -235,15 +361,15 @@ export class PrismaLessonRepository implements LessonRepository {
               tx,
               input.lessonId,
               planStep,
-              input.attempt,
-              input.runs.plan,
+              input.runs.plan.attempt,
+              input.runs.plan.run,
             ),
             upsertRun(
               tx,
               input.lessonId,
               blockStep(firstBlockPosition),
-              input.attempt,
-              input.runs.block,
+              input.runs.block.attempt,
+              input.runs.block.run,
             ),
             ...input.plan.blocks
               .slice(1)
@@ -257,6 +383,61 @@ export class PrismaLessonRepository implements LessonRepository {
                 ),
               ),
           ]);
+        }),
+    );
+  }
+
+  async persistPlanRun(input: {
+    attempt: number;
+    lessonId: string;
+    plan?: LessonPlan;
+    run: StructuredModelRun;
+  }): Promise<void> {
+    await this.observe(
+      "lesson.persist_plan_run",
+      { lessonId: input.lessonId },
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          await upsertRun(
+            tx,
+            input.lessonId,
+            planStep,
+            input.attempt,
+            input.run,
+          );
+          if (!input.plan) return;
+          const existing = await tx.lesson.findUnique({
+            where: { id: input.lessonId },
+            select: { plan: true },
+          });
+          if (!existing || existing.plan !== null) return;
+          const saved = await tx.lesson.updateMany({
+            where: { id: input.lessonId, planAdapter: null },
+            data: {
+              plan: input.plan,
+              planAdapter: input.run.adapter,
+              planModel: input.run.model,
+              planPromptVersion: "v1",
+              planContractVersion: "v1",
+            },
+          });
+          if (saved.count === 1) {
+            await Promise.all([
+              tx.lesson.update({
+                where: { id: input.lessonId },
+                data: { module: { update: { title: input.plan.title } } },
+              }),
+              ...input.plan.blocks.map((_, position) =>
+                upsertRun(
+                  tx,
+                  input.lessonId,
+                  blockStep(position),
+                  input.attempt,
+                  queuedRun(),
+                ),
+              ),
+            ]);
+          }
         }),
     );
   }
@@ -330,9 +511,93 @@ export class PrismaLessonRepository implements LessonRepository {
               input.attempt,
               input.run,
             ),
+            ...(input.blockPosition === firstBlockPosition
+              ? [
+                  tx.lesson.update({
+                    where: { id: input.lessonId },
+                    data: {
+                      blockAdapter: input.run.adapter,
+                      blockContractVersion: "v1",
+                      blockModel: input.run.model,
+                      blockPromptVersion: "v1",
+                      failureCode: null,
+                      status: "ready",
+                    },
+                  }),
+                ]
+              : []),
           ]);
         }),
     );
+  }
+
+  async findActivePlanRuns(): Promise<ActiveLessonPlanRun[]> {
+    return this.observe("lesson.find_active_plan_runs", {}, async () => {
+      const runs = await this.prisma.structuredModelRun.findMany({
+        where: {
+          status: "pending",
+          step: planStep,
+        },
+        include: {
+          lesson: {
+            include: {
+              learningTrack: {
+                include: {
+                  competencyStates: {
+                    include: { competency: { select: { key: true } } },
+                  },
+                  learner: { include: { profileIntroduction: true } },
+                },
+              },
+              priorityCompetency: { select: { key: true } },
+            },
+          },
+        },
+      });
+      return runs.flatMap((run) => {
+        const track = run.lesson.learningTrack;
+        if (
+          !track.learner.instructionLanguage ||
+          !track.learningGoal ||
+          track.lessonEmphases.length === 0
+        ) {
+          return [];
+        }
+        const profile = track.learner.profileIntroduction;
+        return [
+          {
+            attempt: run.attempt,
+            lesson: {
+              id: run.lesson.id,
+              learningTrackId: run.lesson.learningTrackId,
+              moduleId: run.lesson.moduleId,
+              priorityCompetencyId: run.lesson.priorityCompetencyId,
+            },
+            context: lessonValidationContextSchema.parse({
+              instructionLanguage: track.learner.instructionLanguage,
+              targetLanguage: track.targetLanguage,
+              primaryGoal: track.learningGoal,
+              lessonEmphases: track.lessonEmphases,
+              priorityCompetencyKey: run.lesson.priorityCompetency.key,
+              learnerAgeRange: track.learner.ageRange,
+              profileTopics: profile
+                ? [
+                    ...(profile.jobOrField ? [profile.jobOrField] : []),
+                    ...profile.interests,
+                    ...profile.other,
+                  ]
+                : [],
+              competencyProfile: track.competencyStates.map((state) => ({
+                competencyKey: state.competency.key,
+                abilityEstimate: state.abilityEstimate,
+                confidence: state.confidence,
+              })),
+            }),
+            run: toStructuredModelRun(run),
+          },
+        ];
+      });
+    });
   }
 
   async findActiveBlockRuns(): Promise<ActiveLessonBlockRun[]> {
@@ -345,7 +610,14 @@ export class PrismaLessonRepository implements LessonRepository {
         include: {
           lesson: {
             include: {
-              learningTrack: { include: { learner: true } },
+              learningTrack: {
+                include: {
+                  competencyStates: {
+                    include: { competency: { select: { key: true } } },
+                  },
+                  learner: { include: { profileIntroduction: true } },
+                },
+              },
               priorityCompetency: { select: { key: true } },
             },
           },
@@ -360,6 +632,7 @@ export class PrismaLessonRepository implements LessonRepository {
         if (
           !plan?.success ||
           position === null ||
+          run.lesson.status === "failed" ||
           !context.learner.instructionLanguage ||
           !context.learningGoal
         ) {
@@ -371,13 +644,28 @@ export class PrismaLessonRepository implements LessonRepository {
             blockPosition: position,
             lessonId: run.lessonId,
             plan: plan.data,
-            context: {
+            context: lessonValidationContextSchema.parse({
               instructionLanguage: context.learner.instructionLanguage,
               targetLanguage: context.targetLanguage,
               primaryGoal: context.learningGoal,
               lessonEmphases: context.lessonEmphases,
               priorityCompetencyKey: run.lesson.priorityCompetency.key,
-            },
+              learnerAgeRange: context.learner.ageRange,
+              profileTopics: context.learner.profileIntroduction
+                ? [
+                    ...(context.learner.profileIntroduction.jobOrField
+                      ? [context.learner.profileIntroduction.jobOrField]
+                      : []),
+                    ...context.learner.profileIntroduction.interests,
+                    ...context.learner.profileIntroduction.other,
+                  ]
+                : [],
+              competencyProfile: context.competencyStates.map((state) => ({
+                competencyKey: state.competency.key,
+                abilityEstimate: state.abilityEstimate,
+                confidence: state.confidence,
+              })),
+            }),
             run: toStructuredModelRun(run),
           },
         ];
@@ -387,10 +675,19 @@ export class PrismaLessonRepository implements LessonRepository {
 
   async failLesson(lessonId: string, errorCode: string): Promise<void> {
     await this.observe("lesson.mark_failed", { lessonId }, async () => {
-      await this.prisma.lesson.update({
-        where: { id: lessonId },
-        data: { status: "failed", failureCode: errorCode.slice(0, 120) },
-      });
+      await this.prisma.$transaction([
+        this.prisma.lesson.update({
+          where: { id: lessonId },
+          data: { status: "failed", failureCode: errorCode.slice(0, 120) },
+        }),
+        this.prisma.structuredModelRun.updateMany({
+          where: { lessonId, status: "queued" },
+          data: {
+            status: "failed",
+            errorCode: "lesson_generation_cancelled",
+          },
+        }),
+      ]);
     });
   }
 

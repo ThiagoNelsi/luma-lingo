@@ -83,3 +83,18 @@ export async function fetchLesson(
   if (!response.ok) throw new Error("lesson_fetch_failed");
   return lessonResponseSchema.parse(await response.json());
 }
+
+export async function retryLessonGeneration(
+  apiOrigin: string,
+  lessonId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const response = await fetchImpl(
+    `${normalizeApiOrigin(apiOrigin)}/me/lessons/${encodeURIComponent(lessonId)}/retry`,
+    { credentials: "include", method: "POST" },
+  );
+  if (response.status === 401) {
+    throw new UnauthorizedHomeError("unauthenticated");
+  }
+  if (!response.ok) throw new Error("lesson_retry_failed");
+}

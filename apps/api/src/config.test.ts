@@ -87,4 +87,21 @@ describe("runtime config", () => {
       rmSync(workspace, { recursive: true, force: true });
     }
   });
+
+  it("allows the API to start with Lesson generation credentials missing", () => {
+    const config = readRuntimeConfig({
+      API_ORIGIN: "http://localhost:3000",
+      AUTH_CALLBACK_URL: "http://localhost:3000/auth/callback",
+      AUTH_LOGOUT_URL: "http://localhost:5173/login",
+      AWS_REGION: "us-east-1",
+      COGNITO_APP_CLIENT_ID: "client",
+      COGNITO_APP_CLIENT_SECRET: "secret",
+      COGNITO_DOMAIN: "https://auth.example.com",
+      FRONTEND_ORIGIN: "http://localhost:5173",
+      GEMINI_API_KEY: "gemini-key",
+    });
+
+    expect(config.openai.apiKey).toBeUndefined();
+    expect(config.openai.lessonPlanModel).toBe("gpt-5.6-terra");
+  });
 });

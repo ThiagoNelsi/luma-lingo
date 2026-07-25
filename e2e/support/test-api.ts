@@ -20,6 +20,11 @@ import type {
   HomeService,
   LessonResult,
 } from "../../apps/api/src/lessons/home-service.js";
+import type { LessonRepository } from "../../apps/api/src/lessons/lesson-repository.js";
+import {
+  LessonProductionService,
+  type FirstLessonContext,
+} from "../../apps/api/src/lessons/lesson-production-service.js";
 import type { LearnerRepository } from "../../apps/api/src/learners/learner-repository.js";
 import type { OnboardingCompletionRepository } from "../../apps/api/src/learners/onboarding-completion-repository.js";
 import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
@@ -549,6 +554,10 @@ const app = await createApp({
   onboardingCompletion,
   diagnosticAttempts,
   initialLearningPriorities,
+  lessonGenerationReadiness: () => ({
+    status: "degraded",
+    reason: "missing_credentials",
+  }),
   home: {
     async getHome() {
       return {
@@ -573,6 +582,19 @@ const app = await createApp({
             ? ("complete" as const)
             : ("preparing" as const),
       };
+    },
+    async retryLesson(_learnerId, requestedLessonId) {
+      if (requestedLessonId !== lessonId || !laterLessonBlockFailed) {
+        return false;
+      }
+      const firstMissingPosition = lessonBlocks.findIndex(
+        (_block, position) => !approvedLessonBlockPositions.has(position),
+      );
+      if (firstMissingPosition >= 0) {
+        approvedLessonBlockPositions.add(firstMissingPosition);
+      }
+      laterLessonBlockFailed = false;
+      return true;
     },
   } as HomeService,
   sessions: sessionRepository,
@@ -722,6 +744,140 @@ app.post("/test-control/lesson", async (request, reply) => {
   laterLessonBlockFailed = failed;
   return reply.code(204).send();
 });
+
+app.post(
+  "/test-control/rejected-lesson-generation",
+  async (_request, reply) => {
+    let failureCode: string | null = null;
+    let published = false;
+    let retryCount = 0;
+    const context: FirstLessonContext = {
+      instructionLanguage: "pt-BR",
+      targetLanguage: "en",
+      primaryGoal: "travel",
+      lessonEmphases: ["reading"],
+      priorityCompetencyKey: "situational.greetings",
+      learnerAgeRange: "25_39",
+      profileTopics: [],
+      competencyProfile: [],
+    };
+    const plan = {
+      title: "Travel greetings",
+      objective: "Greet someone politely while travelling.",
+      alignment: {
+        instructionLanguage: "pt-BR",
+        targetLanguage: "en",
+        primaryGoal: "travel",
+        priorityCompetencyKey: "situational.greetings",
+        priorityCompetencyState: null,
+        lessonEmphases: ["reading" as const],
+        profileTopics: [],
+      },
+      blocks: [
+        {
+          title: "Say hello",
+          objective: "Use a polite greeting.",
+          emphasis: "reading" as const,
+        },
+        {
+          title: "Ask a name",
+          objective: "Ask another person's name.",
+          emphasis: "reading" as const,
+        },
+        {
+          title: "Say goodbye",
+          objective: "End the introduction politely.",
+          emphasis: "reading" as const,
+        },
+      ],
+    };
+    const unsafeBlock = {
+      title: "Say hello",
+      objective: "Use a polite greeting.",
+      explanation: "Practice racist and discriminatory insults.",
+      examples: [{ target: "Hello", instruction: "Olá" }],
+      activities: [
+        {
+          type: "multiple_choice" as const,
+          prompt: "Choose the greeting.",
+          options: ["Hello", "Thanks"],
+          correctOptionIndex: 0,
+          explanation: "Hello is a greeting.",
+        },
+      ],
+    };
+    const repository: LessonRepository = {
+      async findHomeLesson() {
+        return null;
+      },
+      async findLessonProgress() {
+        return null;
+      },
+      async reserveFirstLesson() {
+        throw new Error("unused");
+      },
+      async persistPlanRun() {},
+      async publishFirstBlock() {
+        published = true;
+      },
+      async claimQueuedBlockRun() {
+        return true;
+      },
+      async persistBlockRun() {},
+      async publishBlockRun() {},
+      async findActivePlanRuns() {
+        return [];
+      },
+      async findActiveBlockRuns() {
+        return [];
+      },
+      async failLesson(_lessonId, code) {
+        failureCode = code;
+      },
+    };
+    const service = new LessonProductionService({
+      repository,
+      model: {
+        async start(request) {
+          return {
+            adapter: "e2e",
+            model: "pinned-model",
+            reference: `run-${request.workload}-1`,
+            status: "completed",
+            output: JSON.stringify(
+              request.workload === "lesson_plan" ? plan : unsafeBlock,
+            ),
+          };
+        },
+        async retry() {
+          retryCount += 1;
+          return {
+            adapter: "e2e",
+            model: "pinned-model",
+            reference: "run-lesson_block-2",
+            status: "completed",
+            output: JSON.stringify(unsafeBlock),
+          };
+        },
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await service.produceFirstBlock({
+      lesson: {
+        id: lessonId,
+        learningTrackId: "track-1",
+        moduleId: "module-1",
+        priorityCompetencyId: "competency-1",
+      },
+      context,
+    });
+
+    return reply.send({ failureCode, published, retryCount });
+  },
+);
 
 app.post("/test-control/profile-introduction", async (request, reply) => {
   const { status, profile: nextProfile } = request.body as {

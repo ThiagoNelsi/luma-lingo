@@ -13,6 +13,7 @@ import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-atte
 import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
 import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
 import type { HomeService } from "../lessons/home-service.js";
+import type { StructuredModelReadiness } from "../models/structured-model.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { LearnerRepository } from "../learners/learner-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
@@ -42,6 +43,7 @@ export interface AppDependencies {
   diagnosticAttempts: DiagnosticAttemptRepository;
   initialLearningPriorities?: InitialLearningPriorityRepository;
   home?: HomeService;
+  lessonGenerationReadiness?: () => StructuredModelReadiness;
   users: UserRepository;
   sessions: SessionRepository;
   initialDiagnostic?: InitialDiagnosticRuntimeService;
@@ -127,7 +129,10 @@ export async function createApp(deps: AppDependencies) {
 
   await registerOpenApi(app);
 
-  registerHealthRoutes(app);
+  registerHealthRoutes(app, {
+    lessonGeneration:
+      deps.lessonGenerationReadiness ?? (() => ({ status: "ready" })),
+  });
   registerAuthRoutes(app, {
     auth,
     authProvider: deps.authProvider,

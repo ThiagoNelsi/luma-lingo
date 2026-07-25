@@ -65,4 +65,24 @@ describe("lesson block contract", () => {
 
     expect(examples.maxItems).toBe(5);
   });
+
+  it("rejects undeclared fields locally instead of silently stripping them", () => {
+    expect(() =>
+      lessonBlockSchema.parse({
+        title: "Greeting",
+        objective: "Say hello.",
+        explanation: "Use Hello.",
+        examples: [{ target: "Hello", instruction: "Olá", hidden: "unsafe" }],
+        activities: [
+          {
+            type: "fill_blank",
+            prompt: "Complete: ___!",
+            answer: "Hello",
+            explanation: "Hello is a greeting.",
+          },
+        ],
+        providerMetadata: "must not be accepted",
+      }),
+    ).toThrow();
+  });
 });

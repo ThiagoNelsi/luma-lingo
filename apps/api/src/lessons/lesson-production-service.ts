@@ -1,6 +1,8 @@
 import type {
   StructuredModel,
+  StructuredModelRequest,
   StructuredModelRun,
+  StructuredModelReadiness,
 } from "../models/structured-model.js";
 import {
   createSilentLogger,
@@ -15,15 +17,18 @@ import {
   type LessonBlock,
   type LessonPlan,
 } from "./lesson-content.js";
-import type { LessonRepository } from "./lesson-repository.js";
+import type {
+  ActiveLessonPlanRun,
+  LessonRepository,
+} from "./lesson-repository.js";
+import {
+  LessonSemanticValidationError,
+  validateLessonBlockSemantics,
+  validateLessonPlanSemantics,
+  type LessonValidationContext,
+} from "./lesson-semantic-validator.js";
 
-export interface FirstLessonContext {
-  instructionLanguage: string;
-  targetLanguage: string;
-  primaryGoal: string;
-  lessonEmphases: string[];
-  priorityCompetencyKey: string;
-}
+export type FirstLessonContext = LessonValidationContext;
 
 export interface ReservedFirstLesson {
   id: string;
@@ -31,6 +36,26 @@ export interface ReservedFirstLesson {
   moduleId: string;
   priorityCompetencyId: string;
 }
+
+type CompletedValidatedRun<T> = {
+  status: "completed";
+  attempt: number;
+  run: StructuredModelRun;
+  value: T;
+};
+
+type ValidatedRun<T> =
+  | CompletedValidatedRun<T>
+  | {
+      status: "pending";
+      attempt: number;
+      run: StructuredModelRun;
+    };
+
+const lessonBlockInstructions =
+  "Produce one safe cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied title and objective exactly. Do not use links, markup, audio, video, or speaking tasks. Return JSON only.";
+const lessonPlanInstructions =
+  "Produce a concise, safe language lesson plan with three to five cohesive blocks. Copy the supplied alignment fields exactly, use only confirmed profile topics, assign every selected emphasis across the blocks, and return JSON only.";
 
 export class LessonProductionService {
   private readonly logger: AppLogger;
@@ -48,6 +73,10 @@ export class LessonProductionService {
     this.concurrencyLimit = deps.concurrencyLimit ?? 4;
   }
 
+  readiness(): StructuredModelReadiness {
+    return this.deps.model.readiness?.() ?? { status: "ready" };
+  }
+
   async produceFirstBlock(input: {
     lesson: ReservedFirstLesson;
     context: FirstLessonContext;
@@ -56,40 +85,54 @@ export class LessonProductionService {
   }): Promise<void> {
     const startedAt = performance.now();
     const attempt = input.attempt ?? 1;
+    const context =
+      (await this.deps.repository.findLessonValidationContext?.(
+        input.lesson.id,
+      )) ?? input.context;
     let stage: "lesson_plan" | "lesson_block" | "persistence" = "lesson_plan";
     try {
-      const planRun = await this.startRun({
-        correlation: correlation(input, attempt),
-        contract: lessonPlanContract,
-        workload: "lesson_plan",
-        instructions:
-          "Produce a concise, safe language lesson plan with three to five cohesive blocks. Return JSON only.",
-        input: planPrompt(input.context),
-      });
-      const plan = parseCompletedRun(planRun, lessonPlanSchema);
-
-      stage = "lesson_block";
-      const firstPlanBlock = plan.blocks[0];
-      if (!firstPlanBlock) throw new Error("lesson_plan_without_block");
-      const blockRun = await this.startRun({
-        correlation: correlation(input, attempt),
-        contract: lessonBlockContract,
-        workload: "lesson_block",
-        instructions:
-          "Produce one cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied objective exactly. Return JSON only.",
-        input: blockPrompt(input.context, plan, firstPlanBlock.objective),
-      });
-      const block = parseCompletedRun(blockRun, lessonBlockSchema);
-      validateSemantics(plan, block, firstPlanBlock.objective);
-
-      stage = "persistence";
-      await this.deps.repository.publishFirstBlock({
+      const planResult = await this.startValidatedRun({
         attempt,
+        onPending: async (pending) => {
+          await this.deps.repository.persistPlanRun({
+            attempt: pending.attempt,
+            lessonId: input.lesson.id,
+            run: pending.run,
+          });
+        },
+        onRejected: async (rejected) => {
+          await this.deps.repository.persistPlanRun({
+            attempt: rejected.attempt,
+            lessonId: input.lesson.id,
+            run: rejected.run,
+          });
+        },
+        validate(plan) {
+          validateLessonPlanSemantics(plan, context);
+        },
+        request: planRequest(context, correlation(input, attempt)),
+        schema: lessonPlanSchema,
+      });
+      if (planResult.status === "pending") return;
+      const { run: planRun, value: plan } = planResult;
+      stage = "persistence";
+      await this.deps.repository.persistPlanRun({
+        attempt: planResult.attempt,
         lessonId: input.lesson.id,
         plan,
-        block,
-        runs: { plan: planRun, block: blockRun },
+        run: planRun,
       });
+
+      stage = "lesson_block";
+      const published = await this.produceFirstBlockFromPlan({
+        attempt,
+        context,
+        correlationId: input.correlationId,
+        lesson: input.lesson,
+        plan,
+        planResult,
+      });
+      if (!published) return;
       this.logger.info(
         {
           ...lessonLogFields(
@@ -100,22 +143,6 @@ export class LessonProductionService {
           durationMs: Math.round(performance.now() - startedAt),
         },
         "First Lesson block generation completed",
-      );
-      void this.produceRemainingBlocks({ input, plan, attempt }).catch(
-        (error) => {
-          this.logger.error(
-            {
-              ...lessonLogFields(
-                input,
-                attempt,
-                "lesson_generation.background_scheduling_failed",
-              ),
-              err: errorMetadata(error),
-              ...errorMetadata(error),
-            },
-            "Background Lesson generation scheduling failed",
-          );
-        },
       );
     } catch (error) {
       const errorCode = errorCodeFor(error, "lesson_production_failed");
@@ -140,6 +167,31 @@ export class LessonProductionService {
   }
 
   async recoverInterrupted(): Promise<void> {
+    const activePlans = await this.deps.repository.findActivePlanRuns();
+    await mapWithConcurrency(
+      activePlans,
+      this.concurrencyLimit,
+      async (active) => {
+        try {
+          await this.recoverPlanRun(active);
+        } catch (error) {
+          this.logger.error(
+            {
+              attempt: active.attempt,
+              err: errorMetadata(error),
+              event: "lesson_generation.plan_recovery_failed",
+              lessonId: active.lesson.id,
+              ...errorMetadata(error),
+            },
+            "Interrupted Lesson plan recovery failed",
+          );
+          await this.deps.repository.failLesson(
+            active.lesson.id,
+            errorCodeFor(error, "lesson_plan_recovery_failed"),
+          );
+        }
+      },
+    );
     const activeRuns = await this.deps.repository.findActiveBlockRuns();
     await mapWithConcurrency(
       activeRuns,
@@ -147,27 +199,85 @@ export class LessonProductionService {
       async (active) => {
         try {
           if (active.run.status === "pending" && active.run.reference) {
-            const run = await this.inspectRun(active.run.reference, {
-              attempt: active.attempt,
-              lessonId: active.lessonId,
-            });
+            let run: StructuredModelRun;
+            try {
+              run = await this.inspectRun(
+                active.run.reference,
+                {
+                  attempt: active.attempt,
+                  lessonId: active.lessonId,
+                },
+                "lesson_block",
+                active.run,
+              );
+            } catch (error) {
+              run = failedRun(active.run, error);
+            }
             await this.persistInspectedRun(active, run);
           } else {
             await this.startQueuedOrInterruptedBlock(active);
           }
         } catch (error) {
-          await this.deps.repository.persistBlockRun({
-            ...active,
-            run: failedRun(active.run, error),
-          });
           this.logBackgroundFailure(active, error, "inspection");
+          if (active.blockPosition === 0) {
+            await this.deps.repository.failLesson(
+              active.lessonId,
+              errorCodeFor(error, "lesson_block_recovery_failed"),
+            );
+          }
         }
       },
     );
   }
 
+  async retryFailedWork(
+    learnerId: string,
+    lessonId: string,
+    correlationId?: string,
+  ): Promise<boolean> {
+    const retryable = await this.deps.repository.prepareLessonRetry?.(
+      learnerId,
+      lessonId,
+    );
+    if (!retryable) return false;
+    if (!retryable.plan) {
+      await this.produceFirstBlock({
+        lesson: retryable.lesson,
+        context: retryable.context,
+        correlationId,
+        attempt: retryable.planAttempt,
+      });
+      return true;
+    }
+    const retryPlan = retryable.plan;
+    await mapWithConcurrency(
+      retryable.blocks,
+      this.concurrencyLimit,
+      async (block) => {
+        const planBlock = retryPlan.blocks[block.blockPosition];
+        if (!planBlock) return;
+        const claimed = await this.deps.repository.claimQueuedBlockRun({
+          attempt: block.attempt,
+          blockPosition: block.blockPosition,
+          lessonId,
+        });
+        if (!claimed) return;
+        await this.startBlock({
+          attempt: block.attempt,
+          blockPosition: block.blockPosition,
+          context: retryable.context,
+          correlationId,
+          expectedObjective: planBlock.objective,
+          lessonId,
+          plan: retryPlan,
+        });
+      },
+    );
+    return true;
+  }
+
   private async produceRemainingBlocks(input: {
-    input: {
+    lessonRequest: {
       lesson: ReservedFirstLesson;
       context: FirstLessonContext;
       correlationId?: string;
@@ -185,37 +295,22 @@ export class LessonProductionService {
           const claimed = await this.deps.repository.claimQueuedBlockRun({
             attempt: input.attempt,
             blockPosition,
-            lessonId: input.input.lesson.id,
+            lessonId: input.lessonRequest.lesson.id,
           });
           if (!claimed) return;
           await this.startBlock({
             attempt: input.attempt,
             blockPosition,
-            context: input.input.context,
-            correlationId: input.input.correlationId,
+            context: input.lessonRequest.context,
+            correlationId: input.lessonRequest.correlationId,
             expectedObjective: planBlock.objective,
-            lessonId: input.input.lesson.id,
+            lessonId: input.lessonRequest.lesson.id,
             plan: input.plan,
           });
         } catch (error) {
-          const failed = failedRun(
-            {
-              adapter: "unavailable",
-              model: "unavailable",
-              reference: `local:${input.input.lesson.id}:${blockPosition}:${input.attempt}`,
-              status: "failed",
-            },
-            error,
-          );
-          await this.deps.repository.persistBlockRun({
-            attempt: input.attempt,
-            blockPosition,
-            lessonId: input.input.lesson.id,
-            run: failed,
-          });
           this.logBackgroundFailure(
             {
-              lessonId: input.input.lesson.id,
+              lessonId: input.lessonRequest.lesson.id,
               blockPosition,
               attempt: input.attempt,
             },
@@ -227,19 +322,266 @@ export class LessonProductionService {
     );
   }
 
+  private async produceFirstBlockFromPlan(input: {
+    attempt: number;
+    context: FirstLessonContext;
+    correlationId?: string;
+    lesson: ReservedFirstLesson;
+    plan: LessonPlan;
+    planResult: CompletedValidatedRun<LessonPlan>;
+  }): Promise<boolean> {
+    const firstPlanBlock = input.plan.blocks[0];
+    if (!firstPlanBlock) throw new Error("lesson_plan_without_block");
+    const claimed = await this.deps.repository.claimQueuedBlockRun({
+      attempt: input.attempt,
+      blockPosition: 0,
+      lessonId: input.lesson.id,
+    });
+    if (!claimed) return false;
+    const blockResult = await this.startValidatedRun({
+      attempt: input.attempt,
+      onPending: async (pending) => {
+        await this.deps.repository.persistBlockRun({
+          attempt: pending.attempt,
+          blockPosition: 0,
+          lessonId: input.lesson.id,
+          run: pending.run,
+        });
+      },
+      onRejected: async (rejected) => {
+        await this.deps.repository.persistBlockRun({
+          attempt: rejected.attempt,
+          blockPosition: 0,
+          lessonId: input.lesson.id,
+          run: rejected.run,
+        });
+      },
+      validate(block) {
+        validateLessonBlockSemantics(
+          input.plan,
+          block,
+          firstPlanBlock.objective,
+          input.context,
+        );
+      },
+      request: {
+        ...blockRequest(input.context, input.plan, firstPlanBlock.objective),
+        correlation: {
+          attempt: input.attempt,
+          lessonId: input.lesson.id,
+          requestId: input.correlationId,
+        },
+      },
+      schema: lessonBlockSchema,
+    });
+    if (blockResult.status === "pending") return false;
+    await this.deps.repository.publishFirstBlock({
+      attempt: input.attempt,
+      lessonId: input.lesson.id,
+      plan: input.plan,
+      block: blockResult.value,
+      runs: {
+        plan: {
+          attempt: input.planResult.attempt,
+          run: input.planResult.run,
+        },
+        block: { attempt: blockResult.attempt, run: blockResult.run },
+      },
+    });
+    void this.produceRemainingBlocks({
+      lessonRequest: {
+        lesson: input.lesson,
+        context: input.context,
+        correlationId: input.correlationId,
+      },
+      plan: input.plan,
+      attempt: input.attempt,
+    }).catch((error) => {
+      this.logger.error(
+        {
+          attempt: input.attempt,
+          err: errorMetadata(error),
+          event: "lesson_generation.background_scheduling_failed",
+          lessonId: input.lesson.id,
+          ...errorMetadata(error),
+        },
+        "Background Lesson generation scheduling failed",
+      );
+    });
+    return true;
+  }
+
+  private async recoverPlanRun(active: ActiveLessonPlanRun): Promise<void> {
+    if (!active.run.reference) {
+      await this.produceFirstBlock({
+        lesson: active.lesson,
+        context: active.context,
+        attempt: active.attempt,
+      });
+      return;
+    }
+    let inspected: StructuredModelRun;
+    try {
+      inspected = await this.inspectRun(
+        active.run.reference,
+        {
+          attempt: active.attempt,
+          lessonId: active.lesson.id,
+        },
+        "lesson_plan",
+        active.run,
+      );
+    } catch (error) {
+      inspected = failedRun(active.run, error);
+    }
+    if (inspected.status === "pending") {
+      await this.deps.repository.persistPlanRun({
+        attempt: active.attempt,
+        lessonId: active.lesson.id,
+        run: inspected,
+      });
+      return;
+    }
+
+    let planResult: CompletedValidatedRun<LessonPlan>;
+    try {
+      const plan = parseCompletedRun(inspected, lessonPlanSchema);
+      validateLessonPlanSemantics(plan, active.context);
+      planResult = {
+        status: "completed",
+        attempt: active.attempt,
+        run: inspected,
+        value: plan,
+      };
+    } catch (error) {
+      await this.deps.repository.persistPlanRun({
+        attempt: active.attempt,
+        lessonId: active.lesson.id,
+        run: failedRun(inspected, error),
+      });
+      const retryAttempt = active.attempt + 1;
+      const retried = await this.retryRun(
+        planRequest(active.context, {
+          attempt: retryAttempt,
+          lessonId: active.lesson.id,
+        }),
+        active.run,
+      );
+      if (retried.status === "pending") {
+        await this.deps.repository.persistPlanRun({
+          attempt: retryAttempt,
+          lessonId: active.lesson.id,
+          run: retried,
+        });
+        return;
+      }
+      try {
+        const plan = parseCompletedRun(retried, lessonPlanSchema);
+        validateLessonPlanSemantics(plan, active.context);
+        planResult = {
+          status: "completed",
+          attempt: retryAttempt,
+          run: retried,
+          value: plan,
+        };
+      } catch (retryError) {
+        await this.deps.repository.persistPlanRun({
+          attempt: retryAttempt,
+          lessonId: active.lesson.id,
+          run: failedRun(retried, retryError),
+        });
+        throw retryError;
+      }
+    }
+
+    await this.deps.repository.persistPlanRun({
+      attempt: planResult.attempt,
+      lessonId: active.lesson.id,
+      plan: planResult.value,
+      run: planResult.run,
+    });
+    await this.produceFirstBlockFromPlan({
+      attempt: planResult.attempt,
+      context: active.context,
+      lesson: active.lesson,
+      plan: planResult.value,
+      planResult,
+    });
+  }
+
   private async persistInspectedRun(
     active: Awaited<
       ReturnType<LessonRepository["findActiveBlockRuns"]>
     >[number],
     run: StructuredModelRun,
   ): Promise<void> {
-    await this.persistProducedRun({
+    if (run.status === "pending") {
+      await this.deps.repository.persistBlockRun({
+        ...active,
+        run,
+      });
+      return;
+    }
+    const expectedObjective =
+      active.plan.blocks[active.blockPosition]?.objective ?? "";
+    let block: LessonBlock;
+    try {
+      block = parseCompletedRun(run, lessonBlockSchema);
+      validateLessonBlockSemantics(
+        active.plan,
+        block,
+        expectedObjective,
+        active.context,
+      );
+    } catch (error) {
+      await this.deps.repository.persistBlockRun({
+        ...active,
+        run: failedRun(run, error),
+      });
+      const retryAttempt = active.attempt + 1;
+      let retried: StructuredModelRun | undefined;
+      let retriedBlock: LessonBlock;
+      try {
+        retried = await this.retryRun(
+          {
+            ...blockRequest(active.context, active.plan, expectedObjective),
+            correlation: {
+              attempt: retryAttempt,
+              lessonId: active.lessonId,
+            },
+          },
+          active.run,
+        );
+        retriedBlock = parseCompletedRun(retried, lessonBlockSchema);
+        validateLessonBlockSemantics(
+          active.plan,
+          retriedBlock,
+          expectedObjective,
+          active.context,
+        );
+      } catch (retryError) {
+        await this.deps.repository.persistBlockRun({
+          attempt: retryAttempt,
+          blockPosition: active.blockPosition,
+          lessonId: active.lessonId,
+          run: failedRun(retried ?? run, retryError),
+        });
+        throw retryError;
+      }
+      await this.deps.repository.publishBlockRun({
+        attempt: retryAttempt,
+        block: retriedBlock,
+        blockPosition: active.blockPosition,
+        lessonId: active.lessonId,
+        run: retried,
+      });
+      return;
+    }
+    await this.deps.repository.publishBlockRun({
       attempt: active.attempt,
+      block,
       blockPosition: active.blockPosition,
       lessonId: active.lessonId,
-      plan: active.plan,
-      expectedObjective:
-        active.plan.blocks[active.blockPosition]?.objective ?? "",
       run,
     });
   }
@@ -251,6 +593,14 @@ export class LessonProductionService {
   ): Promise<void> {
     const objective = active.plan.blocks[active.blockPosition]?.objective;
     if (!objective) throw new Error("lesson_plan_block_missing");
+    if (active.run.status === "queued") {
+      const claimed = await this.deps.repository.claimQueuedBlockRun({
+        attempt: active.attempt,
+        blockPosition: active.blockPosition,
+        lessonId: active.lessonId,
+      });
+      if (!claimed) return;
+    }
     await this.startBlock({
       attempt: active.attempt,
       blockPosition: active.blockPosition,
@@ -270,36 +620,117 @@ export class LessonProductionService {
     lessonId: string;
     plan: LessonPlan;
   }): Promise<void> {
-    const run = await this.startRun({
-      correlation: {
-        attempt: input.attempt,
-        lessonId: input.lessonId,
-        requestId: input.correlationId,
+    const produced = await this.startValidatedRun({
+      attempt: input.attempt,
+      onPending: async (pending) => {
+        await this.deps.repository.persistBlockRun({
+          attempt: pending.attempt,
+          blockPosition: input.blockPosition,
+          lessonId: input.lessonId,
+          run: pending.run,
+        });
       },
-      contract: lessonBlockContract,
-      workload: "lesson_block",
-      instructions:
-        "Produce one cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied objective exactly. Return JSON only.",
-      input: blockPrompt(input.context, input.plan, input.expectedObjective),
+      onRejected: async (rejected) => {
+        await this.deps.repository.persistBlockRun({
+          attempt: rejected.attempt,
+          blockPosition: input.blockPosition,
+          lessonId: input.lessonId,
+          run: rejected.run,
+        });
+      },
+      request: {
+        ...blockRequest(input.context, input.plan, input.expectedObjective),
+        correlation: {
+          attempt: input.attempt,
+          lessonId: input.lessonId,
+          requestId: input.correlationId,
+        },
+      },
+      schema: lessonBlockSchema,
+      validate(block) {
+        validateLessonBlockSemantics(
+          input.plan,
+          block,
+          input.expectedObjective,
+          input.context,
+        );
+      },
     });
-    await this.persistProducedRun({ ...input, run });
+    if (produced.status === "pending") return;
+    await this.deps.repository.publishBlockRun({
+      ...input,
+      attempt: produced.attempt,
+      block: produced.value,
+      run: produced.run,
+    });
   }
 
-  private async persistProducedRun(input: {
+  private async startValidatedRun<T>(input: {
     attempt: number;
-    blockPosition: number;
-    lessonId: string;
-    plan: LessonPlan;
-    expectedObjective: string;
-    run: StructuredModelRun;
-  }): Promise<void> {
-    if (input.run.status !== "completed" || !input.run.output) {
-      await this.deps.repository.persistBlockRun(input);
-      return;
+    request: StructuredModelRequest<T>;
+    schema: { parse(value: unknown): T };
+    validate(value: T): void;
+    onRejected?(input: {
+      attempt: number;
+      error: unknown;
+      run: StructuredModelRun;
+    }): Promise<void>;
+    onPending?(input: {
+      attempt: number;
+      run: StructuredModelRun;
+    }): Promise<void>;
+  }): Promise<ValidatedRun<T>> {
+    let firstRun: StructuredModelRun | undefined;
+    let pinnedRoute: Pick<StructuredModelRun, "adapter" | "model"> | undefined;
+    let lastError: unknown;
+    for (let offset = 0; offset < 2; offset += 1) {
+      const attempt = input.attempt + offset;
+      let attemptedRun: StructuredModelRun | undefined;
+      const request = {
+        ...input.request,
+        correlation: { ...input.request.correlation, attempt },
+      };
+      try {
+        const run =
+          offset === 0
+            ? await this.startRun(request)
+            : await this.retryRun(request, pinnedRoute);
+        attemptedRun = run;
+        firstRun ??= run;
+        pinnedRoute ??= {
+          adapter: firstRun.adapter,
+          model: firstRun.model,
+        };
+        if (run.status === "pending") {
+          await input.onPending?.({ attempt, run });
+          return { status: "pending", attempt, run };
+        }
+        const value = parseCompletedRun(run, input.schema);
+        input.validate(value);
+        return { status: "completed", attempt, run, value };
+      } catch (error) {
+        lastError = error;
+        pinnedRoute ??= this.deps.model.route?.(input.request.workload);
+        if (input.onRejected) {
+          const route = attemptedRun ?? pinnedRoute;
+          if (route) {
+            const rejectedRun: StructuredModelRun = attemptedRun ?? {
+              ...route,
+              reference: `local:${input.request.workload}:${attempt}`,
+              status: "failed",
+            };
+            await input.onRejected({
+              attempt,
+              error,
+              run: failedRun(rejectedRun, error),
+            });
+          }
+        }
+        if (offset === 1) throw error;
+        if (!pinnedRoute) throw error;
+      }
     }
-    const block = lessonBlockSchema.parse(JSON.parse(input.run.output));
-    validateSemantics(input.plan, block, input.expectedObjective);
-    await this.deps.repository.publishBlockRun({ ...input, block });
+    throw lastError;
   }
 
   private async startRun(request: Parameters<StructuredModel["start"]>[0]) {
@@ -308,12 +739,35 @@ export class LessonProductionService {
     return withLatency(run, startedAt);
   }
 
+  private async retryRun(
+    request: Parameters<StructuredModel["retry"]>[0],
+    firstRun:
+      | StructuredModelRun
+      | Pick<StructuredModelRun, "adapter" | "model">
+      | undefined,
+  ) {
+    if (!firstRun) throw new Error("structured_model_route_unavailable");
+    const startedAt = performance.now();
+    const run = await this.deps.model.retry(request, {
+      adapter: firstRun.adapter,
+      model: firstRun.model,
+    });
+    return withLatency(run, startedAt);
+  }
+
   private async inspectRun(
     reference: string,
     correlation: { attempt: number; lessonId: string },
+    workload: StructuredModelRequest<unknown>["workload"] = "lesson_block",
+    pinned?: Pick<StructuredModelRun, "adapter" | "model">,
   ) {
     const startedAt = performance.now();
-    const run = await this.deps.model.inspect(reference, correlation);
+    const run = await this.deps.model.inspect(
+      reference,
+      correlation,
+      workload,
+      pinned,
+    );
     return withLatency(run, startedAt);
   }
 
@@ -368,6 +822,7 @@ function lessonGenerationErrorCategory(
   if (error instanceof SyntaxError || error instanceof TypeError)
     return "validation";
   if (error instanceof Error && error.name === "ZodError") return "validation";
+  if (error instanceof LessonSemanticValidationError) return "validation";
   if (
     error instanceof Error &&
     (error.message.startsWith("openai_") ||
@@ -388,24 +843,29 @@ function parseCompletedRun<T>(
   return schema.parse(JSON.parse(run.output));
 }
 
-function validateSemantics(
-  plan: LessonPlan,
-  block: LessonBlock,
-  expectedObjective: string,
-): void {
-  if (block.objective !== expectedObjective || !plan.objective.trim()) {
-    throw new Error("lesson_block_objective_mismatch");
-  }
-}
-
 function planPrompt(context: FirstLessonContext): string {
+  const priorityCompetencyState =
+    context.competencyProfile?.find(
+      (state) => state.competencyKey === context.priorityCompetencyKey,
+    ) ?? null;
   return JSON.stringify({
     task: "Plan the first approximately ten-minute lesson.",
-    targetLanguage: context.targetLanguage,
-    instructionLanguage: context.instructionLanguage,
-    primaryGoal: context.primaryGoal,
-    lessonEmphases: context.lessonEmphases,
-    priorityCompetency: context.priorityCompetencyKey,
+    requiredAlignment: {
+      targetLanguage: context.targetLanguage,
+      instructionLanguage: context.instructionLanguage,
+      primaryGoal: context.primaryGoal,
+      lessonEmphases: context.lessonEmphases,
+      priorityCompetencyKey: context.priorityCompetencyKey,
+      priorityCompetencyState: priorityCompetencyState
+        ? {
+            abilityEstimate: priorityCompetencyState.abilityEstimate,
+            confidence: priorityCompetencyState.confidence,
+          }
+        : null,
+      profileTopics: (context.profileTopics ?? []).slice(0, 3),
+    },
+    learnerAgeRange: context.learnerAgeRange,
+    competencyProfile: context.competencyProfile ?? [],
     internalDifficultyCeiling: "A1",
   });
 }
@@ -423,6 +883,32 @@ function blockPrompt(
     objective,
     internalDifficultyCeiling: "A1",
   });
+}
+
+function blockRequest(
+  context: FirstLessonContext,
+  plan: LessonPlan,
+  objective: string,
+): StructuredModelRequest<LessonBlock> {
+  return {
+    contract: lessonBlockContract,
+    workload: "lesson_block",
+    instructions: lessonBlockInstructions,
+    input: blockPrompt(context, plan, objective),
+  };
+}
+
+function planRequest(
+  context: FirstLessonContext,
+  correlation: NonNullable<StructuredModelRequest<LessonPlan>["correlation"]>,
+): StructuredModelRequest<LessonPlan> {
+  return {
+    correlation,
+    contract: lessonPlanContract,
+    workload: "lesson_plan",
+    instructions: lessonPlanInstructions,
+    input: planPrompt(context),
+  };
 }
 
 function withLatency(

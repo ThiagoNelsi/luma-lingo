@@ -117,11 +117,34 @@ describe("home routes", () => {
       nextBlockStatus: "preparing",
     });
   });
+
+  it("accepts an explicit retry for recoverable missing Lesson work", async () => {
+    const retryLesson = vi.fn(async () => true);
+    const app = await buildApp({
+      getHome: vi.fn(),
+      retryLesson,
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/me/lessons/f7e1918b-78b8-47e3-b0d9-2d6597542c00/retry",
+      cookies: { luma_lingo_session: "session-token" },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: true });
+    expect(retryLesson).toHaveBeenCalledWith(
+      "learner-1",
+      "f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+      expect.any(String),
+    );
+  });
 });
 
 async function buildApp(input: {
   getHome: ReturnType<typeof vi.fn>;
   getLesson?: ReturnType<typeof vi.fn>;
+  retryLesson?: ReturnType<typeof vi.fn>;
   resolveSession?: ReturnType<typeof vi.fn>;
 }) {
   const app = Fastify();
@@ -144,6 +167,7 @@ async function buildApp(input: {
     home: {
       getHome: input.getHome,
       getLesson: input.getLesson,
+      retryLesson: input.retryLesson,
     } as unknown as HomeService,
   });
   return app;

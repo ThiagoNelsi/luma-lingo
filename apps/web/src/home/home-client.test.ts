@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchHome,
   fetchLesson,
+  retryLessonGeneration,
   UnauthorizedHomeError,
 } from "./home-client.js";
 
@@ -64,5 +65,24 @@ describe("fetchHome", () => {
     ).resolves.toMatchObject({
       nextBlockStatus: "preparing",
     });
+  });
+
+  it("requests an explicit retry without sending Lesson content", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(Response.json({ accepted: true }, { status: 202 }));
+
+    await expect(
+      retryLessonGeneration(
+        "http://localhost:3000",
+        "f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+        fetch,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(fetch).toHaveBeenCalledWith(
+      "http://localhost:3000/me/lessons/f7e1918b-78b8-47e3-b0d9-2d6597542c00/retry",
+      { credentials: "include", method: "POST" },
+    );
   });
 });

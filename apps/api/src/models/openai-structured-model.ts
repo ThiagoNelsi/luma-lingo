@@ -6,6 +6,7 @@ import {
 import type {
   StructuredModel,
   StructuredModelRequest,
+  StructuredModelReadiness,
   StructuredModelRun,
 } from "./structured-model.js";
 
@@ -44,7 +45,7 @@ export class OpenAiStructuredModel implements StructuredModel {
 
   constructor(
     private readonly config: {
-      apiKey: string;
+      apiKey?: string;
       model?: string;
       models?: Record<"lesson_plan" | "lesson_block", string>;
       fetch?: typeof globalThis.fetch;
@@ -55,10 +56,51 @@ export class OpenAiStructuredModel implements StructuredModel {
     this.logger = logger;
   }
 
+  readiness(): StructuredModelReadiness {
+    if (!this.config.apiKey) {
+      return { status: "degraded", reason: "missing_credentials" };
+    }
+    if (
+      (!this.config.models?.lesson_plan && !this.config.model) ||
+      (!this.config.models?.lesson_block && !this.config.model)
+    ) {
+      return {
+        status: "degraded",
+        reason: "invalid_workload_capability",
+      };
+    }
+    return { status: "ready" };
+  }
+
   async start<T>(
     request: StructuredModelRequest<T>,
   ): Promise<StructuredModelRun> {
-    const model = this.modelFor(request.workload);
+    return this.startWithModel(request, this.modelFor(request.workload));
+  }
+
+  route(
+    workload: StructuredModelRequest<unknown>["workload"],
+  ): Pick<StructuredModelRun, "adapter" | "model"> {
+    return { adapter: "openai", model: this.modelFor(workload) };
+  }
+
+  async retry<T>(
+    request: StructuredModelRequest<T>,
+    pinned: Pick<StructuredModelRun, "adapter" | "model">,
+  ): Promise<StructuredModelRun> {
+    if (pinned.adapter !== "openai" || !pinned.model) {
+      throw new OpenAiStructuredModelError("openai_pinned_route_invalid");
+    }
+    return this.startWithModel(request, pinned.model);
+  }
+
+  private async startWithModel<T>(
+    request: StructuredModelRequest<T>,
+    model: string,
+  ): Promise<StructuredModelRun> {
+    if (!this.config.apiKey) {
+      throw new OpenAiStructuredModelError("openai_api_key_required");
+    }
     const startedAt = performance.now();
     try {
       const response = await this.fetch("https://api.openai.com/v1/responses", {
@@ -71,7 +113,7 @@ export class OpenAiStructuredModel implements StructuredModel {
           model,
           instructions: request.instructions,
           input: request.input,
-          store: false,
+          store: true,
           reasoning: { effort: reasoningEffortFor(request.workload) },
           text: {
             format: {
@@ -99,6 +141,9 @@ export class OpenAiStructuredModel implements StructuredModel {
         durationMs: Math.round(performance.now() - startedAt),
         model,
         operation: "responses.create",
+        inputTokens: run.usage?.inputTokens,
+        outputTokens: run.usage?.outputTokens,
+        purpose: request.workload,
         runStatus: run.status,
         statusCode: response.status,
         workload: request.workload,
@@ -110,6 +155,7 @@ export class OpenAiStructuredModel implements StructuredModel {
         durationMs: Math.round(performance.now() - startedAt),
         model,
         operation: "responses.create",
+        purpose: request.workload,
         workload: request.workload,
       });
       throw error;
@@ -119,8 +165,17 @@ export class OpenAiStructuredModel implements StructuredModel {
   async inspect(
     reference: string,
     correlation?: StructuredModelRequest<unknown>["correlation"],
+    workload: StructuredModelRequest<unknown>["workload"] = "lesson_block",
+    pinned?: Pick<StructuredModelRun, "adapter" | "model">,
   ): Promise<StructuredModelRun> {
-    const model = this.modelFor("lesson_block");
+    if (!this.config.apiKey) {
+      throw new OpenAiStructuredModelError("openai_api_key_required");
+    }
+    const fallbackModel =
+      pinned?.model ??
+      this.config.models?.[workload] ??
+      this.config.model ??
+      "unavailable";
     const startedAt = performance.now();
     try {
       const response = await this.fetch(
@@ -137,12 +192,18 @@ export class OpenAiStructuredModel implements StructuredModel {
           providerError.param,
         );
       }
-      const run = toRun((await response.json()) as OpenAiResponse, model);
+      const run = toRun(
+        (await response.json()) as OpenAiResponse,
+        fallbackModel,
+      );
       this.logCompletedOperation({
         ...correlation,
         durationMs: Math.round(performance.now() - startedAt),
-        model,
+        model: run.model,
         operation: "responses.retrieve",
+        inputTokens: run.usage?.inputTokens,
+        outputTokens: run.usage?.outputTokens,
+        purpose: workload,
         runStatus: run.status,
         statusCode: response.status,
       });
@@ -151,8 +212,9 @@ export class OpenAiStructuredModel implements StructuredModel {
       this.logFailedOperation(error, {
         ...correlation,
         durationMs: Math.round(performance.now() - startedAt),
-        model,
+        model: fallbackModel,
         operation: "responses.retrieve",
+        purpose: workload,
       });
       throw error;
     }
@@ -167,9 +229,12 @@ export class OpenAiStructuredModel implements StructuredModel {
   private logCompletedOperation(fields: {
     attempt?: number;
     durationMs: number;
+    inputTokens?: number;
     lessonId?: string;
     model: string;
     operation: string;
+    outputTokens?: number;
+    purpose?: string;
     requestId?: string;
     runStatus: StructuredModelRun["status"];
     statusCode: number;
@@ -193,6 +258,7 @@ export class OpenAiStructuredModel implements StructuredModel {
       lessonId?: string;
       model: string;
       operation: string;
+      purpose?: string;
       requestId?: string;
       workload?: string;
     },
