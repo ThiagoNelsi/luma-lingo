@@ -114,7 +114,7 @@ describe("web routes", () => {
           onboardingStep: "starting_point",
         },
       }),
-    ).toBe("/private");
+    ).toBe("/home");
   });
 
   it("shows the final profile review only after the shared onboarding prerequisites", () => {

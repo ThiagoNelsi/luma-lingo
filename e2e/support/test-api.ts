@@ -16,6 +16,7 @@ import type { DiagnosticAttempt } from "../../apps/api/src/diagnostics/diagnosti
 import type { DiagnosticAttemptRepository } from "../../apps/api/src/diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../../apps/api/src/diagnostics/initial-diagnostic-runtime-service.js";
 import { createApp } from "../../apps/api/src/http/app.js";
+import type { HomeService } from "../../apps/api/src/lessons/home-service.js";
 import type { LearnerRepository } from "../../apps/api/src/learners/learner-repository.js";
 import type { OnboardingCompletionRepository } from "../../apps/api/src/learners/onboarding-completion-repository.js";
 import type { ProfileIntroductionRepository } from "../../apps/api/src/profile/profile-introduction-repository.js";
@@ -491,6 +492,34 @@ const app = await createApp({
   onboardingCompletion,
   diagnosticAttempts,
   initialLearningPriorities,
+  home: {
+    async getHome() {
+      return {
+        status: "ready" as const,
+        lessonId: "f7e1918b-78b8-47e3-b0d9-2d6597542c00",
+      };
+    },
+    async getLesson(_learnerId, lessonId) {
+      return {
+        lessonId,
+        block: {
+          title: "Your first greeting",
+          objective: "Say hello and share your name.",
+          explanation: "Use Hello to greet someone.",
+          examples: [{ target: "Hello!", instruction: "Olá!" }],
+          activities: [
+            {
+              type: "multiple_choice" as const,
+              prompt: "Choose a greeting.",
+              options: ["Hello", "Thanks"],
+              correctOptionIndex: 0,
+              explanation: "Hello is a greeting.",
+            },
+          ],
+        },
+      };
+    },
+  } as HomeService,
   sessions: sessionRepository,
   users,
   profileIntroduction,

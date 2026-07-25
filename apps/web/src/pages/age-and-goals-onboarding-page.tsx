@@ -47,7 +47,7 @@ export function AgeAndGoalsOnboardingPage({
         const me = await fetchMe(apiOrigin);
         if (!active) return;
         if (me.currentLearningTrack?.onboardingStatus === "completed") {
-          navigate("/private", { replace: true });
+          navigate("/home", { replace: true });
           return;
         }
         if (!me.learner.instructionLanguage || !me.currentLearningTrack) {

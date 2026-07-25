@@ -9,6 +9,11 @@ import { z } from "zod";
 import { rankInitialLearningPriorities } from "../learning/initial-learning-priority.js";
 import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
 import { assumedConceptRequirementSchema } from "../learning/knowledge-inference.js";
+import {
+  createSilentLogger,
+  errorMetadata,
+  type AppLogger,
+} from "../observability/logger.js";
 
 const pedagogicalPolicyMetadataSchema = z.object({
   ranking: pedagogicalRankingConfigSchema.optional(),
@@ -17,6 +22,7 @@ const pedagogicalPolicyMetadataSchema = z.object({
 export class PrismaInitialLearningPriorityRepository implements InitialLearningPriorityRepository {
   constructor(
     private readonly prisma: PrismaClient,
+    private readonly logger: AppLogger = createSilentLogger(),
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -24,10 +30,49 @@ export class PrismaInitialLearningPriorityRepository implements InitialLearningP
     learningTrackId: string;
     onboardingStartingPoint: "beginner" | "diagnostic";
   }) {
+    const startedAt = performance.now();
+    try {
+      const priority = await this.resolveInitialLearningPriority(input);
+      this.logger.debug(
+        {
+          durationMs: Math.round(performance.now() - startedAt),
+          event: "prisma.operation.completed",
+          learningTrackId: input.learningTrackId,
+          operation: "learning_priority.resolve_initial",
+          provider: "prisma",
+          status: "completed",
+        },
+        "Prisma operation completed",
+      );
+      return priority;
+    } catch (error) {
+      this.logger.error(
+        {
+          durationMs: Math.round(performance.now() - startedAt),
+          err: errorMetadata(error),
+          event: "prisma.operation.failed",
+          learningTrackId: input.learningTrackId,
+          operation: "learning_priority.resolve_initial",
+          prismaCode: prismaErrorCode(error),
+          provider: "prisma",
+          status: "failed",
+          ...errorMetadata(error),
+        },
+        "Prisma operation failed",
+      );
+      throw error;
+    }
+  }
+
+  private async resolveInitialLearningPriority(input: {
+    learningTrackId: string;
+    onboardingStartingPoint: "beginner" | "diagnostic";
+  }) {
     const learningTrack = await this.prisma.learningTrack.findUnique({
       where: { id: input.learningTrackId },
       select: {
         competencyCatalogId: true,
+        targetLanguage: true,
         learningGoal: true,
         additionalGoals: true,
         conceptStates: {
@@ -49,12 +94,20 @@ export class PrismaInitialLearningPriorityRepository implements InitialLearningP
         },
       },
     });
-    const primaryGoal = goalSchema.safeParse(learningTrack?.learningGoal);
+    if (!learningTrack) return null;
+
+    const competencyCatalogId =
+      learningTrack.competencyCatalogId ??
+      (await this.restorePublishedCatalog(
+        input.learningTrackId,
+        learningTrack.targetLanguage,
+      ));
+    const primaryGoal = goalSchema.safeParse(learningTrack.learningGoal);
     const additionalGoals = additionalGoalSchema
       .array()
-      .safeParse(learningTrack?.additionalGoals);
+      .safeParse(learningTrack.additionalGoals);
     if (
-      !learningTrack?.competencyCatalogId ||
+      !competencyCatalogId ||
       !primaryGoal.success ||
       !additionalGoals.success
     ) {
@@ -62,7 +115,7 @@ export class PrismaInitialLearningPriorityRepository implements InitialLearningP
     }
 
     const policy = await this.prisma.pedagogicalPolicy.findFirst({
-      where: { catalogId: learningTrack.competencyCatalogId },
+      where: { catalogId: competencyCatalogId },
       orderBy: [{ createdAt: "desc" }, { version: "desc" }],
       select: {
         version: true,
@@ -86,8 +139,8 @@ export class PrismaInitialLearningPriorityRepository implements InitialLearningP
 
     const competencies = await this.prisma.competency.findMany({
       where: {
-        catalogId: learningTrack.competencyCatalogId,
-        status: "published",
+        catalogId: competencyCatalogId,
+        status: "active",
       },
       select: {
         id: true,
@@ -157,4 +210,34 @@ export class PrismaInitialLearningPriorityRepository implements InitialLearningP
 
     return priorities[0] ?? null;
   }
+
+  private async restorePublishedCatalog(
+    learningTrackId: string,
+    targetLanguage: string,
+  ): Promise<string | null> {
+    const catalog = await this.prisma.competencyCatalog.findFirst({
+      where: { targetLanguage, status: "published" },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      select: { id: true },
+    });
+    if (!catalog) return null;
+
+    await this.prisma.learningTrack.updateMany({
+      where: { id: learningTrackId, competencyCatalogId: null },
+      data: { competencyCatalogId: catalog.id },
+    });
+    return catalog.id;
+  }
+}
+
+function prismaErrorCode(error: unknown): string | undefined {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    typeof error.code !== "string"
+  ) {
+    return undefined;
+  }
+  return error.code;
 }

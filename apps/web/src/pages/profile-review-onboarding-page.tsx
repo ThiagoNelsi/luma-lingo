@@ -54,8 +54,7 @@ export function getProfileReviewRedirect(
   me: MeResponse,
   profileIntroductionStatus: ProfileIntroductionStatus,
 ): string | null {
-  if (me.currentLearningTrack?.onboardingStatus === "completed")
-    return "/private";
+  if (me.currentLearningTrack?.onboardingStatus === "completed") return "/home";
   if (!me.learner.instructionLanguage || !me.currentLearningTrack)
     return "/onboarding/languages";
   if (!me.learner.ageRange) return "/onboarding/about-you";
@@ -190,7 +189,7 @@ export function ProfileReviewOnboardingPage({
       await confirmProfileIntroduction(apiOrigin, formResult.profile);
       await completeOnboarding(apiOrigin);
       clearProfileIntroductionRecording();
-      navigate("/private", { replace: true });
+      navigate("/home", { replace: true });
     } catch (error) {
       if (isUnauthorizedError(error)) {
         navigate("/login", { replace: true });

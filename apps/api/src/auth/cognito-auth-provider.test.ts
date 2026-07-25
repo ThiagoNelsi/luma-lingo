@@ -77,6 +77,10 @@ describe("CognitoAuthProvider", () => {
       expect.objectContaining({
         errorMessage: "invalid_grant",
         event: "cognito.token_exchange.failed",
+        operation: "oauth2.token_exchange",
+        provider: "cognito",
+        status: "failed",
+        statusCode: 400,
       }),
       "Cognito token exchange failed",
     );

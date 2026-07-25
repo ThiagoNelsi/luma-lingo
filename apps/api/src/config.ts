@@ -29,6 +29,12 @@ export interface RuntimeConfig {
     apiKey: string;
     model: string;
   };
+  openai: {
+    apiKey: string;
+    lessonForegroundBudgetMs: number;
+    lessonBlockModel: string;
+    lessonPlanModel: string;
+  };
   port: number;
 }
 
@@ -63,6 +69,14 @@ export function readRuntimeConfig(
     gemini: {
       apiKey: required(env, "GEMINI_API_KEY"),
       model: env.GEMINI_MODEL ?? "gemini-3.5-flash",
+    },
+    openai: {
+      apiKey: required(env, "OPENAI_API_KEY"),
+      lessonForegroundBudgetMs: parseInteger(
+        env.LESSON_FOREGROUND_BUDGET_MS ?? "5000",
+      ),
+      lessonBlockModel: env.OPENAI_LESSON_BLOCK_MODEL ?? "gpt-5.6-terra",
+      lessonPlanModel: env.OPENAI_LESSON_PLAN_MODEL ?? "gpt-5.6-terra",
     },
     port: parseInteger(env.PORT ?? "3000"),
   };

@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "LumaLingo Runtime Architecture",
+    "subtitle": "Primary learner path, external providers, and logical trust boundaries",
+    "output": "runtime-architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "learner-request",
+        "label": "Learner request path",
+        "focus": ["learner", "web", "api", "postgres"],
+        "note": "Follow the authenticated browser request to durable learner state."
+      },
+      {
+        "id": "identity",
+        "label": "Managed identity",
+        "focus": ["web", "api", "cognito", "google"],
+        "note": "Cognito Managed Login returns to the API, which creates the application session."
+      },
+      {
+        "id": "ai-services",
+        "label": "AI-assisted work",
+        "focus": ["api", "gemini", "openai", "postgres"],
+        "note": "The API owns provider calls and persists only application results."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "learner",
+      "type": "external",
+      "label": "Learner",
+      "sublabel": "browser / microphone",
+      "pos": [40, 340]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web application",
+      "sublabel": "React + Vite",
+      "pos": [260, 340],
+      "tag": "untrusted client"
+    },
+    {
+      "id": "cognito",
+      "type": "security",
+      "label": "Amazon Cognito",
+      "sublabel": "Managed Login / OAuth 2.0",
+      "pos": [345, 120],
+      "tag": "external identity boundary"
+    },
+    {
+      "id": "google",
+      "type": "external",
+      "label": "Google",
+      "sublabel": "optional OIDC federation",
+      "pos": [80, 120]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Application API",
+      "sublabel": "Fastify + Zod + domain services",
+      "pos": [530, 340],
+      "tag": "session + origin checks"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Prisma; learner and catalog state",
+      "pos": [765, 340],
+      "tag": "durable application data"
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Google Gemini API",
+      "sublabel": "profile transcription + extraction",
+      "pos": [670, 130]
+    },
+    {
+      "id": "openai",
+      "type": "external",
+      "label": "OpenAI Responses API",
+      "sublabel": "structured lesson generation",
+      "pos": [930, 130],
+      "size": [150, 60]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "LumaLingo application boundary (logical)",
+      "wraps": ["web", "api", "postgres"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Trusted server and data boundary (logical)",
+      "wraps": ["api", "postgres"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "learner-to-web",
+      "from": "learner",
+      "to": "web",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-to-api",
+      "from": "web",
+      "to": "api",
+      "label": "HTTPS + session cookie",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-postgres",
+      "from": "api",
+      "to": "postgres",
+      "label": "Prisma / SQL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-to-cognito",
+      "from": "web",
+      "to": "cognito",
+      "label": "login redirect",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "orthogonal-v",
+      "labelDx": -52
+    },
+    {
+      "id": "cognito-to-api",
+      "from": "cognito",
+      "to": "api",
+      "label": "code exchange",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [[505, 150], [505, 270], [590, 270]],
+      "labelDy": -12
+    },
+    {
+      "id": "google-to-cognito",
+      "from": "google",
+      "to": "cognito",
+      "label": "OIDC (optional)",
+      "variant": "security"
+    },
+    {
+      "id": "api-to-gemini",
+      "from": "api",
+      "to": "gemini",
+      "label": "profile processing",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [[590, 285], [730, 285]],
+      "labelDy": -12
+    },
+    {
+      "id": "api-to-openai",
+      "from": "api",
+      "to": "openai",
+      "label": "structured output",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [[620, 300], [990, 300]],
+      "labelDy": 14
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Runtime responsibilities",
+      "items": [
+        "Web is the React/Vite client; the Fastify API owns authentication, onboarding, diagnostics, and lesson orchestration.",
+        "Shared Zod contracts cross application boundaries; Prisma persists application state in PostgreSQL."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust and data handling",
+      "items": [
+        "Browser input crosses into the API; origin checks and an app-owned HttpOnly session gate authenticated operations.",
+        "Profile audio is processed in API memory, submitted to Gemini, then zeroed; raw audio is not persisted.",
+        "The two dashed boundaries are logical trust boundaries, not a claim about deployed network controls."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "External dependencies",
+      "items": [
+        "Cognito supplies Managed Login and optional Google federation; the API exchanges OAuth codes and creates its own session.",
+        "Gemini transcribes/extracts profile facts; OpenAI creates structured lesson content. Both adapters are API-owned."
+      ]
+    }
+  ]
+}

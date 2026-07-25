@@ -58,7 +58,7 @@ export function OnboardingStartingPointPage({
         ]);
         if (!active) return;
         if (me.currentLearningTrack?.onboardingStatus === "completed") {
-          navigate("/private", { replace: true });
+          navigate("/home", { replace: true });
           return;
         }
         if (!me.learner.instructionLanguage || !me.currentLearningTrack) {

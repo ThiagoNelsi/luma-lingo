@@ -34,6 +34,7 @@ export class CognitoAuthProvider implements AuthProvider {
     redirectUri: string;
   }): Promise<AuthIdentity> {
     const startedAt = performance.now();
+    let statusCode: number | undefined;
     try {
       const body = new URLSearchParams({
         grant_type: "authorization_code",
@@ -55,6 +56,7 @@ export class CognitoAuthProvider implements AuthProvider {
           body,
         },
       );
+      statusCode = response.status;
       const token = (await response.json()) as {
         access_token?: string;
         id_token?: string;
@@ -77,6 +79,10 @@ export class CognitoAuthProvider implements AuthProvider {
         {
           durationMs: Math.round(performance.now() - startedAt),
           event: "cognito.token_exchange.completed",
+          operation: "oauth2.token_exchange",
+          provider: "cognito",
+          status: "completed",
+          statusCode,
         },
         "Cognito token exchange completed",
       );
@@ -91,7 +97,12 @@ export class CognitoAuthProvider implements AuthProvider {
       this.logger.error(
         {
           durationMs: Math.round(performance.now() - startedAt),
+          err: errorMetadata(error),
           event: "cognito.token_exchange.failed",
+          operation: "oauth2.token_exchange",
+          provider: "cognito",
+          status: "failed",
+          statusCode,
           ...errorMetadata(error),
         },
         "Cognito token exchange failed",

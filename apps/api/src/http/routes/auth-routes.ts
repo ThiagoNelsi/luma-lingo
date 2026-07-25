@@ -102,7 +102,7 @@ export function registerAuthRoutes(
           secure: deps.config.sessionCookieSecure,
         });
 
-        return reply.redirect(`${deps.config.frontendOrigin}/private`);
+        return reply.redirect(`${deps.config.frontendOrigin}/home`);
       } catch (error) {
         if (error instanceof UnverifiedEmailError) {
           return reply.redirect(

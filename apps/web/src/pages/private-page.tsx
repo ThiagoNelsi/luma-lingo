@@ -28,7 +28,7 @@ export function renderPrivateRouteText(me: MeResponse): string {
 
 export function getNextOnboardingRoute(me: MeResponse): string {
   if (me.currentLearningTrack?.onboardingStatus === "completed") {
-    return "/private";
+    return "/home";
   }
   if (!me.learner.instructionLanguage || !me.currentLearningTrack) {
     return "/onboarding/languages";

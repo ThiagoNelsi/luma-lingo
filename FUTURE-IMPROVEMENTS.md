@@ -1,5 +1,44 @@
 # Future Improvements
 
+## 2026-07-25
+
+### Listening Components In Generated Lessons
+
+- **Deferred:** Add generated listening components to cohesive lesson blocks,
+  including a validated transcript, playback behavior, and listening-specific
+  exercise schemas that the application can render.
+- **Current scope boundary:** Issue #6 is limited to text blocks and closed
+  schemas for text exercise types. It does not generate audio-oriented
+  components or introduce their additional UI and validation states.
+- **Future value:** Listening practice would broaden lesson emphasis and let
+  learners connect written forms with target-language comprehension while
+  preserving the same incremental block experience.
+- **Revisit when:** Text lesson generation and rendering are stable. Decide
+  between browser speech synthesis and generated audio, define
+  language-and-voice quality requirements, and add structured listening
+  contracts, accessibility behavior, and browser coverage.
+
+### Automatic Cross-Provider Model Fallback
+
+- **Deferred:** Add capability-aware automatic fallback between configured
+  structured-model providers for lesson planning, block generation, and
+  validation. An execution already accepted by a provider must remain pinned
+  to that adapter; only a new attempt may be routed to a fallback.
+- **Current scope boundary:** Issue #6 introduces the provider-neutral
+  `StructuredModel` seam, an OpenAI production adapter, an in-memory test
+  adapter, and explicit provider/model routing by workload. Automatically
+  selecting another production provider would add routing policy, equivalent
+  provider configuration, cross-provider failure semantics, and pedagogical
+  quality validation beyond the first-lesson slice.
+- **Future value:** A fallback route could preserve lesson availability during
+  provider outages, quota exhaustion, rate limiting, or capability changes
+  without exposing provider details to `LessonProduction` or the Home.
+- **Revisit when:** At least one additional production adapter has passed the
+  same structured-output, privacy, latency, cost, and pedagogical evaluations
+  as the OpenAI adapter. Define provider priority, retry eligibility,
+  per-workload capability requirements, run stickiness, audit metadata, and
+  operator-visible fallback events before enabling automatic routing.
+
 ## 2026-07-23
 
 ### Aggregate Confidence Across Direct Concept Evidence

@@ -18,6 +18,10 @@ const envKeys = [
   "GEMINI_API_KEY",
   "GEMINI_MODEL",
   "LOG_LEVEL",
+  "OPENAI_API_KEY",
+  "OPENAI_LESSON_BLOCK_MODEL",
+  "OPENAI_LESSON_PLAN_MODEL",
+  "LESSON_FOREGROUND_BUDGET_MS",
   "PORT",
   "SESSION_COOKIE_NAME",
   "SESSION_COOKIE_SECURE",
@@ -61,6 +65,9 @@ describe("runtime config", () => {
         "FRONTEND_ORIGIN=http://localhost:5173",
         "GEMINI_API_KEY=test-key",
         "GEMINI_MODEL=gemini-test",
+        "OPENAI_API_KEY=openai-test-key",
+        "OPENAI_LESSON_PLAN_MODEL=gpt-test-plan",
+        "OPENAI_LESSON_BLOCK_MODEL=gpt-test-block",
         "LOG_LEVEL=debug",
         "PORT=3000",
         "SESSION_COOKIE_NAME=luma_lingo_session",
@@ -73,6 +80,7 @@ describe("runtime config", () => {
       loadRuntimeEnv(packageDirectory);
       expect(readRuntimeConfig().app.apiOrigin).toBe("http://localhost:3000");
       expect(readRuntimeConfig().gemini.model).toBe("gemini-test");
+      expect(readRuntimeConfig().openai.lessonPlanModel).toBe("gpt-test-plan");
       expect(readRuntimeConfig().app.logLevel).toBe("debug");
     } finally {
       rmSync(workspace, { recursive: true, force: true });

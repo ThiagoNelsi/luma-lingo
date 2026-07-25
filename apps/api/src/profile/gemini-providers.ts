@@ -140,6 +140,10 @@ export function createGeminiGenerate(
           durationMs: Math.round(performance.now() - startedAt),
           event: "gemini.generate.completed",
           model: config.model,
+          operation: "models.generateContent",
+          provider: "gemini",
+          status: "completed",
+          statusCode: response.status,
         },
         "Gemini generation completed",
       );
@@ -148,9 +152,14 @@ export function createGeminiGenerate(
       logger.error(
         {
           durationMs: Math.round(performance.now() - startedAt),
-          err: error,
+          err: errorMetadata(error),
           event: "gemini.generate.failed",
           model: config.model,
+          operation: "models.generateContent",
+          provider: "gemini",
+          status: "failed",
+          statusCode:
+            error instanceof GeminiRequestError ? error.status : undefined,
           ...errorMetadata(error),
         },
         "Gemini generation failed",

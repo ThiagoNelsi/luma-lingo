@@ -44,7 +44,7 @@ export function LanguageOnboardingPage({
         if (!active) return;
 
         if (me.currentLearningTrack?.onboardingStatus === "completed") {
-          navigate("/private", { replace: true });
+          navigate("/home", { replace: true });
           return;
         }
 

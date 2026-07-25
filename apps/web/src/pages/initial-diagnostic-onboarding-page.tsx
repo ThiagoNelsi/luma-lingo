@@ -38,7 +38,7 @@ export function getInitialDiagnosticRedirect(
   profileIntroductionStatus: ProfileIntroductionStatus,
 ): string | null {
   if (me.currentLearningTrack?.onboardingStatus === "completed") {
-    return "/private";
+    return "/home";
   }
   if (!me.learner.instructionLanguage || !me.currentLearningTrack) {
     return "/onboarding/languages";

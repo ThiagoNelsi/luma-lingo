@@ -5,6 +5,9 @@ import { loadRuntimeEnv, readRuntimeConfig } from "./config.js";
 import { DiagnosticAttemptService } from "./diagnostics/diagnostic-attempt-service.js";
 import { InitialDiagnosticRuntimeService } from "./diagnostics/initial-diagnostic-runtime-service.js";
 import { createApp } from "./http/app.js";
+import { HomeService } from "./lessons/home-service.js";
+import { LessonProductionService } from "./lessons/lesson-production-service.js";
+import { OpenAiStructuredModel } from "./models/openai-structured-model.js";
 import { createAppLogger } from "./observability/logger.js";
 import {
   createGeminiGenerate,
@@ -19,6 +22,7 @@ import { PrismaProfileIntroductionRepository } from "./repositories/prisma-profi
 import { PrismaOnboardingCompletionRepository } from "./repositories/prisma-onboarding-completion-repository.js";
 import { PrismaSessionRepository } from "./repositories/prisma-session-repository.js";
 import { PrismaLearnerRepository } from "./repositories/prisma-learner-repository.js";
+import { PrismaLessonRepository } from "./repositories/prisma-lesson-repository.js";
 import { PrismaUserRepository } from "./repositories/prisma-user-repository.js";
 
 loadRuntimeEnv();
@@ -27,6 +31,10 @@ const runtime = readRuntimeConfig();
 const logger = createAppLogger(runtime.app.logLevel);
 const prisma = createDatabaseClient();
 const profileRepository = new PrismaProfileIntroductionRepository(prisma);
+const lessonRepository = new PrismaLessonRepository(
+  prisma,
+  logger.child({ component: "prisma-lesson-repository" }),
+);
 const diagnosticAttemptRepository = new PrismaDiagnosticAttemptRepository(
   prisma,
 );
@@ -36,6 +44,24 @@ const geminiGenerate = createGeminiGenerate(
   runtime.gemini,
   logger.child({ component: "gemini" }),
 );
+const initialLearningPriorities = new PrismaInitialLearningPriorityRepository(
+  prisma,
+  logger.child({ component: "prisma-initial-learning-priority-repository" }),
+);
+const lessonProduction = new LessonProductionService({
+  model: new OpenAiStructuredModel(
+    {
+      apiKey: runtime.openai.apiKey,
+      models: {
+        lesson_plan: runtime.openai.lessonPlanModel,
+        lesson_block: runtime.openai.lessonBlockModel,
+      },
+    },
+    logger.child({ component: "openai-structured-model" }),
+  ),
+  repository: lessonRepository,
+  logger: logger.child({ component: "lesson-production-service" }),
+});
 const profileIntroduction = new ProfileIntroductionService({
   repository: profileRepository,
   transcription: new GeminiTranscriptionProvider(geminiGenerate),
@@ -55,9 +81,14 @@ const app = await createApp({
   learners: new PrismaLearnerRepository(prisma),
   onboardingCompletion: new PrismaOnboardingCompletionRepository(prisma),
   diagnosticAttempts: diagnosticAttemptRepository,
-  initialLearningPriorities: new PrismaInitialLearningPriorityRepository(
-    prisma,
-  ),
+  initialLearningPriorities,
+  home: new HomeService({
+    lessons: lessonRepository,
+    priorities: initialLearningPriorities,
+    production: lessonProduction,
+    foregroundBudgetMs: runtime.openai.lessonForegroundBudgetMs,
+    logger: logger.child({ component: "home-service" }),
+  }),
   users: new PrismaUserRepository(prisma),
   sessions: new PrismaSessionRepository(prisma),
   initialDiagnostic: new InitialDiagnosticRuntimeService({

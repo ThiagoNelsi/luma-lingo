@@ -432,6 +432,7 @@ describe("auth routes", () => {
           event: "http.request.completed",
           level: 30,
           reqId: expect.any(String),
+          requestId: expect.any(String),
           route: "/health",
           statusCode: 200,
         }),
@@ -439,6 +440,7 @@ describe("auth routes", () => {
           event: "http.request.completed",
           level: 40,
           reqId: expect.any(String),
+          requestId: expect.any(String),
           route: "/me",
           statusCode: 401,
         }),
@@ -525,7 +527,7 @@ describe("auth routes", () => {
     });
 
     expect(callback.statusCode).toBe(302);
-    expect(callback.headers.location).toBe("http://localhost:5173/private");
+    expect(callback.headers.location).toBe("http://localhost:5173/home");
     expect(callback.cookies).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

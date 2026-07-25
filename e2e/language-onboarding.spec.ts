@@ -18,7 +18,6 @@ test("learner resumes onboarding and completes the diagnostic path", async ({
   await installRecordingMock(page);
   await authenticate(page);
 
-  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/onboarding\/languages$/);
 
   const instructionLanguage = page.getByLabel("Sei falar");
@@ -42,7 +41,6 @@ test("learner resumes onboarding and completes the diagnostic path", async ({
   await expect(page).toHaveURL(/\/onboarding\/about-you$/);
 
   await page.goto("/private");
-  await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page).toHaveURL(/\/onboarding\/about-you$/);
 
   await page.getByRole("button", { name: "Continuar" }).click();
@@ -120,9 +118,10 @@ test("learner resumes onboarding and completes the diagnostic path", async ({
       competencyId: "synthetic-competency-1",
     },
   });
-  await expect(page).toHaveURL(/\/private$/);
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(
+    page.getByRole("heading", { name: "Your first greeting" }),
+  ).toBeVisible();
 });
 
 test("learner completes onboarding directly through the beginner path", async ({
@@ -149,9 +148,10 @@ test("learner completes onboarding directly through the beginner path", async ({
       competencyId: "synthetic-competency-1",
     },
   });
-  await expect(page).toHaveURL(/\/private$/);
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(
+    page.getByRole("heading", { name: "Your first greeting" }),
+  ).toBeVisible();
 });
 
 test("learner can finish manually while the recorded introduction is still processing", async ({
@@ -168,7 +168,7 @@ test("learner can finish manually while the recorded introduction is still proce
   await page.getByLabel("Área de trabalho ou atuação").fill("Designer");
   await page.getByLabel("Interesses").fill("cinema");
   await page.getByRole("button", { name: "Confirmar e começar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 test("pending extraction fills the final review without overwriting learner edits", async ({
@@ -277,7 +277,7 @@ test("learner can complete the profile manually after extraction fails", async (
   await page.getByLabel("Área de trabalho ou atuação").fill("Analista");
   await page.getByLabel("Interesses").fill("música");
   await page.getByRole("button", { name: "Confirmar e começar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 test("a failed extraction after refresh offers a new recording and manual completion", async ({
@@ -295,7 +295,7 @@ test("a failed extraction after refresh offers a new recording and manual comple
   await page.getByLabel("Área de trabalho ou atuação").fill("Analista");
   await page.getByLabel("Interesses").fill("música");
   await page.getByRole("button", { name: "Confirmar e começar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 test("learner keeps the profile details when confirmation or completion temporarily fails", async ({
@@ -351,7 +351,7 @@ test("learner keeps the profile details when confirmation or completion temporar
     "Não foi possível salvar seu perfil. Tente novamente.",
   );
   await page.getByRole("button", { name: "Confirmar e começar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 test("learner can continue without audio after microphone access is denied", async ({
@@ -441,12 +441,12 @@ test("learner under 13 is sent through the manual introduction path", async ({
   await page.getByLabel("Área de trabalho ou atuação").fill("Estudante");
   await page.getByLabel("Interesses").fill("desenho");
   await page.getByRole("button", { name: "Confirmar e começar" }).click();
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 async function authenticate(page: Page) {
   await page.goto("/login");
-  await expect(page).toHaveURL(/\/private$/);
+  await expect(page).toHaveURL(/\/onboarding\/languages$/);
 }
 
 async function seedAuthenticatedLearner(

@@ -12,6 +12,7 @@ import type { AppConfig } from "../config.js";
 import type { DiagnosticAttemptRepository } from "../diagnostics/diagnostic-attempt-repository.js";
 import type { InitialDiagnosticRuntimeService } from "../diagnostics/initial-diagnostic-runtime-service.js";
 import type { InitialLearningPriorityRepository } from "../learning/initial-learning-priority-repository.js";
+import type { HomeService } from "../lessons/home-service.js";
 import type { OnboardingCompletionRepository } from "../learners/onboarding-completion-repository.js";
 import type { LearnerRepository } from "../learners/learner-repository.js";
 import type { UserRepository } from "../repositories/user-repository.js";
@@ -27,6 +28,7 @@ import { OnboardingService } from "../services/onboarding-service.js";
 import { registerOpenApi } from "./openapi.js";
 import { registerAuthRoutes } from "./routes/auth-routes.js";
 import { registerHealthRoutes } from "./routes/health-routes.js";
+import { registerHomeRoutes } from "./routes/home-routes.js";
 import { registerInitialDiagnosticRoutes } from "./routes/initial-diagnostic-routes.js";
 import { registerMeRoutes } from "./routes/me-routes.js";
 import { registerOnboardingRoutes } from "./routes/onboarding-routes.js";
@@ -39,6 +41,7 @@ export interface AppDependencies {
   onboardingCompletion: OnboardingCompletionRepository;
   diagnosticAttempts: DiagnosticAttemptRepository;
   initialLearningPriorities?: InitialLearningPriorityRepository;
+  home?: HomeService;
   users: UserRepository;
   sessions: SessionRepository;
   initialDiagnostic?: InitialDiagnosticRuntimeService;
@@ -64,6 +67,7 @@ export async function createApp(deps: AppDependencies) {
         err: error,
         event: "http.request.failed",
         method: request.method,
+        requestId: request.id,
         route: request.routeOptions.url ?? request.url,
         statusCode: reply.statusCode,
       },
@@ -75,6 +79,7 @@ export async function createApp(deps: AppDependencies) {
     const fields = {
       event: "http.request.completed",
       method: request.method,
+      requestId: request.id,
       route: request.routeOptions.url ?? request.url,
       statusCode: reply.statusCode,
       durationMs: Math.round(reply.elapsedTime),
@@ -129,6 +134,9 @@ export async function createApp(deps: AppDependencies) {
     config: deps.config,
   });
   registerMeRoutes(app, { auth, config: deps.config });
+  if (deps.home) {
+    registerHomeRoutes(app, { auth, config: deps.config, home: deps.home });
+  }
   registerOnboardingRoutes(app, {
     auth,
     config: deps.config,

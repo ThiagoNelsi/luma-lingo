@@ -81,6 +81,10 @@ describe("Gemini profile providers", () => {
         errorMessage: "gemini_request_failed:429",
         event: "gemini.generate.failed",
         model: "gemini-test",
+        operation: "models.generateContent",
+        provider: "gemini",
+        status: "failed",
+        statusCode: 429,
       }),
       "Gemini generation failed",
     );

@@ -56,7 +56,7 @@ export function StudyPaceOnboardingPage({
         ]);
         if (!active) return;
         if (me.currentLearningTrack?.onboardingStatus === "completed") {
-          navigate("/private", { replace: true });
+          navigate("/home", { replace: true });
           return;
         }
         if (!me.currentLearningTrack?.learningGoal) {
