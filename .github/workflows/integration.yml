@@ -47,7 +47,6 @@ jobs:
           prisma: true
           project_id: ${{ vars.NEON_PROJECT_ID }}
           role: neondb_owner
-          suspend_timeout: 60
 
       - name: Rebuild the disposable schema from migrations
         env:
