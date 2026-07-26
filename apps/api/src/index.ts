@@ -7,6 +7,7 @@ import { InitialDiagnosticRuntimeService } from "./diagnostics/initial-diagnosti
 import { createApp } from "./http/app.js";
 import { HomeService } from "./lessons/home-service.js";
 import { LessonProductionService } from "./lessons/lesson-production-service.js";
+import { OpenAiContentModerator } from "./models/openai-content-moderator.js";
 import { OpenAiStructuredModel } from "./models/openai-structured-model.js";
 import { createAppLogger } from "./observability/logger.js";
 import {
@@ -49,6 +50,13 @@ const initialLearningPriorities = new PrismaInitialLearningPriorityRepository(
   logger.child({ component: "prisma-initial-learning-priority-repository" }),
 );
 const lessonProduction = new LessonProductionService({
+  moderator: new OpenAiContentModerator(
+    {
+      apiKey: runtime.openai.apiKey,
+      model: runtime.openai.moderationModel,
+    },
+    logger.child({ component: "openai-content-moderator" }),
+  ),
   model: new OpenAiStructuredModel(
     {
       apiKey: runtime.openai.apiKey,

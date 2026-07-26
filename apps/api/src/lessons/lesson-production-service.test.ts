@@ -9,11 +9,212 @@ import {
 } from "./lesson-production-service.js";
 
 describe("LessonProductionService", () => {
+  it("states the current deterministic approval requirements in the versioned prompt", async () => {
+    const start = vi.fn(async (input) => {
+      if (input.workload === "lesson_plan") return completedRun(lessonPlan());
+      const objective = (JSON.parse(input.input) as { objective: string })
+        .objective;
+      return completedRun(blockFor(objective));
+    });
+    const service = new LessonProductionService({
+      moderator: moderatorStub(),
+      repository: repositoryStub(),
+      model: {
+        start,
+        async retry() {
+          throw new Error("unused");
+        },
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await service.produceFirstBlock(firstLessonInput());
+
+    const request = start.mock.calls.find(
+      ([candidate]) => candidate.workload === "lesson_plan",
+    )?.[0];
+    expect(request?.promptVersion).toBe("v2");
+    expect(JSON.parse(request?.input ?? "{}")).toMatchObject({
+      approvalRequirements: expect.arrayContaining([
+        "Copy every requiredAlignment field exactly.",
+        "Use only confirmed profile topics and copy declared topics exactly.",
+        "Assign every selected Lesson emphasis to at least one block.",
+      ]),
+    });
+  });
+
+  it("moderates generated work and gives a pinned retry the rejection reason", async () => {
+    const moderate = vi
+      .fn()
+      .mockResolvedValueOnce({
+        flagged: true,
+        flaggedCategories: ["hate"],
+        model: "omni-moderation-latest",
+        reference: "modr-1",
+      })
+      .mockResolvedValue({
+        flagged: false,
+        flaggedCategories: [],
+        model: "omni-moderation-latest",
+        reference: "modr-2",
+      });
+    const retry = vi.fn(async () => completedRun(lessonPlan()));
+    const publishFirstBlock = vi.fn(async () => undefined);
+    const service = new LessonProductionService({
+      moderator: { moderate },
+      repository: repositoryStub({ publishFirstBlock }),
+      model: {
+        async start(input) {
+          if (input.workload === "lesson_plan")
+            return completedRun(lessonPlan());
+          const objective = (JSON.parse(input.input) as { objective: string })
+            .objective;
+          return completedRun(blockFor(objective));
+        },
+        retry,
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await service.produceFirstBlock(firstLessonInput());
+
+    expect(moderate).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: "lesson_plan" }),
+    );
+    expect(
+      JSON.parse((moderate.mock.calls[0]?.[0] as { content: string }).content),
+    ).toEqual(lessonPlan());
+    expect(
+      moderate.mock.calls
+        .map(([input]) => input)
+        .filter((input) => input.purpose === "lesson_plan")
+        .map((input) => input.correlation?.attempt),
+    ).toEqual([1, 2]);
+    expect(retry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.stringContaining('"reason":"unsafe_content"'),
+      }),
+      { adapter: "test", model: "test-model" },
+    );
+    expect(publishFirstBlock).toHaveBeenCalledOnce();
+  });
+
+  it("publishes the first block after a manual retry approves the second plan attempt", async () => {
+    const publishFirstBlock = vi.fn(async () => undefined);
+    const moderate = vi
+      .fn()
+      .mockResolvedValueOnce({
+        flagged: true,
+        flaggedCategories: ["violence"],
+        model: "omni-moderation-latest",
+        reference: "modr-rejected",
+      })
+      .mockResolvedValue({
+        flagged: false,
+        flaggedCategories: [],
+        model: "omni-moderation-latest",
+        reference: "modr-approved",
+      });
+    const service = new LessonProductionService({
+      moderator: { moderate },
+      repository: repositoryStub({
+        async prepareLessonRetry() {
+          return {
+            lesson: firstLessonInput().lesson,
+            context: firstLessonInput().context,
+            plan: null,
+            planAttempt: 7,
+            blocks: [],
+          };
+        },
+        async claimQueuedBlockRun(input) {
+          return input.attempt === 8;
+        },
+        publishFirstBlock,
+      }),
+      model: {
+        async start(input) {
+          if (input.workload === "lesson_plan")
+            return completedRun(lessonPlan());
+          const objective = (JSON.parse(input.input) as { objective: string })
+            .objective;
+          return completedRun(blockFor(objective));
+        },
+        async retry() {
+          return completedRun(lessonPlan());
+        },
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+    });
+
+    await expect(
+      service.retryFailedWork("learner-1", "lesson-1"),
+    ).resolves.toBe(true);
+    await vi.waitFor(() => expect(publishFirstBlock).toHaveBeenCalledOnce());
+    expect(publishFirstBlock).toHaveBeenCalledWith(
+      expect.objectContaining({ attempt: 8 }),
+    );
+  });
+
+  it("logs the safe rejection reason and moderation categories when moderation rejects twice", async () => {
+    const failLesson = vi.fn(async () => undefined);
+    const error = vi.fn();
+    const warn = vi.fn();
+    const service = new LessonProductionService({
+      moderator: {
+        async moderate() {
+          return {
+            flagged: true,
+            flaggedCategories: ["violence", "violence/graphic"],
+            model: "omni-moderation-latest",
+            reference: "modr-rejected",
+          };
+        },
+      },
+      repository: repositoryStub({ failLesson }),
+      model: {
+        async start() {
+          return completedRun(lessonPlan());
+        },
+        async retry() {
+          return completedRun(lessonPlan());
+        },
+        async inspect() {
+          throw new Error("unused");
+        },
+      },
+      logger: { error, warn } as unknown as AppLogger,
+    });
+
+    await service.produceFirstBlock(firstLessonInput());
+
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "moderation",
+        errorCode: "lesson_content_moderation_rejected",
+        flaggedCategories: ["violence", "violence/graphic"],
+        rejectionReason: "unsafe_content",
+      }),
+      "First Lesson block generation failed",
+    );
+    expect(failLesson).toHaveBeenCalledWith(
+      "lesson-1",
+      "lesson_content_moderation_rejected",
+    );
+  });
+
   it("automatically retries a rejected run once through its pinned adapter and model", async () => {
     const retry = vi.fn(async () => completedRun(lessonPlan()));
     const failLesson = vi.fn(async () => undefined);
     const publishFirstBlock = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ failLesson, publishFirstBlock }),
       model: {
         async start(input) {
@@ -55,6 +256,7 @@ describe("LessonProductionService", () => {
     const persistPlanRun = vi.fn(async () => undefined);
     const failLesson = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ persistPlanRun, failLesson }),
       model: {
         async start(input) {
@@ -100,6 +302,7 @@ describe("LessonProductionService", () => {
     const failLesson = vi.fn(async () => undefined);
     const retry = vi.fn();
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ persistPlanRun, failLesson }),
       model: {
         async start() {
@@ -136,6 +339,7 @@ describe("LessonProductionService", () => {
     const failLesson = vi.fn(async () => undefined);
     const retry = vi.fn();
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ persistBlockRun, failLesson }),
       model: {
         async start(input) {
@@ -179,6 +383,7 @@ describe("LessonProductionService", () => {
       return completedRun(blockFor(objective));
     });
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ persistBlockRun, publishBlockRun }),
       model: {
         async start(input) {
@@ -229,14 +434,20 @@ describe("LessonProductionService", () => {
     );
   });
 
-  it("manually retries only missing failed blocks through the current route", async () => {
+  it("accepts a manual retry before generating only missing failed blocks in the background", async () => {
     const publishBlockRun = vi.fn(async () => undefined);
+    let releaseGeneration: (() => void) | undefined;
+    const generationPending = new Promise<void>((resolve) => {
+      releaseGeneration = resolve;
+    });
     const start = vi.fn(async (request) => {
+      await generationPending;
       const objective = (JSON.parse(request.input) as { objective: string })
         .objective;
       return completedRun(blockFor(objective));
     });
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async prepareLessonRetry() {
           return {
@@ -260,11 +471,20 @@ describe("LessonProductionService", () => {
       },
     });
 
-    await expect(
-      service.retryFailedWork("learner-1", "lesson-1"),
-    ).resolves.toBe(true);
+    let accepted = false;
+    const request = service
+      .retryFailedWork("learner-1", "lesson-1")
+      .then((result) => {
+        accepted = result;
+        return result;
+      });
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
+    await Promise.resolve();
 
-    expect(start).toHaveBeenCalledOnce();
+    expect(accepted).toBe(true);
+    await expect(request).resolves.toBe(true);
+    expect(publishBlockRun).not.toHaveBeenCalled();
+
     expect(start).toHaveBeenCalledWith(
       expect.objectContaining({
         correlation: expect.objectContaining({ attempt: 4 }),
@@ -272,6 +492,12 @@ describe("LessonProductionService", () => {
           lessonPlan().blocks[2]?.objective ?? "missing",
         ),
       }),
+    );
+    releaseGeneration?.();
+    await vi.waitFor(() =>
+      expect(publishBlockRun).toHaveBeenCalledWith(
+        expect.objectContaining({ attempt: 4, blockPosition: 2 }),
+      ),
     );
     expect(publishBlockRun).toHaveBeenCalledWith(
       expect.objectContaining({ attempt: 4, blockPosition: 2 }),
@@ -284,6 +510,7 @@ describe("LessonProductionService", () => {
     const publishedPositions: number[] = [];
     const service = new LessonProductionService({
       concurrencyLimit: 2,
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async publishBlockRun(input) {
           publishedPositions.push(input.blockPosition);
@@ -325,6 +552,7 @@ describe("LessonProductionService", () => {
   it("reconciles an active provider run after an API restart", async () => {
     const publishBlockRun = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async findActiveBlockRuns() {
           return [
@@ -371,6 +599,7 @@ describe("LessonProductionService", () => {
     const persistPlanRun = vi.fn(async () => undefined);
     const publishFirstBlock = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async findActivePlanRuns() {
           return [
@@ -417,6 +646,7 @@ describe("LessonProductionService", () => {
     const persistBlockRun = vi.fn(async () => undefined);
     const retry = vi.fn();
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async findActiveBlockRuns() {
           return [
@@ -472,6 +702,7 @@ describe("LessonProductionService", () => {
       completedRun(blockFor(lessonPlan().blocks[1]?.objective ?? "")),
     );
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async findActiveBlockRuns() {
           return [
@@ -535,6 +766,7 @@ describe("LessonProductionService", () => {
   it("marks the Lesson recoverably failed when its interrupted first block exhausts retry", async () => {
     const failLesson = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({
         async findActiveBlockRuns() {
           return [
@@ -657,7 +889,11 @@ describe("LessonProductionService", () => {
         throw new Error("unused");
       },
     };
-    const service = new LessonProductionService({ model, repository });
+    const service = new LessonProductionService({
+      model,
+      moderator: moderatorStub(),
+      repository,
+    });
 
     await service.produceFirstBlock({
       lesson: {
@@ -725,6 +961,7 @@ describe("LessonProductionService", () => {
       failLesson,
     };
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository,
       model: {
         async start() {
@@ -779,6 +1016,7 @@ describe("LessonProductionService", () => {
   it("fails malformed provider content with a stable safe code", async () => {
     const failLesson = vi.fn(async () => undefined);
     const service = new LessonProductionService({
+      moderator: moderatorStub(),
       repository: repositoryStub({ failLesson }),
       model: {
         async start(input) {
@@ -854,6 +1092,19 @@ function repositoryStub(
       return undefined;
     },
     ...overrides,
+  };
+}
+
+function moderatorStub() {
+  return {
+    async moderate() {
+      return {
+        flagged: false,
+        flaggedCategories: [],
+        model: "test-moderator",
+        reference: "moderation-accepted",
+      };
+    },
   };
 }
 

@@ -21,6 +21,7 @@ const envKeys = [
   "OPENAI_API_KEY",
   "OPENAI_LESSON_BLOCK_MODEL",
   "OPENAI_LESSON_PLAN_MODEL",
+  "OPENAI_MODERATION_MODEL",
   "LESSON_FOREGROUND_BUDGET_MS",
   "LESSON_GENERATION_CONCURRENCY",
   "PORT",
@@ -69,6 +70,7 @@ describe("runtime config", () => {
         "OPENAI_API_KEY=openai-test-key",
         "OPENAI_LESSON_PLAN_MODEL=gpt-test-plan",
         "OPENAI_LESSON_BLOCK_MODEL=gpt-test-block",
+        "OPENAI_MODERATION_MODEL=moderation-test",
         "LOG_LEVEL=debug",
         "PORT=3000",
         "SESSION_COOKIE_NAME=luma_lingo_session",
@@ -82,6 +84,9 @@ describe("runtime config", () => {
       expect(readRuntimeConfig().app.apiOrigin).toBe("http://localhost:3000");
       expect(readRuntimeConfig().gemini.model).toBe("gemini-test");
       expect(readRuntimeConfig().openai.lessonPlanModel).toBe("gpt-test-plan");
+      expect(readRuntimeConfig().openai.moderationModel).toBe(
+        "moderation-test",
+      );
       expect(readRuntimeConfig().app.logLevel).toBe("debug");
     } finally {
       rmSync(workspace, { recursive: true, force: true });
@@ -103,5 +108,6 @@ describe("runtime config", () => {
 
     expect(config.openai.apiKey).toBeUndefined();
     expect(config.openai.lessonPlanModel).toBe("gpt-5.6-terra");
+    expect(config.openai.moderationModel).toBe("omni-moderation-latest");
   });
 });

@@ -143,18 +143,22 @@ export class OpenAiStructuredModel implements StructuredModel {
         operation: "responses.create",
         inputTokens: run.usage?.inputTokens,
         outputTokens: run.usage?.outputTokens,
+        promptVersion: request.promptVersion,
         purpose: request.workload,
         runStatus: run.status,
         statusCode: response.status,
         workload: request.workload,
       });
-      return run;
+      return request.promptVersion
+        ? { ...run, promptVersion: request.promptVersion }
+        : run;
     } catch (error) {
       this.logFailedOperation(error, {
         ...request.correlation,
         durationMs: Math.round(performance.now() - startedAt),
         model,
         operation: "responses.create",
+        promptVersion: request.promptVersion,
         purpose: request.workload,
         workload: request.workload,
       });
@@ -166,7 +170,9 @@ export class OpenAiStructuredModel implements StructuredModel {
     reference: string,
     correlation?: StructuredModelRequest<unknown>["correlation"],
     workload: StructuredModelRequest<unknown>["workload"] = "lesson_block",
-    pinned?: Pick<StructuredModelRun, "adapter" | "model">,
+    pinned?: Pick<StructuredModelRun, "adapter" | "model"> & {
+      promptVersion?: string;
+    },
   ): Promise<StructuredModelRun> {
     if (!this.config.apiKey) {
       throw new OpenAiStructuredModelError("openai_api_key_required");
@@ -207,7 +213,9 @@ export class OpenAiStructuredModel implements StructuredModel {
         runStatus: run.status,
         statusCode: response.status,
       });
-      return run;
+      return pinned?.promptVersion
+        ? { ...run, promptVersion: pinned.promptVersion }
+        : run;
     } catch (error) {
       this.logFailedOperation(error, {
         ...correlation,
@@ -234,6 +242,7 @@ export class OpenAiStructuredModel implements StructuredModel {
     model: string;
     operation: string;
     outputTokens?: number;
+    promptVersion?: string;
     purpose?: string;
     requestId?: string;
     runStatus: StructuredModelRun["status"];
@@ -258,6 +267,7 @@ export class OpenAiStructuredModel implements StructuredModel {
       lessonId?: string;
       model: string;
       operation: string;
+      promptVersion?: string;
       purpose?: string;
       requestId?: string;
       workload?: string;

@@ -35,6 +35,7 @@ export interface RuntimeConfig {
     lessonForegroundBudgetMs: number;
     lessonBlockModel: string;
     lessonPlanModel: string;
+    moderationModel: string;
   };
   port: number;
 }
@@ -81,6 +82,7 @@ export function readRuntimeConfig(
       ),
       lessonBlockModel: env.OPENAI_LESSON_BLOCK_MODEL ?? "gpt-5.6-terra",
       lessonPlanModel: env.OPENAI_LESSON_PLAN_MODEL ?? "gpt-5.6-terra",
+      moderationModel: env.OPENAI_MODERATION_MODEL ?? "omni-moderation-latest",
     },
     port: parseInteger(env.PORT ?? "3000"),
   };

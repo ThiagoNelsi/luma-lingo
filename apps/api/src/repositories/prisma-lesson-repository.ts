@@ -163,34 +163,34 @@ export class PrismaLessonRepository implements LessonRepository {
         learningTrackId: input.learningTrackId,
         priorityCompetencyId: input.priorityCompetencyId,
       },
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const existing = await tx.lesson.findUnique({
-            where: {
-              learningTrackId_priorityCompetencyId: {
-                learningTrackId: input.learningTrackId,
-                priorityCompetencyId: input.priorityCompetencyId,
+      async () => {
+        try {
+          return await this.prisma.$transaction(async (tx) => {
+            const existing = await tx.lesson.findUnique({
+              where: {
+                learningTrackId_priorityCompetencyId: {
+                  learningTrackId: input.learningTrackId,
+                  priorityCompetencyId: input.priorityCompetencyId,
+                },
               },
-            },
-          });
-          if (existing) return toReservedHomeLesson(existing, false);
+            });
+            if (existing) return toReservedHomeLesson(existing, false);
 
-          const module = await tx.learningModule.upsert({
-            where: {
-              learningTrackId_objectiveCompetencyId: {
+            const module = await tx.learningModule.upsert({
+              where: {
+                learningTrackId_objectiveCompetencyId: {
+                  learningTrackId: input.learningTrackId,
+                  objectiveCompetencyId: input.priorityCompetencyId,
+                },
+              },
+              create: {
+                id: createId(),
                 learningTrackId: input.learningTrackId,
                 objectiveCompetencyId: input.priorityCompetencyId,
+                title: input.priorityCompetencyKey,
               },
-            },
-            create: {
-              id: createId(),
-              learningTrackId: input.learningTrackId,
-              objectiveCompetencyId: input.priorityCompetencyId,
-              title: input.priorityCompetencyKey,
-            },
-            update: {},
-          });
-          try {
+              update: {},
+            });
             const lesson = await tx.lesson.create({
               data: {
                 id: createId(),
@@ -200,19 +200,20 @@ export class PrismaLessonRepository implements LessonRepository {
               },
             });
             return toReservedHomeLesson(lesson, true);
-          } catch (error) {
-            if (!isUniqueConstraint(error)) throw error;
-            const concurrent = await tx.lesson.findUniqueOrThrow({
-              where: {
-                learningTrackId_priorityCompetencyId: {
-                  learningTrackId: input.learningTrackId,
-                  priorityCompetencyId: input.priorityCompetencyId,
-                },
+          });
+        } catch (error) {
+          if (!isUniqueConstraint(error)) throw error;
+          const concurrent = await this.prisma.lesson.findUniqueOrThrow({
+            where: {
+              learningTrackId_priorityCompetencyId: {
+                learningTrackId: input.learningTrackId,
+                priorityCompetencyId: input.priorityCompetencyId,
               },
-            });
-            return toReservedHomeLesson(concurrent, false);
-          }
-        }),
+            },
+          });
+          return toReservedHomeLesson(concurrent, false);
+        }
+      },
     );
   }
 
@@ -760,8 +761,9 @@ function runData(attempt: number, run: StructuredModelRun) {
     latencyMs: run.latencyMs,
     model: run.model,
     outputTokens: run.usage?.outputTokens,
-    promptVersion: "v1",
+    promptVersion: (run.promptVersion ?? "v1").slice(0, 120),
     providerReference: run.reference,
+    rejectionReason: run.rejectionReason?.slice(0, 120),
     status: run.status,
   };
 }
@@ -773,7 +775,9 @@ function toStructuredModelRun(run: {
   latencyMs: number | null;
   model: string;
   outputTokens: number | null;
+  promptVersion?: string;
   providerReference: string | null;
+  rejectionReason?: string | null;
   status: "queued" | "pending" | "completed" | "failed";
 }): StructuredModelRun {
   return {
@@ -781,7 +785,9 @@ function toStructuredModelRun(run: {
     errorCode: run.errorCode ?? undefined,
     latencyMs: run.latencyMs ?? undefined,
     model: run.model,
+    promptVersion: run.promptVersion,
     reference: run.providerReference ?? "",
+    rejectionReason: run.rejectionReason ?? undefined,
     status: run.status,
     usage:
       run.inputTokens === null && run.outputTokens === null

@@ -4,6 +4,50 @@ import type { AppLogger } from "../observability/logger.js";
 import { PrismaLessonRepository } from "./prisma-lesson-repository.js";
 
 describe("PrismaLessonRepository", () => {
+  it("returns the concurrently reserved Lesson after a unique constraint aborts its transaction", async () => {
+    const concurrentLesson = {
+      id: "lesson-1",
+      learningTrackId: "track-1",
+      moduleId: "module-1",
+      priorityCompetencyId: "competency-1",
+      status: "preparing" as const,
+    };
+    const findUniqueOrThrow = vi.fn(async () => concurrentLesson);
+    const repository = new PrismaLessonRepository({
+      lesson: { findUniqueOrThrow },
+      async $transaction() {
+        throw Object.assign(new Error("concurrent_reservation"), {
+          code: "P2002",
+        });
+      },
+    } as never);
+
+    await expect(
+      repository.reserveFirstLesson({
+        learnerId: "learner-1",
+        learningTrackId: "track-1",
+        priorityCompetencyId: "competency-1",
+        priorityCompetencyKey: "situational.greetings",
+      }),
+    ).resolves.toEqual({
+      created: false,
+      lesson: { block: null, id: "lesson-1", status: "preparing" },
+      production: {
+        learningTrackId: "track-1",
+        moduleId: "module-1",
+        priorityCompetencyId: "competency-1",
+      },
+    });
+    expect(findUniqueOrThrow).toHaveBeenCalledWith({
+      where: {
+        learningTrackId_priorityCompetencyId: {
+          learningTrackId: "track-1",
+          priorityCompetencyId: "competency-1",
+        },
+      },
+    });
+  });
+
   it("builds validation context from confirmed profile, Goal, emphasis, and competency state", async () => {
     const repository = new PrismaLessonRepository({
       lesson: {
@@ -108,6 +152,8 @@ describe("PrismaLessonRepository", () => {
         status: "completed",
         reference: "resp-2",
         latencyMs: 120,
+        promptVersion: "v2",
+        rejectionReason: "profile_alignment",
         usage: { inputTokens: 10, outputTokens: 20 },
       },
     });
@@ -120,6 +166,8 @@ describe("PrismaLessonRepository", () => {
           inputTokens: 10,
           model: "gpt-test",
           outputTokens: 20,
+          promptVersion: "v2",
+          rejectionReason: "profile_alignment",
           step: "plan",
         }),
       }),

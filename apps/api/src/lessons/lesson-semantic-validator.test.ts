@@ -108,7 +108,7 @@ describe("validateLessonPlanSemantics", () => {
     ).not.toThrow();
   });
 
-  it("rejects age-inappropriate scenarios for learners under 13", () => {
+  it("leaves age-sensitive topic classification to the moderation boundary", () => {
     const candidate = plan();
     candidate.objective = "Discuss gambling vocabulary while travelling.";
 
@@ -117,11 +117,7 @@ describe("validateLessonPlanSemantics", () => {
         ...context,
         learnerAgeRange: "under_13",
       }),
-    ).toThrowError(
-      expect.objectContaining<Partial<LessonSemanticValidationError>>({
-        reason: "unsafe_content",
-      }),
-    );
+    ).not.toThrow();
   });
 
   it("requires selected emphases to prevail across the plan", () => {
@@ -142,16 +138,17 @@ describe("validateLessonPlanSemantics", () => {
     "A violent knife attack is your lesson scenario.",
     "Adult sexual roleplay vocabulary.",
     "A racist insult is the central example.",
-  ])("rejects disallowed or unsafe plan content", (objective) => {
-    const candidate = plan();
-    candidate.objective = objective;
+  ])(
+    "leaves unsafe plan classification to the moderation boundary",
+    (objective) => {
+      const candidate = plan();
+      candidate.objective = `${objective} while travelling.`;
 
-    expect(() => validateLessonPlanSemantics(candidate, context)).toThrowError(
-      expect.objectContaining<Partial<LessonSemanticValidationError>>({
-        reason: "unsafe_content",
-      }),
-    );
-  });
+      expect(() =>
+        validateLessonPlanSemantics(candidate, context),
+      ).not.toThrow();
+    },
+  );
 
   it("rejects learner-facing CEFR claims", () => {
     const candidate = plan();
@@ -176,15 +173,20 @@ describe("validateLessonPlanSemantics", () => {
     );
   });
 
-  it("rejects a claimed profile topic absent from the visible plan", () => {
+  it("accepts a confirmed profile topic without requiring literal word overlap", () => {
     const candidate = plan();
     candidate.alignment!.profileTopics = ["music"];
 
-    expect(() => validateLessonPlanSemantics(candidate, context)).toThrowError(
-      expect.objectContaining<Partial<LessonSemanticValidationError>>({
-        reason: "profile_alignment",
-      }),
-    );
+    expect(() => validateLessonPlanSemantics(candidate, context)).not.toThrow();
+  });
+
+  it("accepts exact priority metadata without requiring the catalog key in learner-facing text", () => {
+    const candidate = plan();
+    candidate.title = "Introductions for travel";
+    candidate.objective =
+      "Introduce yourself to a software colleague while travelling.";
+
+    expect(() => validateLessonPlanSemantics(candidate, context)).not.toThrow();
   });
 });
 
@@ -215,7 +217,7 @@ describe("validateLessonBlockSemantics", () => {
     );
   });
 
-  it("rejects unsafe content anywhere in a block", () => {
+  it("leaves unsafe block classification to the moderation boundary", () => {
     const candidate = block();
     candidate.activities[0] = {
       ...candidate.activities[0]!,
@@ -229,11 +231,7 @@ describe("validateLessonBlockSemantics", () => {
         plan().blocks[0]!.objective,
         context,
       ),
-    ).toThrowError(
-      expect.objectContaining<Partial<LessonSemanticValidationError>>({
-        reason: "unsafe_content",
-      }),
-    );
+    ).not.toThrow();
   });
 
   it("rejects unsupported links, markup, and speaking instructions", () => {
@@ -380,23 +378,22 @@ describe("validateLessonBlockSemantics", () => {
     "Discours raciste et discriminatoire.",
     "Übe Selbstmord und Selbstverletzung.",
     "学习暴力、色情和自杀词汇。",
-  ])("rejects unsafe multilingual content", (explanation) => {
-    const candidate = block();
-    candidate.explanation = explanation;
+  ])(
+    "leaves multilingual unsafe classification to moderation",
+    (explanation) => {
+      const candidate = block();
+      candidate.explanation = explanation;
 
-    expect(() =>
-      validateLessonBlockSemantics(
-        plan(),
-        candidate,
-        plan().blocks[0]!.objective,
-        context,
-      ),
-    ).toThrowError(
-      expect.objectContaining<Partial<LessonSemanticValidationError>>({
-        reason: "unsafe_content",
-      }),
-    );
-  });
+      expect(() =>
+        validateLessonBlockSemantics(
+          plan(),
+          candidate,
+          plan().blocks[0]!.objective,
+          context,
+        ),
+      ).not.toThrow();
+    },
+  );
 });
 
 function plan(): LessonPlan {

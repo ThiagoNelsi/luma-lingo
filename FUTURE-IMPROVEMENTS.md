@@ -2,6 +2,35 @@
 
 ## 2026-07-25
 
+### Versioned Lesson Prompt Evaluation
+
+- **Deferred:** Replace the minimal Lesson-generation prompt adjustment with a
+  reviewed, versioned prompt lifecycle and privacy-safe eval suite, tracked in
+  GitHub issue
+  [#40](https://github.com/ThiagoNelsi/luma-lingo/issues/40).
+- **Current scope boundary:** The current fix only states the existing
+  deterministic approval requirements in prompt version `v2` and feeds a safe
+  normalized rejection reason to the pinned automatic retry.
+- **Future value:** Comparable evals and rollout thresholds can reveal whether a
+  prompt/model change improves acceptance without increasing unsafe,
+  misaligned, or brittle output.
+- **Revisit when:** Before making another material Lesson plan or block prompt
+  change, or when rejection metrics show a recurring reason.
+
+### LLM Pedagogical Validator
+
+- **Deferred:** Add the ADR 0001 `Validator` role as a provider-neutral LLM gate
+  for nuanced curricular alignment, natural personalization, coherence, Goal
+  fit, and age appropriateness, tracked in GitHub issue
+  [#41](https://github.com/ThiagoNelsi/luma-lingo/issues/41).
+- **Current scope boundary:** The current implementation intentionally uses
+  closed schemas and deterministic product rules plus the OpenAI Moderation API;
+  it does not add a second LLM judgment.
+- **Future value:** A calibrated evaluator can judge semantic qualities that
+  exact metadata checks and harmful-content classification cannot establish.
+- **Revisit when:** Issue #40 provides versioned prompts, curated evals, and
+  false-acceptance/false-rejection thresholds suitable for gating publication.
+
 ### Listening Components In Generated Lessons
 
 - **Deferred:** Add generated listening components to cohesive lesson blocks,

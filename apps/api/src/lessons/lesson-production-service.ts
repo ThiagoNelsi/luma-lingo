@@ -17,9 +17,14 @@ import {
   type LessonBlock,
   type LessonPlan,
 } from "./lesson-content.js";
+import {
+  LessonContentModerationError,
+  type ContentModerator,
+} from "./content-moderator.js";
 import type {
   ActiveLessonPlanRun,
   LessonRepository,
+  RetryableLessonWork,
 } from "./lesson-repository.js";
 import {
   LessonSemanticValidationError,
@@ -56,6 +61,7 @@ const lessonBlockInstructions =
   "Produce one safe cohesive text lesson block with explanation, one to five examples, and one to five activities. Match the supplied title and objective exactly. Do not use links, markup, audio, video, or speaking tasks. Return JSON only.";
 const lessonPlanInstructions =
   "Produce a concise, safe language lesson plan with three to five cohesive blocks. Copy the supplied alignment fields exactly, use only confirmed profile topics, assign every selected emphasis across the blocks, and return JSON only.";
+const lessonPromptVersion = "v2";
 
 export class LessonProductionService {
   private readonly logger: AppLogger;
@@ -64,6 +70,7 @@ export class LessonProductionService {
   constructor(
     private readonly deps: {
       model: StructuredModel;
+      moderator: ContentModerator;
       repository: LessonRepository;
       concurrencyLimit?: number;
       logger?: AppLogger;
@@ -107,8 +114,13 @@ export class LessonProductionService {
             run: rejected.run,
           });
         },
-        validate(plan) {
+        validate: async (plan, validatedAttempt) => {
           validateLessonPlanSemantics(plan, context);
+          await this.moderateGeneratedContent(
+            plan,
+            "lesson_plan",
+            correlation(input, validatedAttempt),
+          );
         },
         request: planRequest(context, correlation(input, attempt)),
         schema: lessonPlanSchema,
@@ -125,7 +137,7 @@ export class LessonProductionService {
 
       stage = "lesson_block";
       const published = await this.produceFirstBlockFromPlan({
-        attempt,
+        attempt: planResult.attempt,
         context,
         correlationId: input.correlationId,
         lesson: input.lesson,
@@ -158,6 +170,7 @@ export class LessonProductionService {
           err: errorMetadata(error),
           errorCode,
           stage,
+          ...rejectionMetadata(error),
           ...errorMetadata(error),
         },
         "First Lesson block generation failed",
@@ -181,6 +194,7 @@ export class LessonProductionService {
               err: errorMetadata(error),
               event: "lesson_generation.plan_recovery_failed",
               lessonId: active.lesson.id,
+              ...rejectionMetadata(error),
               ...errorMetadata(error),
             },
             "Interrupted Lesson plan recovery failed",
@@ -240,6 +254,27 @@ export class LessonProductionService {
       lessonId,
     );
     if (!retryable) return false;
+    void this.resumeRetryFailedWork(retryable, correlationId).catch((error) => {
+      this.logger.error(
+        {
+          err: errorMetadata(error),
+          event: "lesson_generation.manual_retry_failed",
+          learnerId,
+          lessonId,
+          requestId: correlationId,
+          ...rejectionMetadata(error),
+          ...errorMetadata(error),
+        },
+        "Lesson generation manual retry failed",
+      );
+    });
+    return true;
+  }
+
+  private async resumeRetryFailedWork(
+    retryable: RetryableLessonWork,
+    correlationId?: string,
+  ): Promise<void> {
     if (!retryable.plan) {
       await this.produceFirstBlock({
         lesson: retryable.lesson,
@@ -247,7 +282,7 @@ export class LessonProductionService {
         correlationId,
         attempt: retryable.planAttempt,
       });
-      return true;
+      return;
     }
     const retryPlan = retryable.plan;
     await mapWithConcurrency(
@@ -259,7 +294,7 @@ export class LessonProductionService {
         const claimed = await this.deps.repository.claimQueuedBlockRun({
           attempt: block.attempt,
           blockPosition: block.blockPosition,
-          lessonId,
+          lessonId: retryable.lesson.id,
         });
         if (!claimed) return;
         await this.startBlock({
@@ -268,12 +303,11 @@ export class LessonProductionService {
           context: retryable.context,
           correlationId,
           expectedObjective: planBlock.objective,
-          lessonId,
+          lessonId: retryable.lesson.id,
           plan: retryPlan,
         });
       },
     );
-    return true;
   }
 
   private async produceRemainingBlocks(input: {
@@ -356,13 +390,18 @@ export class LessonProductionService {
           run: rejected.run,
         });
       },
-      validate(block) {
+      validate: async (block, validatedAttempt) => {
         validateLessonBlockSemantics(
           input.plan,
           block,
           firstPlanBlock.objective,
           input.context,
         );
+        await this.moderateGeneratedContent(block, "lesson_block", {
+          attempt: validatedAttempt,
+          lessonId: input.lesson.id,
+          requestId: input.correlationId,
+        });
       },
       request: {
         ...blockRequest(input.context, input.plan, firstPlanBlock.objective),
@@ -447,6 +486,10 @@ export class LessonProductionService {
     try {
       const plan = parseCompletedRun(inspected, lessonPlanSchema);
       validateLessonPlanSemantics(plan, active.context);
+      await this.moderateGeneratedContent(plan, "lesson_plan", {
+        attempt: active.attempt,
+        lessonId: active.lesson.id,
+      });
       planResult = {
         status: "completed",
         attempt: active.attempt,
@@ -461,10 +504,13 @@ export class LessonProductionService {
       });
       const retryAttempt = active.attempt + 1;
       const retried = await this.retryRun(
-        planRequest(active.context, {
-          attempt: retryAttempt,
-          lessonId: active.lesson.id,
-        }),
+        withRejectionFeedback(
+          planRequest(active.context, {
+            attempt: retryAttempt,
+            lessonId: active.lesson.id,
+          }),
+          error,
+        ),
         active.run,
       );
       if (retried.status === "pending") {
@@ -478,6 +524,10 @@ export class LessonProductionService {
       try {
         const plan = parseCompletedRun(retried, lessonPlanSchema);
         validateLessonPlanSemantics(plan, active.context);
+        await this.moderateGeneratedContent(plan, "lesson_plan", {
+          attempt: retryAttempt,
+          lessonId: active.lesson.id,
+        });
         planResult = {
           status: "completed",
           attempt: retryAttempt,
@@ -533,6 +583,10 @@ export class LessonProductionService {
         expectedObjective,
         active.context,
       );
+      await this.moderateGeneratedContent(block, "lesson_block", {
+        attempt: active.attempt,
+        lessonId: active.lessonId,
+      });
     } catch (error) {
       await this.deps.repository.persistBlockRun({
         ...active,
@@ -543,13 +597,16 @@ export class LessonProductionService {
       let retriedBlock: LessonBlock;
       try {
         retried = await this.retryRun(
-          {
-            ...blockRequest(active.context, active.plan, expectedObjective),
-            correlation: {
-              attempt: retryAttempt,
-              lessonId: active.lessonId,
+          withRejectionFeedback(
+            {
+              ...blockRequest(active.context, active.plan, expectedObjective),
+              correlation: {
+                attempt: retryAttempt,
+                lessonId: active.lessonId,
+              },
             },
-          },
+            error,
+          ),
           active.run,
         );
         retriedBlock = parseCompletedRun(retried, lessonBlockSchema);
@@ -559,6 +616,10 @@ export class LessonProductionService {
           expectedObjective,
           active.context,
         );
+        await this.moderateGeneratedContent(retriedBlock, "lesson_block", {
+          attempt: retryAttempt,
+          lessonId: active.lessonId,
+        });
       } catch (retryError) {
         await this.deps.repository.persistBlockRun({
           attempt: retryAttempt,
@@ -647,13 +708,18 @@ export class LessonProductionService {
         },
       },
       schema: lessonBlockSchema,
-      validate(block) {
+      validate: async (block, validatedAttempt) => {
         validateLessonBlockSemantics(
           input.plan,
           block,
           input.expectedObjective,
           input.context,
         );
+        await this.moderateGeneratedContent(block, "lesson_block", {
+          attempt: validatedAttempt,
+          lessonId: input.lessonId,
+          requestId: input.correlationId,
+        });
       },
     });
     if (produced.status === "pending") return;
@@ -669,7 +735,7 @@ export class LessonProductionService {
     attempt: number;
     request: StructuredModelRequest<T>;
     schema: { parse(value: unknown): T };
-    validate(value: T): void;
+    validate(value: T, attempt: number): void | Promise<void>;
     onRejected?(input: {
       attempt: number;
       error: unknown;
@@ -686,8 +752,12 @@ export class LessonProductionService {
     for (let offset = 0; offset < 2; offset += 1) {
       const attempt = input.attempt + offset;
       let attemptedRun: StructuredModelRun | undefined;
+      const baseRequest =
+        offset === 0
+          ? input.request
+          : withRejectionFeedback(input.request, lastError);
       const request = {
-        ...input.request,
+        ...baseRequest,
         correlation: { ...input.request.correlation, attempt },
       };
       try {
@@ -706,10 +776,25 @@ export class LessonProductionService {
           return { status: "pending", attempt, run };
         }
         const value = parseCompletedRun(run, input.schema);
-        input.validate(value);
+        await input.validate(value, attempt);
         return { status: "completed", attempt, run, value };
       } catch (error) {
         lastError = error;
+        const rejection = rejectionMetadata(error);
+        if (rejection.rejectionReason) {
+          this.logger.warn(
+            {
+              ...request.correlation,
+              adapter: attemptedRun?.adapter ?? pinnedRoute?.adapter,
+              event: "lesson_generation.output_rejected",
+              model: attemptedRun?.model ?? pinnedRoute?.model,
+              promptVersion: request.promptVersion,
+              ...rejection,
+              workload: request.workload,
+            },
+            "Generated Lesson output rejected",
+          );
+        }
         pinnedRoute ??= this.deps.model.route?.(input.request.workload);
         if (input.onRejected) {
           const route = attemptedRun ?? pinnedRoute;
@@ -731,6 +816,25 @@ export class LessonProductionService {
       }
     }
     throw lastError;
+  }
+
+  private async moderateGeneratedContent(
+    value: LessonPlan | LessonBlock,
+    purpose: "lesson_plan" | "lesson_block",
+    correlation?: {
+      attempt?: number;
+      lessonId?: string;
+      requestId?: string;
+    },
+  ): Promise<void> {
+    const result = await this.deps.moderator.moderate({
+      content: JSON.stringify(value),
+      correlation,
+      purpose,
+    });
+    if (result.flagged) {
+      throw new LessonContentModerationError(result.flaggedCategories);
+    }
   }
 
   private async startRun(request: Parameters<StructuredModel["start"]>[0]) {
@@ -784,6 +888,7 @@ export class LessonProductionService {
         event: "lesson_generation.background_block_failed",
         lessonId: run.lessonId,
         phase,
+        ...rejectionMetadata(error),
         ...errorMetadata(error),
       },
       "Background Lesson block generation failed",
@@ -823,6 +928,7 @@ function lessonGenerationErrorCategory(
     return "validation";
   if (error instanceof Error && error.name === "ZodError") return "validation";
   if (error instanceof LessonSemanticValidationError) return "validation";
+  if (error instanceof LessonContentModerationError) return "moderation";
   if (
     error instanceof Error &&
     (error.message.startsWith("openai_") ||
@@ -831,6 +937,22 @@ function lessonGenerationErrorCategory(
     return "provider";
   }
   return "generation";
+}
+
+function rejectionMetadata(error: unknown): {
+  flaggedCategories?: string[];
+  rejectionReason?: string;
+} {
+  if (error instanceof LessonSemanticValidationError) {
+    return { rejectionReason: error.reason };
+  }
+  if (error instanceof LessonContentModerationError) {
+    return {
+      flaggedCategories: error.flaggedCategories,
+      rejectionReason: error.reason,
+    };
+  }
+  return {};
 }
 
 function parseCompletedRun<T>(
@@ -867,6 +989,14 @@ function planPrompt(context: FirstLessonContext): string {
     learnerAgeRange: context.learnerAgeRange,
     competencyProfile: context.competencyProfile ?? [],
     internalDifficultyCeiling: "A1",
+    approvalRequirements: [
+      "Copy every requiredAlignment field exactly.",
+      "Use only confirmed profile topics and copy declared topics exactly.",
+      "Assign every selected Lesson emphasis to at least one block.",
+      "Use unique non-empty block objectives.",
+      "Keep the learner-facing scenario aligned with the primary Goal.",
+      "Keep all content neutral, age-appropriate, and suitable for language learning.",
+    ],
   });
 }
 
@@ -882,6 +1012,14 @@ function blockPrompt(
     plan,
     objective,
     internalDifficultyCeiling: "A1",
+    approvalRequirements: [
+      "Match the supplied block title and objective exactly.",
+      "Teach the supplied objective coherently.",
+      "Use only the target and instruction languages in their required fields.",
+      "Implement the planned emphasis with a supported activity type.",
+      "Keep practice volume proportional to the examples.",
+      "Keep all content neutral, age-appropriate, and suitable for language learning.",
+    ],
   });
 }
 
@@ -895,6 +1033,7 @@ function blockRequest(
     workload: "lesson_block",
     instructions: lessonBlockInstructions,
     input: blockPrompt(context, plan, objective),
+    promptVersion: lessonPromptVersion,
   };
 }
 
@@ -908,6 +1047,7 @@ function planRequest(
     workload: "lesson_plan",
     instructions: lessonPlanInstructions,
     input: planPrompt(context),
+    promptVersion: lessonPromptVersion,
   };
 }
 
@@ -926,7 +1066,49 @@ function failedRun(
     ...run,
     status: "failed",
     errorCode: errorCodeFor(error, "lesson_block_generation_failed"),
+    rejectionReason: rejectionMetadata(error).rejectionReason,
   };
+}
+
+function withRejectionFeedback<T>(
+  request: StructuredModelRequest<T>,
+  error: unknown,
+): StructuredModelRequest<T> {
+  const reason = rejectionMetadata(error).rejectionReason;
+  if (!reason) return request;
+  const input = JSON.parse(request.input) as Record<string, unknown>;
+  return {
+    ...request,
+    input: JSON.stringify({
+      ...input,
+      previousAttemptRejection: {
+        correction: correctionFor(reason),
+        reason,
+      },
+    }),
+  };
+}
+
+function correctionFor(reason: string): string {
+  const corrections: Record<string, string> = {
+    curricular_alignment:
+      "Keep the exact priority competency metadata and make every block serve the supplied objective.",
+    emphasis_alignment:
+      "Use only the selected emphases and assign every selected emphasis to at least one block.",
+    goal_alignment:
+      "Keep the exact primary Goal metadata and make the lesson scenario support that Goal.",
+    language_alignment:
+      "Use only the supplied target and instruction languages in their required fields.",
+    practice_volume:
+      "Keep practice volume proportional to the examples and within the contract limits.",
+    profile_alignment:
+      "Use only confirmed profile topics and copy every declared topic exactly from the supplied list.",
+    unsafe_content:
+      "Replace the flagged scenario with neutral, age-appropriate language-learning content.",
+    unsupported_content:
+      "Remove links, markup, media, speaking tasks, and learner-facing CEFR claims.",
+  };
+  return corrections[reason] ?? "Correct the rejected output before retrying.";
 }
 
 function errorCodeFor(error: unknown, fallback: string): string {

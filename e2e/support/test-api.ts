@@ -836,6 +836,17 @@ app.post(
       },
     };
     const service = new LessonProductionService({
+      moderator: {
+        async moderate(input) {
+          const flagged = input.content.includes("discriminatory insults");
+          return {
+            flagged,
+            flaggedCategories: flagged ? ["hate"] : [],
+            model: "e2e-moderator",
+            reference: "modr-e2e",
+          };
+        },
+      },
       repository,
       model: {
         async start(request) {

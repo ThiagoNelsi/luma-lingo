@@ -16,6 +16,8 @@ export const structuredModelRunSchema = z
     reference: z.string(),
     output: z.string().optional(),
     errorCode: z.string().optional(),
+    promptVersion: z.string().optional(),
+    rejectionReason: z.string().optional(),
     usage: z
       .object({
         inputTokens: z.number().int().nonnegative().optional(),
@@ -48,6 +50,7 @@ export interface StructuredModelRequest<T> {
   contract: StructuredOutputContract<T>;
   instructions: string;
   input: string;
+  promptVersion?: string;
   workload: "lesson_plan" | "lesson_block";
 }
 
@@ -65,6 +68,8 @@ export interface StructuredModel {
     reference: string,
     correlation?: StructuredModelRequest<unknown>["correlation"],
     workload?: StructuredModelRequest<unknown>["workload"],
-    pinned?: Pick<StructuredModelRun, "adapter" | "model">,
+    pinned?: Pick<StructuredModelRun, "adapter" | "model"> & {
+      promptVersion?: string;
+    },
   ): Promise<StructuredModelRun>;
 }

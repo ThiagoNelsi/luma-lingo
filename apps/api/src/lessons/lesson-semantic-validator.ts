@@ -35,7 +35,6 @@ export type LessonSemanticRejectionReason =
   | "language_alignment"
   | "practice_volume"
   | "profile_alignment"
-  | "unsafe_content"
   | "unsupported_content";
 
 export class LessonSemanticValidationError extends Error {
@@ -51,7 +50,7 @@ export function validateLessonPlanSemantics(
   plan: LessonPlan,
   context: LessonValidationContext,
 ): void {
-  rejectUnsafeOrUnsupported(plan, context.learnerAgeRange);
+  rejectUnsupported(plan);
   const alignment = plan.alignment;
   if (
     !alignment ||
@@ -106,20 +105,9 @@ export function validateLessonPlanSemantics(
   const confirmedTopics = new Set(context.profileTopics ?? []);
   if (
     alignment.profileTopics.some((topic) => !confirmedTopics.has(topic)) ||
-    new Set(alignment.profileTopics).size !== alignment.profileTopics.length ||
-    alignment.profileTopics.some(
-      (topic) => !hasConceptOverlap(visibleContent, conceptTerms(topic)),
-    )
+    new Set(alignment.profileTopics).size !== alignment.profileTopics.length
   ) {
     reject("profile_alignment");
-  }
-  if (
-    !hasConceptOverlap(
-      visibleContent,
-      conceptTerms(context.priorityCompetencyKey),
-    )
-  ) {
-    reject("curricular_alignment");
   }
   const objectives = plan.blocks.map((block) => normalize(block.objective));
   if (
@@ -136,7 +124,7 @@ export function validateLessonBlockSemantics(
   expectedObjective: string,
   context: LessonValidationContext,
 ): void {
-  rejectUnsafeOrUnsupported(block, context.learnerAgeRange);
+  rejectUnsupported(block);
   const planned = plan.blocks.find(
     (candidate) => candidate.objective === expectedObjective,
   );
@@ -198,39 +186,8 @@ export function validateLessonBlockSemantics(
   }
 }
 
-function rejectUnsafeOrUnsupported(
-  value: LessonPlan | LessonBlock,
-  learnerAgeRange: string | null | undefined,
-): void {
+function rejectUnsupported(value: LessonPlan | LessonBlock): void {
   const content = lessonContentText(value).toLocaleLowerCase("en");
-  const searchable = normalizeSearch(content);
-  const unsafePatterns = [
-    /\b(?:sexual|porn(?:ography|ographic)?|explicit sex|sexual abuse)\b/,
-    /\b(?:sexo explicito|pornografia|abuso sexual)\b/,
-    /\b(?:pornographie|abus sexuel)\b/,
-    /\b(?:pornografie|sexueller missbrauch)\b/,
-    /\b(?:violent|violence|murder|kill|knife attack|gun|shoot|torture|assault)\b/,
-    /\b(?:violencia|assassinato|asesinato|matar|arma|tortura|agressao)\b/,
-    /\b(?:meurtre|tuer|arme|torture|agression)\b/,
-    /\b(?:gewalt|mord|toten|waffe|folter|angriff)\b/,
-    /\b(?:racist|racism|discriminat(?:e|ion|ory)|hate speech|racial slur)\b/,
-    /\b(?:racista|racismo|discriminacao|discriminacion|discurso de odio)\b/,
-    /\b(?:raciste|racisme|discriminatoire|discours de haine)\b/,
-    /\b(?:rassistisch|rassismus|diskriminierung|hassrede)\b/,
-    /\b(?:suicide|self harm|self-harm)\b/,
-    /\b(?:suicidio|automutilacao|autolesion)\b/,
-    /\b(?:Selbstmord|Selbstverletzung)\b/i,
-    /(?:暴力|谋杀|殺人|杀死|槍|枪|色情|自杀|自殺|歧视|歧視|种族主义|種族主義)/,
-  ];
-  if (
-    unsafePatterns.some((pattern) => pattern.test(searchable)) ||
-    (learnerAgeRange === "under_13" &&
-      /\b(?:alcohol|gambling|drug use|alcool|jogo de azar|drogas|apuestas|drogues)\b/.test(
-        searchable,
-      ))
-  ) {
-    reject("unsafe_content");
-  }
   if (
     /https?:\/\//.test(content) ||
     /<\/?[a-z][^>]*>/.test(content) ||

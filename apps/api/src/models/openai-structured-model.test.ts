@@ -256,6 +256,7 @@ describe("OpenAiStructuredModel", () => {
     await model.start({
       correlation: { attempt: 2, lessonId: "lesson-1" },
       workload: "lesson_block",
+      promptVersion: "v2",
       instructions: "sensitive instructions",
       input: "sensitive profile data",
       contract: {
@@ -275,6 +276,7 @@ describe("OpenAiStructuredModel", () => {
         model: "gpt-5.6-terra",
         outputTokens: 45,
         provider: "openai",
+        promptVersion: "v2",
         purpose: "lesson_block",
       }),
       "OpenAI structured-output operation completed",

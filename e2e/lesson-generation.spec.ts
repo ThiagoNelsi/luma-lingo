@@ -41,7 +41,7 @@ test("unsafe generated Lesson content is rejected twice without being published"
 
   expect(response.ok()).toBe(true);
   await expect(response.json()).resolves.toEqual({
-    failureCode: "lesson_semantic_rejected",
+    failureCode: "lesson_content_moderation_rejected",
     published: false,
     retryCount: 1,
   });

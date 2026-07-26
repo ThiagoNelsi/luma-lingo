@@ -108,18 +108,18 @@ model Learner {
 }
 
 model ProfileIntroduction {
-  id           String                    @id @db.Uuid
-  learnerId    String                    @unique @map("learner_id") @db.Uuid
-  status       ProfileIntroductionStatus @default(not_started)
-  attempts     Int                       @default(0)
-  errorCode    String?                   @map("error_code")
-  jobOrField   String?                   @map("job_or_field")
-  interests    String[]                  @default([])
-  other        String[]                  @default([])
-  confirmedAt  DateTime?                 @map("confirmed_at") @db.Timestamptz(6)
-  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learner      Learner                   @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  id          String                    @id @db.Uuid
+  learnerId   String                    @unique @map("learner_id") @db.Uuid
+  status      ProfileIntroductionStatus @default(not_started)
+  attempts    Int                       @default(0)
+  errorCode   String?                   @map("error_code")
+  jobOrField  String?                   @map("job_or_field")
+  interests   String[]                  @default([])
+  other       String[]                  @default([])
+  confirmedAt DateTime?                 @map("confirmed_at") @db.Timestamptz(6)
+  createdAt   DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learner     Learner                   @relation(fields: [learnerId], references: [id], onDelete: Cascade)
 
   @@map("profile_introductions")
 }
@@ -157,19 +157,19 @@ model LearningTrack {
 }
 
 model CompetencyCatalog {
-  id                 String              @id @db.Uuid
-  targetLanguage     String              @map("target_language")
-  version            String
-  status             String              @default("draft")
-  publishedAt        DateTime?           @map("published_at") @db.Timestamptz(6)
-  sourceChecksum     String?             @map("source_checksum")
-  metadata           Json                @default("{}")
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learningTracks     LearningTrack[]
-  competencies       Competency[]
-  diagnosticItems    DiagnosticItem[]
-  diagnosticAttempts DiagnosticAttempt[]
+  id                  String              @id @db.Uuid
+  targetLanguage      String              @map("target_language")
+  version             String
+  status              String              @default("draft")
+  publishedAt         DateTime?           @map("published_at") @db.Timestamptz(6)
+  sourceChecksum      String?             @map("source_checksum")
+  metadata            Json                @default("{}")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTracks      LearningTrack[]
+  competencies        Competency[]
+  diagnosticItems     DiagnosticItem[]
+  diagnosticAttempts  DiagnosticAttempt[]
   pedagogicalPolicies PedagogicalPolicy[]
 
   @@unique([targetLanguage, version])
@@ -178,28 +178,28 @@ model CompetencyCatalog {
 }
 
 model Competency {
-  id                       String                   @id @db.Uuid
-  catalogId                String                   @map("catalog_id") @db.Uuid
+  id                       String                            @id @db.Uuid
+  catalogId                String                            @map("catalog_id") @db.Uuid
   key                      String
   title                    String
   description              String?
   family                   String
-  difficultyBand           String?                  @map("difficulty_band")
-  taxonomyId               String                   @map("taxonomy_id")
-  estimatedDifficultyScore Float?                   @map("estimated_difficulty_score")
-  status                   String                   @default("draft")
-  details                  Json                     @default("{}")
-  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  catalog                  CompetencyCatalog        @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  difficultyBand           String?                           @map("difficulty_band")
+  taxonomyId               String                            @map("taxonomy_id")
+  estimatedDifficultyScore Float?                            @map("estimated_difficulty_score")
+  status                   String                            @default("draft")
+  details                  Json                              @default("{}")
+  createdAt                DateTime                          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog                  CompetencyCatalog                 @relation(fields: [catalogId], references: [id], onDelete: Cascade)
   conceptRelationships     CompetencyConcept[]
-  primaryDiagnosticItems   DiagnosticItem[]         @relation("PrimaryDiagnosticCompetency")
+  primaryDiagnosticItems   DiagnosticItem[]                  @relation("PrimaryDiagnosticCompetency")
   learnerStates            LearnerCompetencyState[]
   evidence                 CompetencyEvidence[]
   pedagogicalWeights       PedagogicalCompetencyWeight[]
   pedagogicalGoalWeights   PedagogicalCompetencyGoalWeight[]
   objectiveModules         LearningModule[]
-  initialLessons           Lesson[]                 @relation("InitialLessonPriorityCompetency")
+  initialLessons           Lesson[]                          @relation("InitialLessonPriorityCompetency")
 
   @@unique([catalogId, key])
   @@index([catalogId, family])
@@ -227,7 +227,7 @@ model Concept {
   diagnosticEvidenceMappings DiagnosticItemConceptEvidenceMapping[]
   learnerStates              LearnerConceptState[]
   evidence                   ConceptEvidence[]
-  pedagogicalGoalWeights    PedagogicalConceptGoalWeight[]
+  pedagogicalGoalWeights     PedagogicalConceptGoalWeight[]
 
   @@unique([targetLanguage, key])
   @@index([targetLanguage, status])
@@ -252,18 +252,18 @@ model CompetencyConcept {
 }
 
 model PedagogicalPolicy {
-  id                     String                              @id @db.Uuid
-  catalogId              String                              @map("catalog_id") @db.Uuid
-  sourcePolicyId         String                              @map("source_policy_id")
-  version                String
-  sourceChecksum         String                              @map("source_checksum")
-  metadata               Json                                @default("{}")
-  createdAt              DateTime                            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime                            @updatedAt @map("updated_at") @db.Timestamptz(6)
-  catalog                CompetencyCatalog                   @relation(fields: [catalogId], references: [id], onDelete: Cascade)
-  competencyWeights      PedagogicalCompetencyWeight[]
-  competencyGoalWeights  PedagogicalCompetencyGoalWeight[]
-  conceptGoalWeights     PedagogicalConceptGoalWeight[]
+  id                    String                            @id @db.Uuid
+  catalogId             String                            @map("catalog_id") @db.Uuid
+  sourcePolicyId        String                            @map("source_policy_id")
+  version               String
+  sourceChecksum        String                            @map("source_checksum")
+  metadata              Json                              @default("{}")
+  createdAt             DateTime                          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  catalog               CompetencyCatalog                 @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  competencyWeights     PedagogicalCompetencyWeight[]
+  competencyGoalWeights PedagogicalCompetencyGoalWeight[]
+  conceptGoalWeights    PedagogicalConceptGoalWeight[]
 
   @@unique([catalogId, version])
   @@index([catalogId])
@@ -488,15 +488,15 @@ model ConceptEvidence {
 }
 
 model LearningModule {
-  id                     String        @id @db.Uuid
-  learningTrackId        String        @map("learning_track_id") @db.Uuid
-  objectiveCompetencyId  String        @map("objective_competency_id") @db.Uuid
-  title                  String
-  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learningTrack          LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
-  objectiveCompetency    Competency    @relation(fields: [objectiveCompetencyId], references: [id], onDelete: Restrict)
-  lessons                Lesson[]
+  id                    String        @id @db.Uuid
+  learningTrackId       String        @map("learning_track_id") @db.Uuid
+  objectiveCompetencyId String        @map("objective_competency_id") @db.Uuid
+  title                 String
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack         LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  objectiveCompetency   Competency    @relation(fields: [objectiveCompetencyId], references: [id], onDelete: Restrict)
+  lessons               Lesson[]
 
   @@unique([learningTrackId, objectiveCompetencyId])
   @@index([objectiveCompetencyId])
@@ -504,28 +504,28 @@ model LearningModule {
 }
 
 model Lesson {
-  id                        String        @id @db.Uuid
-  learningTrackId           String        @map("learning_track_id") @db.Uuid
-  moduleId                  String        @map("module_id") @db.Uuid
-  priorityCompetencyId      String        @map("priority_competency_id") @db.Uuid
-  status                    LessonStatus  @default(preparing)
-  plan                      Json?
-  planAdapter               String?       @map("plan_adapter")
-  planModel                 String?       @map("plan_model")
-  planPromptVersion         String?       @map("plan_prompt_version")
-  planContractVersion       String?       @map("plan_contract_version")
-  blockAdapter              String?       @map("block_adapter")
-  blockModel                String?       @map("block_model")
-  blockPromptVersion        String?       @map("block_prompt_version")
-  blockContractVersion      String?       @map("block_contract_version")
-  failureCode               String?       @map("failure_code")
-  createdAt                 DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                 DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learningTrack             LearningTrack @relation("InitialLessonLearningTrack", fields: [learningTrackId], references: [id], onDelete: Cascade)
-  module                    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  priorityCompetency        Competency    @relation("InitialLessonPriorityCompetency", fields: [priorityCompetencyId], references: [id], onDelete: Restrict)
-  blocks                    LessonBlock[]
-  structuredModelRuns       StructuredModelRun[]
+  id                   String               @id @db.Uuid
+  learningTrackId      String               @map("learning_track_id") @db.Uuid
+  moduleId             String               @map("module_id") @db.Uuid
+  priorityCompetencyId String               @map("priority_competency_id") @db.Uuid
+  status               LessonStatus         @default(preparing)
+  plan                 Json?
+  planAdapter          String?              @map("plan_adapter")
+  planModel            String?              @map("plan_model")
+  planPromptVersion    String?              @map("plan_prompt_version")
+  planContractVersion  String?              @map("plan_contract_version")
+  blockAdapter         String?              @map("block_adapter")
+  blockModel           String?              @map("block_model")
+  blockPromptVersion   String?              @map("block_prompt_version")
+  blockContractVersion String?              @map("block_contract_version")
+  failureCode          String?              @map("failure_code")
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack        LearningTrack        @relation("InitialLessonLearningTrack", fields: [learningTrackId], references: [id], onDelete: Cascade)
+  module               LearningModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  priorityCompetency   Competency           @relation("InitialLessonPriorityCompetency", fields: [priorityCompetencyId], references: [id], onDelete: Restrict)
+  blocks               LessonBlock[]
+  structuredModelRuns  StructuredModelRun[]
 
   @@unique([learningTrackId, priorityCompetencyId])
   @@index([moduleId])
@@ -534,36 +534,37 @@ model Lesson {
 }
 
 model LessonBlock {
-  id          String   @id @db.Uuid
-  lessonId    String   @map("lesson_id") @db.Uuid
-  position    Int
-  content     Json
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id        String   @id @db.Uuid
+  lessonId  String   @map("lesson_id") @db.Uuid
+  position  Int
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, position])
   @@map("lesson_blocks")
 }
 
 model StructuredModelRun {
-  id                 String                  @id @db.Uuid
-  lessonId           String                  @map("lesson_id") @db.Uuid
-  step               String
-  adapter            String
-  model              String
-  status             StructuredModelRunStatus @default(pending)
-  attempt            Int                     @default(1)
-  promptVersion      String                  @map("prompt_version")
-  contractVersion    String                  @map("contract_version")
-  providerReference  String?                 @map("provider_reference")
-  inputTokens        Int?                    @map("input_tokens")
-  outputTokens       Int?                    @map("output_tokens")
-  latencyMs          Int?                    @map("latency_ms")
-  errorCode          String?                 @map("error_code")
-  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
-  lesson             Lesson                  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id                String                   @id @db.Uuid
+  lessonId          String                   @map("lesson_id") @db.Uuid
+  step              String
+  adapter           String
+  model             String
+  status            StructuredModelRunStatus @default(pending)
+  attempt           Int                      @default(1)
+  promptVersion     String                   @map("prompt_version")
+  contractVersion   String                   @map("contract_version")
+  providerReference String?                  @map("provider_reference")
+  inputTokens       Int?                     @map("input_tokens")
+  outputTokens      Int?                     @map("output_tokens")
+  latencyMs         Int?                     @map("latency_ms")
+  errorCode         String?                  @map("error_code")
+  rejectionReason   String?                  @map("rejection_reason") @db.VarChar(120)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lesson            Lesson                   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, step, attempt])
   @@index([status])
