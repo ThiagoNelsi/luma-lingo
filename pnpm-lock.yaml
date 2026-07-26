@@ -83,6 +83,9 @@ importers:
       "@types/pg":
         specifier: latest
         version: 8.20.0
+      dotenv-cli:
+        specifier: latest
+        version: 11.0.0
       tsx:
         specifier: latest
         version: 4.22.4

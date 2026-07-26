@@ -1,0 +1,60 @@
+name: Integration
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lesson-flow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set branch expiration
+        run: echo "NEON_BRANCH_EXPIRES_AT=$(date -u --date '+1 day' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
+      - name: Create isolated Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: integration-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_type: schema-only
+          database: luma_lingo
+          expires_at: ${{ env.NEON_BRANCH_EXPIRES_AT }}
+          parent_branch: production
+          prisma: true
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          role: neondb_owner
+          suspend_timeout: 60
+
+      - name: Rebuild the disposable schema from migrations
+        env:
+          DATABASE_MIGRATION_URL: ${{ steps.neon.outputs.db_url }}
+          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+        run: pnpm --filter @luma-lingo/database db:migrate:reset:test
+
+      - name: Run integration tests
+        env:
+          ALLOW_INTEGRATION_DATABASE: "1"
+          TEST_DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+        run: pnpm test:integration

@@ -13,6 +13,8 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "check": "DATABASE_URL=${DATABASE_URL:-postgresql://user:password@localhost:5432/luma_lingo} DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-postgresql://user:password@localhost:5432/luma_lingo} prisma validate && tsc --noEmit",
     "db:generate": "prisma generate",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:reset:test": "prisma migrate reset --force --skip-seed",
     "db:import:concepts": "dotenv -e ../../.env -- tsx scripts/import-concept-registry.ts",
     "db:import:competencies": "dotenv -e ../../.env -- tsx scripts/import-competency-catalog.ts",
     "db:import:policy": "dotenv -e ../../.env -- tsx scripts/import-pedagogical-policy.ts",
