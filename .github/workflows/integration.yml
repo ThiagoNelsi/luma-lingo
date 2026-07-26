@@ -41,10 +41,9 @@ jobs:
         with:
           api_key: ${{ secrets.NEON_API_KEY }}
           branch_name: integration-${{ github.run_id }}-${{ github.run_attempt }}
-          branch_type: schema-only
           database: luma_lingo
           expires_at: ${{ env.NEON_BRANCH_EXPIRES_AT }}
-          parent_branch: production
+          parent_branch: integration-ci
           prisma: true
           project_id: ${{ vars.NEON_PROJECT_ID }}
           role: neondb_owner
