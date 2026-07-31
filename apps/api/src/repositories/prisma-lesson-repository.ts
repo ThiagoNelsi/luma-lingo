@@ -187,6 +187,7 @@ export class PrismaLessonRepository implements LessonRepository {
                 id: createId(),
                 learningTrackId: input.learningTrackId,
                 objectiveCompetencyId: input.priorityCompetencyId,
+                objectiveSelectionTrace: input.prioritySelectionTrace,
                 title: input.priorityCompetencyKey,
               },
               update: {},

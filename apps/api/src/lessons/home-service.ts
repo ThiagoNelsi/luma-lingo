@@ -102,6 +102,7 @@ export class HomeService {
       learningTrackId: context.learningTrack.id,
       priorityCompetencyId: priority.competencyId,
       priorityCompetencyKey: priority.competencyKey,
+      prioritySelectionTrace: priority,
     });
     if (!reserved.created) return toHomeResult(reserved.lesson);
 

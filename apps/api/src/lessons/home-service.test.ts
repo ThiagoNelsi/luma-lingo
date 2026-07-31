@@ -14,6 +14,16 @@ describe("HomeService", () => {
       block: null;
     } | null = null;
     let productionCalls = 0;
+    const reserveFirstLesson = vi.fn(async () => {
+      const production = {
+        moduleId: "module-1",
+        learningTrackId: "track-1",
+        priorityCompetencyId: "competency-1",
+      };
+      if (lesson) return { lesson, created: false, production };
+      lesson = { id: "lesson-1", status: "preparing", block: null };
+      return { lesson, created: true, production };
+    });
     const repository: LessonRepository = {
       async findHomeLesson() {
         return lesson;
@@ -21,16 +31,7 @@ describe("HomeService", () => {
       async findLessonProgress() {
         return null;
       },
-      async reserveFirstLesson() {
-        const production = {
-          moduleId: "module-1",
-          learningTrackId: "track-1",
-          priorityCompetencyId: "competency-1",
-        };
-        if (lesson) return { lesson, created: false, production };
-        lesson = { id: "lesson-1", status: "preparing", block: null };
-        return { lesson, created: true, production };
-      },
+      reserveFirstLesson,
       async publishFirstBlock() {
         throw new Error("unused");
       },
@@ -109,6 +110,26 @@ describe("HomeService", () => {
     expect(first).toEqual({ status: "preparing", lessonId: "lesson-1" });
     expect(second).toEqual({ status: "preparing", lessonId: "lesson-1" });
     expect(productionCalls).toBe(1);
+    expect(reserveFirstLesson).toHaveBeenCalledWith({
+      learnerId: "learner-1",
+      learningTrackId: "track-1",
+      priorityCompetencyId: "competency-1",
+      priorityCompetencyKey: "introduce-yourself",
+      prioritySelectionTrace: {
+        competencyId: "competency-1",
+        competencyKey: "introduce-yourself",
+        score: 1,
+        readiness: 1,
+        foundationWeight: 100,
+        basePriority: 100,
+        goalFit: 100,
+        knowledgeGap: 1,
+        uncertainty: 1,
+        reviewNeed: 0,
+        recentRepetition: 0,
+        selectionReason: "beginner_a1_fallback",
+      },
+    });
   });
 
   it("keeps failed Home reads side-effect free and retries only after an explicit request", async () => {

@@ -3,7 +3,69 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppLogger } from "../observability/logger.js";
 import { PrismaLessonRepository } from "./prisma-lesson-repository.js";
 
+const prioritySelectionTrace = {
+  competencyId: "competency-1",
+  competencyKey: "situational.greetings",
+  score: 142,
+  readiness: 1,
+  foundationWeight: 100,
+  basePriority: 80,
+  goalFit: 90,
+  knowledgeGap: 1,
+  uncertainty: 1,
+  reviewNeed: 0,
+  recentRepetition: 0,
+  selectionReason: "beginner_pre_a1_foundation" as const,
+};
+
 describe("PrismaLessonRepository", () => {
+  it("stores the immutable priority decision with the module objective", async () => {
+    const learningModule = {
+      upsert: vi.fn(async () => ({ id: "module-1" })),
+    };
+    const lesson = {
+      create: vi.fn(async () => ({
+        id: "lesson-1",
+        learningTrackId: "track-1",
+        moduleId: "module-1",
+        priorityCompetencyId: "competency-1",
+        status: "preparing" as const,
+      })),
+      findUnique: vi.fn(async () => null),
+    };
+    const repository = new PrismaLessonRepository({
+      lesson,
+      async $transaction(task: (tx: unknown) => Promise<unknown>) {
+        return task({ learningModule, lesson });
+      },
+    } as never);
+
+    await repository.reserveFirstLesson({
+      learnerId: "learner-1",
+      learningTrackId: "track-1",
+      priorityCompetencyId: "competency-1",
+      priorityCompetencyKey: "situational.greetings",
+      prioritySelectionTrace,
+    });
+
+    expect(learningModule.upsert).toHaveBeenCalledWith({
+      where: {
+        learningTrackId_objectiveCompetencyId: {
+          learningTrackId: "track-1",
+          objectiveCompetencyId: "competency-1",
+        },
+      },
+      create: {
+        id: expect.any(String),
+        learningTrackId: "track-1",
+        objectiveCompetencyId: "competency-1",
+        objectiveSelectionTrace: prioritySelectionTrace,
+        title: "situational.greetings",
+      },
+      update: {},
+    });
+  });
+
   it("returns the concurrently reserved Lesson after a unique constraint aborts its transaction", async () => {
     const concurrentLesson = {
       id: "lesson-1",
@@ -28,6 +90,7 @@ describe("PrismaLessonRepository", () => {
         learningTrackId: "track-1",
         priorityCompetencyId: "competency-1",
         priorityCompetencyKey: "situational.greetings",
+        prioritySelectionTrace: prioritySelectionTrace,
       }),
     ).resolves.toEqual({
       created: false,

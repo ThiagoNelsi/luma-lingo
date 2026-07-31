@@ -13,6 +13,7 @@ import {
   lessonValidationContextSchema,
   type LessonValidationContext,
 } from "./lesson-semantic-validator.js";
+import type { InitialLearningPriority } from "../learning/initial-learning-priority.js";
 
 export interface HomeLesson {
   id: string;
@@ -40,6 +41,7 @@ export interface FirstLessonReservation {
   learningTrackId: string;
   priorityCompetencyId: string;
   priorityCompetencyKey: string;
+  prioritySelectionTrace: InitialLearningPriority;
 }
 
 export const persistedRunSchema = z

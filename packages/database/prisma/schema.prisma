@@ -488,15 +488,16 @@ model ConceptEvidence {
 }
 
 model LearningModule {
-  id                    String        @id @db.Uuid
-  learningTrackId       String        @map("learning_track_id") @db.Uuid
-  objectiveCompetencyId String        @map("objective_competency_id") @db.Uuid
-  title                 String
-  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  learningTrack         LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
-  objectiveCompetency   Competency    @relation(fields: [objectiveCompetencyId], references: [id], onDelete: Restrict)
-  lessons               Lesson[]
+  id                      String        @id @db.Uuid
+  learningTrackId         String        @map("learning_track_id") @db.Uuid
+  objectiveCompetencyId   String        @map("objective_competency_id") @db.Uuid
+  objectiveSelectionTrace Json          @default("{}") @map("objective_selection_trace")
+  title                   String
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  learningTrack           LearningTrack @relation(fields: [learningTrackId], references: [id], onDelete: Cascade)
+  objectiveCompetency     Competency    @relation(fields: [objectiveCompetencyId], references: [id], onDelete: Restrict)
+  lessons                 Lesson[]
 
   @@unique([learningTrackId, objectiveCompetencyId])
   @@index([objectiveCompetencyId])
